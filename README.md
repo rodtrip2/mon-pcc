@@ -10,10 +10,11 @@ un·e professionnel·le qui l’accompagne et, si elle le souhaite, ses proches.
 ## Fonctionnalités
 
 - **Trame officielle** : les 14 étapes suivent, dans l’ordre, les questions du support PCC version adulte (V6, 2026).
-- **Rédaction guidée** : pour chaque question, un conseil de rédaction et des **suggestions à cocher** (touchez pour ajouter, touchez à nouveau pour retirer), complétées par une saisie libre « avec mes mots ».
+- **Rédaction guidée sans induire les réponses** : pour chaque question, un conseil de rédaction et une saisie libre « avec mes mots » en premier. Des **exemples à cocher** n’apparaissent qu’en touchant le bouton « Exemples ».
 - **Priorités** : stratégies et personnes ressources se classent par ordre de priorité (moi-même → entourage → professionnel·les → services de garde), comme le demande le PCC.
 - **Cohérence** : rappel si des soins à éviter sont indiqués sans alternative (champ indispensable selon le PCC).
 - **Démarche respectée** : remplir d’abord seul·e à la première personne, puis décision partagée, signature, diffusion, relecture au moins tous les 6 mois (rappel de date).
+- **Signature sur l’écran** : la personne et chaque partenaire peuvent signer au doigt sur le smartphone (ou à la main sur la version imprimée). Alerte si le plan est modifié après les signatures.
 - **Partage au choix de la personne** : impression / PDF avec cadres de signature, envoi d’un document lisible partout (HTML autonome), ou envoi en texte via le menu de partage du téléphone.
 - **Hors connexion** une fois installée.
 - **Accessibilité** : grandes zones tactiles, mode sombre, navigation clavier, lecteurs d’écran.

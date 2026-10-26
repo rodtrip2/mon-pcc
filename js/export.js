@@ -42,7 +42,7 @@ export function stepContent(step, data) {
     if (filled(ld)) lines.push(ld);
     if (lines.length) out.push({ lines });
     const sig = (f.signataires || []).filter(recFilled);
-    if (sig.length) out.push({ label: 'Rôles & signatures', lines: sig.map((r) => [r.nom, r.role].filter(filled).join(' — ')), signatures: true });
+    if (sig.length) out.push({ label: 'Rôles & signatures', lines: sig.map((r) => [r.nom, r.role].filter(filled).join(' — ') + (r.sig ? ' (signé le ' + fmtDate(r.signedAt) + ')' : '')), signers: sig, signatures: true });
     return out;
   }
   const groups = step.groups || [{ id: null }];
@@ -90,7 +90,12 @@ export function documentHTML(plan) {
     for (const block of content) {
       if (block.label) h += `<h3>${esc(block.label)}</h3>`;
       if (block.signatures) {
-        h += '<div class="doc-sign">' + block.lines.map((l) => `<div class="doc-sign-box"><span>${esc(l)}</span><span class="doc-sign-line">Signature</span></div>`).join('') + '</div>';
+        h += '<div class="doc-sign">' + block.signers.map((r) => {
+          const who = [r.nom, r.role].filter(filled).join(' — ');
+          const img = r.sig && r.sig.startsWith('data:image/png;base64,') ? `<img class="doc-sign-img" src="${r.sig}" alt="Signature">` : '';
+          const line = r.sig ? `Signé sur écran le ${esc(fmtDate(r.signedAt))}` : 'Signature';
+          return `<div class="doc-sign-box${img ? ' signed' : ''}"><span>${esc(who)}</span>${img}<span class="doc-sign-line">${line}</span></div>`;
+        }).join('') + '</div>';
       } else if (step.type === 'final') {
         h += block.lines.map((l) => `<p>${esc(l)}</p>`).join('');
       } else {
@@ -144,6 +149,8 @@ export const DOC_CSS = `
 .doc-sign{display:grid;grid-template-columns:repeat(auto-fit,minmax(200px,1fr));gap:.75rem;margin-top:.5rem}
 .doc-sign-box{border:1px solid #bcc;border-radius:6px;padding:.5rem .6rem 2.6rem;display:flex;flex-direction:column;gap:.2rem;position:relative}
 .doc-sign-line{position:absolute;bottom:.4rem;left:.6rem;right:.6rem;border-top:1px dashed #9aa;font-size:.7rem;color:#899;padding-top:.15rem}
+.doc-sign-box.signed{padding-bottom:1.6rem}
+.doc-sign-img{display:block;max-width:100%;max-height:90px;margin:.2rem 0}
 .doc-foot{border-top:1px solid #cdd;margin-top:1.5rem;padding-top:.5rem;font-size:.72rem;color:#677}
 `;
 

@@ -198,6 +198,23 @@ input:focus, textarea:focus { border-color: var(--brand); outline: none; box-sha
 .menu-link.strong { font-weight: 700; color: var(--brand-ink); }
 #menu-steps { margin: .4rem 0; padding-left: .3rem; font-size: .95rem; }
 
+/* Exemples */
+.sugg { margin-top: .6rem; }
+.ex-btn { margin-bottom: .5rem; }
+.ex-btn[aria-expanded="true"] { border-color: var(--brand); color: var(--brand-ink); }
+
+/* Signature */
+.sig-area { display: flex; flex-direction: column; gap: .3rem; align-items: flex-start; }
+.sig-img { background: #fff; border: 1px solid var(--line); border-radius: 8px; max-width: 100%; max-height: 110px; }
+.sig-tools { display: flex; gap: .4rem; flex-wrap: wrap; }
+.sigpad { width: min(720px, 96vw); max-height: 96vh; }
+.sig-inner { padding: 1rem; }
+.sig-who { font-weight: 700; margin: 0; }
+.sig-canvas-wrap { position: relative; margin-top: .5rem; }
+.sig-canvas-wrap canvas { display: block; width: 100%; height: min(260px, 45vh); background: #fff; border: 2px solid var(--line); border-radius: 12px; touch-action: none; cursor: crosshair; }
+.sig-base { position: absolute; left: 14px; right: 14px; bottom: 30%; border-bottom: 1px dashed #bcc; color: #9aa; font-size: .9rem; line-height: 1.4; pointer-events: none; }
+@media (orientation: landscape) and (max-height: 500px) { .sig-canvas-wrap canvas { height: 55vh; } .sig-inner { padding: .6rem; } }
+
 /* Pied de page, toast, modale */
 .footer { font-size: .78rem; color: var(--muted); text-align: center; padding: 1rem 1rem calc(1.2rem + env(safe-area-inset-bottom)); border-top: 1px solid var(--line); }
 .footer p { margin: .2rem auto; max-width: 60ch; }
@@ -223,6 +240,8 @@ input:focus, textarea:focus { border-color: var(--brand); outline: none; box-sha
 .doc-sign { display: grid; grid-template-columns: repeat(auto-fit, minmax(200px, 1fr)); gap: .75rem; margin-top: .5rem; }
 .doc-sign-box { border: 1px solid #bcc; border-radius: 6px; padding: .5rem .6rem 2.6rem; position: relative; }
 .doc-sign-line { position: absolute; bottom: .4rem; left: .6rem; right: .6rem; border-top: 1px dashed #9aa; font-size: .7rem; color: #899; padding-top: .15rem; }
+.doc-sign-box.signed { padding-bottom: 1.6rem; }
+.doc-sign-img { display: block; max-width: 100%; max-height: 90px; margin: .2rem 0; }
 .doc-foot { border-top: 1px solid #cdd; margin-top: 1.5rem; padding-top: .5rem; font-size: .72rem; color: #677; }
 
 @media print {

@@ -22,9 +22,9 @@ export const SOURCE = {
 /* Les six temps de la démarche, d'après le guide et la FAQ du PCC */
 export const PROCESS = [
   { t: 'Je choisis un moment calme', d: 'Idéalement à distance d’une crise, dans un moment d’apaisement. Je peux faire des pauses et avancer à mon rythme.' },
-  { t: 'Je remplis d’abord seul·e', d: 'À la première personne (« je »), avec mes propres mots. Les suggestions sont là pour m’aider, pas pour parler à ma place.' },
+  { t: 'Je remplis d’abord seul·e', d: 'À la première personne (« je »), avec mes propres mots. Des exemples sont disponibles si je manque d’idées, mais ils ne parlent pas à ma place.' },
   { t: 'J’en discute avec un·e professionnel·le', d: 'Au minimum avec un·e professionnel·le qui m’accompagne, et avec mes proches si je le souhaite. Ensemble, nous complétons ou modifions le plan : c’est une décision partagée.' },
-  { t: 'Nous datons et signons', d: 'Chaque partenaire indique son rôle et signe le document imprimé.' },
+  { t: 'Nous datons et signons', d: 'Chaque partenaire indique son rôle et signe, avec le doigt sur le téléphone ou à la main sur le document imprimé.' },
   { t: 'Je le transmets', d: 'Aux proches et professionnel·les cités dans le plan, et je le range dans un endroit facile d’accès.' },
   { t: 'Je le relis régulièrement', d: 'Après une crise ou une rechute, lors d’un changement important, et au moins tous les six mois.' },
 ];
@@ -297,7 +297,7 @@ export const STEPS = [
     short: 'Date et signatures',
     title: 'Lieu, date et signatures',
     question: 'Lieu et date. Rôles & signatures :',
-    tip: 'Les signatures se font sur le document imprimé. Je note ici qui signe et avec quel rôle ; la date me rappellera quand relire mon plan.',
+    tip: 'Avant de signer, nous relisons le plan ensemble. Chacun·e peut signer sur l’écran de ce téléphone ou sur le document imprimé. La date me rappellera quand relire mon plan.',
     fields: [
       { key: 'nom', label: 'Nom', placeholder: 'Ex. : moi-même' },
       { key: 'role', label: 'Rôle', placeholder: 'Ex. : usager·ère, infirmier·ère…' },
