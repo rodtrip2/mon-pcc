@@ -46,6 +46,7 @@ export const RESOURCES = [
     id: 'proches', title: 'Pour les proches', icon: '🤝',
     items: [
       { name: 'Unafam — Écoute famille', tel: '01 42 63 03 03', hours: 'Du lundi au vendredi de 9 h à 13 h et de 14 h à 18 h (17 h le vendredi)', url: 'https://www.unafam.org/', desc: 'Pour l’entourage d’une personne vivant avec des troubles psychiques : écoute par des psychologues cliniciens. Anonyme et gratuit.' },
+      { name: 'Programme BREF', url: 'https://www.unafam.org/', desc: 'Programme court de psychoéducation pour les proches d’une personne vivant avec des troubles psychiques, quel que soit le diagnostic : trois séances en famille, sans la personne concernée, animées par des soignant·es (la dernière avec un·e bénévole de l’Unafam), puis un appel de suivi quelques mois plus tard. Pour en bénéficier : le demander à l’équipe qui soigne mon proche ou à la délégation Unafam de mon département.' },
       { name: 'Dites Je suis là', url: 'https://www.ditesjesuisla.fr/', desc: 'Pour aider un·e proche en crise suicidaire : conseils et lieux de soutien.' },
     ],
   },
