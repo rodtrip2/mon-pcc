@@ -249,6 +249,16 @@ img.tb-media { background: transparent; }
 .qr-url { font-weight: 700; color: #24524e; word-break: break-all; margin: 0; }
 .qr-full .btn-ghost { color: #1d2a2c; border-color: #ccd; }
 
+/* PDF protégé */
+.choice { border: 0; padding: 0; margin: .6rem 0; display: flex; flex-direction: column; gap: .5rem; }
+.radio { display: flex; gap: .6rem; align-items: flex-start; cursor: pointer; }
+.radio input { width: 22px; height: 22px; min-height: 0; margin-top: .15rem; flex: none; }
+.code-box { margin: 0 0 .4rem 1.9rem; display: flex; flex-direction: column; gap: .4rem; align-items: flex-start; }
+.code-box[hidden] { display: none; }
+.code-box input { font-family: ui-monospace, Menlo, Consolas, monospace; letter-spacing: .08em; font-size: 1.1rem; }
+.more { margin-top: .8rem; }
+.more summary { cursor: pointer; color: var(--brand-ink); font-weight: 600; min-height: 36px; display: flex; align-items: center; }
+
 /* Exemples */
 .sugg { margin-top: .6rem; }
 .ex-btn { margin-bottom: .5rem; }

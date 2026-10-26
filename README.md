@@ -17,7 +17,7 @@ un·e professionnel·le qui l’accompagne et, si elle le souhaite, ses proches.
 - **Boîte à outils** (étape 7, partie 1, et menu) : photos, vidéos, sons, messages vocaux enregistrés dans l’application et liens qui aident à aller mieux. Fichiers stockés sur l’appareil (IndexedDB), chiffrés avec le code si le plan est protégé ; seuls les titres et liens figurent dans le plan imprimé ou envoyé.
 - **Contacts du téléphone** (Android/Chrome) : aux étapes Partenaires, À qui demander de l’aide et Démarches, bouton « Choisir dans mes contacts » après information et accord. Seuls les contacts cochés sont transmis (API Contact Picker) ; le bouton n’apparaît pas sur les appareils non compatibles (iPhone, ordinateur) ni dans Brave, qui expose l’API sans la faire fonctionner ([brave-browser#18908](https://github.com/brave/brave-browser/issues/18908)) ; un message invite alors à utiliser Chrome.
 - **Signature sur l’écran** : la personne et chaque partenaire peuvent signer au doigt sur le smartphone (ou à la main sur la version imprimée). Alerte si le plan est modifié après les signatures.
-- **Partage au choix de la personne** : impression / PDF avec cadres de signature, envoi d’un document lisible partout (HTML autonome), ou envoi en texte via le menu de partage du téléphone.
+- **Imprimer, enregistrer, envoyer** : impression séparée de l’export ; **PDF généré sur l’appareil** (enregistré ou envoyé via le menu de partage du téléphone), **protégeable par un code** (chiffrement PDF standard AES-256, ISO 32000-2, demandé à l’ouverture par tous les lecteurs PDF récents). Générateur de code, rappel de transmettre le code par un autre canal. Envoi en texte possible, signalé comme non protégé.
 - **Installation** : bandeau proposé sur smartphone (« Plus tard » = 30 jours, « Ne plus proposer » = définitif, réactivable dans les Réglages), aussi accessible depuis le menu.
 - **Partager l’application** (menu) : lien, QR code en plein écran, carte JPG et planche A4 de 10 cartes 85 × 55 mm en PDF, générés sur l’appareil. Seule l’adresse de l’application est partagée, jamais le plan.
 - **Hors connexion** une fois installée.
@@ -53,6 +53,8 @@ css/style.css           styles (clair/sombre, impression)
 js/data.js              trame PCC, conseils et suggestions  ← contenu à relire
 js/app.js               interface et navigation
 js/storage.js           stockage local et chiffrement
+js/pdf.js               écriture PDF et chiffrement AES-256
+js/planpdf.js           mise en page du plan en PDF
 js/share.js             carte, QR code, planche PDF
 js/early.js             capture de l’invitation à installer
 js/vendor/qrcode.js     générateur de QR code (MIT)

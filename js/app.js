@@ -5,8 +5,9 @@ import * as media from './media.js';
 import { appUrl, displayUrl, makeQr, qrSvg, renderCard, canvasToJpeg, buildSheetPdf } from './share.js';
 import {
   esc, fmtDate, addMonths, stepIsFilled, progress, documentHTML, planText,
-  standaloneHTML, fileBaseName,
+  fileBaseName,
 } from './export.js';
+import { buildPlanPdf } from './planpdf.js';
 
 const $ = (sel, root = document) => root.querySelector(sel);
 const app = $('#app');
@@ -622,14 +623,19 @@ function renderPlan() {
     ${refused && !alt ? '<div class="warn" role="status"><strong>À compléter :</strong> j’ai indiqué des soins à éviter sans proposer d’alternative. <a href="#/etape/' + STEPS.findIndex((s) => s.id === 'alternatives') + '">Compléter les alternatives</a></div>' : ''}
     ${modifiedAfterSigning() ? '<div class="warn" role="status"><strong>Le plan a été modifié après les signatures.</strong> <a href="#/etape/' + (STEPS.length - 1) + '">Vérifier les signatures</a></div>' : ''}
     <section class="card actions no-print">
-      <h2>Partager mon plan</h2>
+      <h2>Imprimer, enregistrer, envoyer</h2>
       <p class="muted">Rien ne part sans mon accord. Je choisis à qui j’envoie mon plan et par quel moyen.</p>
       <div class="stack">
-        <button class="btn btn-primary" data-act="print">Imprimer ou enregistrer en PDF</button>
-        <button class="btn btn-secondary" data-act="share-file">${canShare ? 'Envoyer le document' : 'Télécharger le document'}</button>
-        <button class="btn btn-secondary" data-act="share-text">${canShare ? 'Envoyer en texte' : 'Copier le texte'}</button>
+        <button class="btn btn-secondary" data-act="print">🖨 Imprimer</button>
+        <button class="btn btn-secondary" data-act="pdf-save">📄 Enregistrer en PDF</button>
+        <button class="btn btn-primary" data-act="pdf-send">📤 Envoyer le PDF</button>
       </div>
-      <p class="muted small">Le PDF permet de recueillir les signatures. Le document s’ouvre sur n’importe quel téléphone ou ordinateur, sans application.</p>
+      <p class="muted small">Pour l’enregistrement comme pour l’envoi, je peux <strong>protéger le PDF par un code</strong> : il sera demandé à l’ouverture du fichier.</p>
+      <details class="more">
+        <summary>Autre option : envoyer en texte</summary>
+        <p class="muted small">Le texte se colle dans un message. Il <strong>ne peut pas être protégé</strong> par un code : je préfère le PDF protégé pour un envoi.</p>
+        <button class="btn btn-ghost btn-sm" data-act="share-text">${canShare ? 'Envoyer en texte (non protégé)' : 'Copier le texte (non protégé)'}</button>
+      </details>
     </section>
     <article class="doc">${documentHTML(plan)}</article>
     <div class="nav-bottom no-print"><a class="btn btn-ghost" href="#/etape/${STEPS.length - 1}">← Modifier</a><a class="btn btn-ghost" href="#/">Accueil</a></div>`;
@@ -710,15 +716,107 @@ async function confirmShare() {
   return ok;
 }
 
-async function shareFile() {
-  if (!(await confirmShare())) return;
-  const name = fileBaseName(plan) + '.html';
-  const file = new File([standaloneHTML(plan)], name, { type: 'text/html' });
-  if (navigator.canShare && navigator.canShare({ files: [file] })) {
-    try { await navigator.share({ files: [file], title: 'Mon plan de crise conjoint' }); return; } catch (e) { if (e.name === 'AbortError') return; }
+/* ---------- PDF du plan (enregistrer / envoyer), protégé par code ---------- */
+
+function randomCode() {
+  const A = 'ABCDEFGHJKMNPQRSTUVWXYZ23456789';
+  const r = crypto.getRandomValues(new Uint8Array(8));
+  const c = Array.from(r, (b) => A[b % A.length]).join('');
+  return c.slice(0, 4) + '-' + c.slice(4);
+}
+
+/** Demande s'il faut protéger le PDF ; renvoie { password } ou null si annulé */
+function pdfDialog(mode) {
+  return new Promise((resolve) => {
+    const d = $('#modal');
+    const send = mode === 'send';
+    d.innerHTML = `<form method="dialog" class="modal-inner pdf-dlg">
+      <h2>${send ? '📤 Envoyer mon plan en PDF' : '📄 Enregistrer mon plan en PDF'}</h2>
+      ${send ? `<p class="small">Mon plan contient des <strong>informations de santé</strong>. Une fois envoyé, il quitte ce téléphone : je l’envoie seulement à des personnes de confiance ou aux professionnel·les qui m’accompagnent, et je vérifie le destinataire.</p>` : ''}
+      <fieldset class="choice">
+        <legend class="sr-only">Protection</legend>
+        <label class="radio"><input type="radio" name="mode" value="code" checked> <span><strong>Protéger par un code</strong> (recommandé)<br><span class="muted small">Le code sera demandé pour ouvrir le PDF.</span></span></label>
+        <div class="code-box">
+          <label class="field"><span>Code (6 caractères minimum)</span>
+            <input name="code" autocomplete="off" autocapitalize="characters" spellcheck="false"></label>
+          <button type="button" class="btn btn-ghost btn-sm" data-gen>Générer un code</button>
+          <p class="muted small">${send
+            ? 'Je communique ce code au destinataire <strong>par un autre moyen</strong> (de vive voix, par SMS séparé…), jamais dans le même message que le fichier.'
+            : 'Je note ce code : sans lui, le fichier ne pourra pas être ouvert. Mon PCC ne le garde pas.'}</p>
+        </div>
+        <label class="radio"><input type="radio" name="mode" value="none"> <span>Sans code</span></label>
+      </fieldset>
+      <p class="error" role="alert" hidden></p>
+      <div class="modal-actions">
+        <button value="cancel" class="btn btn-ghost" formnovalidate>Annuler</button>
+        <button value="ok" class="btn btn-primary">${send ? 'Préparer l’envoi' : 'Enregistrer'}</button>
+      </div></form>`;
+    const f = d.querySelector('form');
+    const box = d.querySelector('.code-box');
+    const err = d.querySelector('.error');
+    const sync = () => { box.hidden = f.mode.value !== 'code'; };
+    f.addEventListener('change', sync);
+    d.querySelector('[data-gen]').onclick = () => { f.code.value = randomCode(); f.code.focus(); };
+    f.addEventListener('submit', (e) => {
+      if (e.submitter?.value !== 'ok') return;
+      if (f.mode.value === 'code' && f.code.value.trim().length < 6) {
+        e.preventDefault();
+        err.textContent = 'Le code doit comporter au moins 6 caractères.';
+        err.hidden = false;
+        f.code.focus();
+      }
+    });
+    d.addEventListener('close', () => {
+      if (d.returnValue !== 'ok') return resolve(null);
+      resolve({ password: f.mode.value === 'code' ? f.code.value.trim() : '' });
+    }, { once: true });
+    d.returnValue = '';
+    d.showModal();
+    sync();
+  });
+}
+
+async function makePlanPdf(password) {
+  saveState.textContent = 'Préparation du PDF…';
+  try {
+    const blob = await buildPlanPdf(plan, password);
+    return new File([blob], fileBaseName(plan) + (password ? '-protege' : '') + '.pdf', { type: 'application/pdf' });
+  } finally {
+    saveState.textContent = 'Enregistré sur ce téléphone';
   }
-  download(file, name);
-  toast('Document téléchargé.');
+}
+
+async function pdfSave() {
+  const opt = await pdfDialog('save');
+  if (!opt) return;
+  try {
+    const file = await makePlanPdf(opt.password);
+    download(file, file.name);
+    toast(opt.password ? 'PDF protégé enregistré. Gardez le code en lieu sûr.' : 'PDF enregistré.');
+  } catch {
+    toast('Impossible de créer le PDF sur cet appareil.');
+  }
+}
+
+async function pdfSend() {
+  const opt = await pdfDialog('send');
+  if (!opt) return;
+  let file;
+  try { file = await makePlanPdf(opt.password); } catch { toast('Impossible de créer le PDF sur cet appareil.'); return; }
+  const share = () => navigator.share({ files: [file], title: 'Mon plan de crise conjoint' });
+  if (navigator.canShare && navigator.canShare({ files: [file] })) {
+    try { await share(); return; } catch (e) {
+      if (e.name === 'AbortError') return;
+      // Certains navigateurs exigent un nouveau geste après la préparation
+      if (e.name === 'NotAllowedError') {
+        if (await modal({ title: 'Le PDF est prêt', body: `<p>${opt.password ? 'Le fichier est protégé par le code choisi.' : 'Le fichier n’est pas protégé.'}</p>`, ok: 'Envoyer' })) {
+          try { await share(); return; } catch (e2) { if (e2.name === 'AbortError') return; }
+        } else return;
+      }
+    }
+  }
+  download(file, file.name);
+  toast('Envoi direct indisponible : le PDF a été téléchargé, je peux le joindre à un message.');
 }
 
 async function shareText() {
@@ -809,6 +907,7 @@ function renderPrivacy() {
         <li><strong>Aucune donnée n’est collectée</strong> par Mon PCC : pas de compte, pas de serveur, pas de base de données.</li>
         <li>Mes réponses sont enregistrées <strong>uniquement dans le navigateur de ce téléphone</strong>.</li>
         <li>Aucun cookie, aucune mesure d’audience, aucune publicité, aucune police ou ressource chargée depuis un autre site.</li>
+        <li>Quand j’enregistre ou j’envoie mon plan en PDF, je peux le <strong>protéger par un code</strong> (chiffrement AES-256) : sans ce code, le fichier ne peut pas être ouvert. Mon PCC ne conserve pas ce code.</li>
         <li>Les photos, vidéos et sons de ma <strong>boîte à outils</strong> restent sur ce téléphone (chiffrés si j’ai mis un code). Ils ne figurent jamais dans le plan imprimé ou envoyé : seuls leurs titres et les liens y apparaissent.</li>
         <li>Si mon téléphone le permet, je peux <strong>choisir des contacts</strong> dans mon carnet : seuls ceux que je coche sont ajoutés (nom et numéro), le reste de mon carnet n’est jamais lu.</li>
         <li>Je peux <strong>protéger</strong> mon plan par un code (chiffrement AES-256) et <strong>tout effacer</strong> à tout moment dans les Réglages.</li>
@@ -1260,7 +1359,8 @@ document.addEventListener('click', async (e) => {
       break;
     }
     case 'print': window.print(); break;
-    case 'share-file': shareFile(); break;
+    case 'pdf-save': pdfSave(); break;
+    case 'pdf-send': pdfSend(); break;
     case 'share-text': shareText(); break;
     case 'export': {
       const files = [];

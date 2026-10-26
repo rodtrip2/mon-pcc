@@ -171,6 +171,6 @@ export function standaloneHTML(plan) {
 
 export function fileBaseName(plan) {
   const id = plan.data.coordonnees || {};
-  const who = [id.prenom, id.nom].filter(Boolean).join('-').normalize('NFD').replace(/[̀-ͯ]/g, '').replace(/[^A-Za-z0-9-]+/g, '-');
+  const who = [id.prenom, id.nom].filter(Boolean).join('-').replace(/œ/g, 'oe').replace(/Œ/g, 'OE').replace(/æ/g, 'ae').replace(/Æ/g, 'AE').normalize('NFD').replace(/[̀-ͯ]/g, '').replace(/[^A-Za-z0-9-]+/g, '-');
   return 'plan-de-crise-conjoint' + (who ? '-' + who.toLowerCase() : '') + '-' + new Date().toISOString().slice(0, 10);
 }
