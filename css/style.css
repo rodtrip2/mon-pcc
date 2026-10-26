@@ -259,6 +259,9 @@ img.tb-media { background: transparent; }
 .more { margin-top: .8rem; }
 .more summary { cursor: pointer; color: var(--brand-ink); font-weight: 600; min-height: 36px; display: flex; align-items: center; }
 
+.mes-steps { padding-left: 1.3rem; margin: .3rem 0 .8rem; }
+.mes-steps li { margin: .35rem 0; }
+
 /* Exemples */
 .sugg { margin-top: .6rem; }
 .ex-btn { margin-bottom: .5rem; }

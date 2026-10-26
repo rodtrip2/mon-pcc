@@ -8,6 +8,7 @@ import {
   fileBaseName, sigValid, lastUpdate, fmtDateTime,
 } from './export.js';
 import { buildPlanPdf } from './planpdf.js';
+import { renderCrisisCard, toJpeg, crisisCardPdf } from './crisiscard.js';
 
 const $ = (sel, root = document) => root.querySelector(sel);
 const app = $('#app');
@@ -118,6 +119,7 @@ function route() {
     case 'plan': renderPlan(); break;
     case 'reglages': renderSettings(); break;
     case 'partager': renderShare(); break;
+    case 'mon-espace-sante': renderMES(); break;
     case 'boite-outils': renderToolbox(arg === 'etape'); break;
     case 'apropos': renderAbout(); break;
     case 'confidentialite': renderPrivacy(); break;
@@ -610,6 +612,95 @@ function recordVoice() {
 
 const usedMediaIds = () => (plan?.data.boiteOutils || []).map((it) => it.file).filter(Boolean);
 
+/* ---------- Mon Espace Santé + carte de crise ---------- */
+
+const MES_URL = 'https://www.monespacesante.fr/';
+let cardTimer = null;
+let cardPreviewUrl = '';
+
+/** Données de la carte, préremplies depuis le plan au premier affichage */
+function carte() {
+  if (!plan.data.carte) {
+    const proche = (plan.data.aide?.proches || []).find((r) => r.nom || r.tel) || {};
+    const pro = (plan.data.aide?.pros || []).find((r) => r.nom || r.tel) || {};
+    const id = plan.data.coordonnees || {};
+    plan.data.carte = {
+      nom: [id.prenom, id.nom].filter(Boolean).join(' '),
+      ou: 'Dans Mon Espace Santé',
+      contactNom: proche.nom || '', contactLien: proche.lien || '', contactTel: proche.tel || '',
+      soignantNom: [pro.nom, pro.lien].filter(Boolean).join(', '), soignantTel: pro.tel || '',
+    };
+  }
+  return plan.data.carte;
+}
+
+async function refreshCardPreview() {
+  const box = $('#crisis-preview');
+  if (!box) return;
+  const blob = await toJpeg(renderCrisisCard(carte()));
+  if (cardPreviewUrl) URL.revokeObjectURL(cardPreviewUrl);
+  cardPreviewUrl = URL.createObjectURL(blob);
+  box.innerHTML = `<img src="${cardPreviewUrl}" alt="Aperçu de ma carte de crise">`;
+}
+
+function renderMES() {
+  const c = carte();
+  const f = (k, label, ph, type = 'text') => `<label class="field"><span>${label}</span><input ${type === 'tel' ? 'inputmode="tel"' : ''} data-card="${k}" data-fk="card:${k}" value="${esc(c[k] || '')}" placeholder="${esc(ph)}"></label>`;
+  app.innerHTML = `
+    <h1>🏥 Ajouter à Mon Espace Santé</h1>
+    <p class="lead">Déposer mon plan dans Mon Espace Santé permet aux soignant·es que j’autorise de le consulter, y compris en cas d’hospitalisation ou d’urgence. Ma carte de crise signale qu’il existe.</p>
+
+    <section class="card">
+      <h2>1. Télécharger mon plan en PDF</h2>
+      <p class="muted small">Sans code : Mon Espace Santé est déjà un espace sécurisé, et un code empêcherait les soignant·es de lire le document.</p>
+      ${modifiedAfterSigning() ? '<p class="warn small">Certaines signatures sont antérieures à la dernière modification : elles ne figureront pas dans le PDF. <a href="#/etape/' + (STEPS.length - 1) + '">Signer à nouveau</a></p>' : ''}
+      <button type="button" class="btn btn-primary" data-act="mes-pdf">📄 Télécharger le PDF</button>
+    </section>
+
+    <section class="card">
+      <h2>2. Le déposer dans Mon Espace Santé</h2>
+      <ol class="mes-steps">
+        <li>J’ouvre l’application <strong>Mon Espace Santé</strong> ou le site monespacesante.fr, et je me connecte.</li>
+        <li>Dans <strong>Documents</strong>, je touche <strong>« Ajouter un document »</strong> et je choisis le PDF téléchargé.</li>
+        <li>Je lui donne un titre clair : <strong>« Plan de crise conjoint »</strong>, avec la date.</li>
+        <li>Je vérifie qu’il <strong>n’est pas masqué</strong> aux professionnel·les qui me suivent.</li>
+        <li>Dans les <strong>paramètres de confidentialité</strong>, je peux autoriser l’<strong>accès en cas d’urgence</strong> (médecin du SAMU-Centre 15, soignant·es face à un risque immédiat pour ma santé). C’est ce qui rend mon plan utile en situation de crise.</li>
+        <li>À chaque mise à jour de mon plan, je dépose la nouvelle version et je supprime l’ancienne.</li>
+      </ol>
+      <a class="btn btn-secondary" href="${MES_URL}" target="_blank" rel="noopener noreferrer">Ouvrir Mon Espace Santé ↗</a>
+      <details class="more">
+        <summary>Si je suis hospitalisé·e</summary>
+        <ul class="small">
+          <li>Si le logiciel de l’hôpital est relié à Mon Espace Santé, les soignant·es que j’autorise peuvent consulter mon plan.</li>
+          <li>Je peux aussi le remettre à l’équipe à mon arrivée (PDF ou version imprimée), pour qu’il soit ajouté à mon dossier.</li>
+          <li>Le ou la soignant·e qui m’accompagne peut l’envoyer à l’hôpital par la messagerie sécurisée de santé (MSSanté).</li>
+        </ul>
+      </details>
+    </section>
+
+    <section class="card">
+      <h2>3. Ma carte de crise</h2>
+      <p class="muted small">Une carte au format carte bancaire, à garder dans mon portefeuille à côté de ma carte Vitale. Elle indique seulement que j’ai un plan de crise conjoint, où le trouver et qui prévenir : aucune information sur ma santé.</p>
+      <div class="card-preview" id="crisis-preview"><span class="muted">Préparation…</span></div>
+      <div class="form-grid">
+        ${f('nom', 'Mon nom', 'Prénom Nom')}
+        ${f('ou', 'Où trouver mon plan', 'Ex. : Dans Mon Espace Santé')}
+        ${f('contactNom', 'Personne à prévenir', 'Ex. : Julie Durand')}
+        ${f('contactLien', 'Lien', 'Ex. : ma sœur')}
+        ${f('contactTel', 'Son téléphone', '06 …', 'tel')}
+        ${f('soignantNom', 'Mon soignant référent (facultatif)', 'Ex. : Mme Martin, CMP')}
+        ${f('soignantTel', 'Son téléphone (facultatif)', '02 …', 'tel')}
+      </div>
+      <div class="stack">
+        <button type="button" class="btn btn-primary" data-act="card-print">🖨 Imprimer la carte (PDF)</button>
+        <button type="button" class="btn btn-secondary" data-act="card-img">🖼 Enregistrer l’image</button>
+      </div>
+      <p class="muted small">Je vérifie avec la personne à prévenir qu’elle est d’accord pour figurer sur ma carte.</p>
+    </section>
+    <div class="nav-bottom"><a class="btn btn-ghost" href="#/plan">← Mon plan</a></div>`;
+  refreshCardPreview();
+}
+
 /* ---------- plan complet et partage ---------- */
 
 function renderPlan() {
@@ -627,6 +718,7 @@ function renderPlan() {
         <button class="btn btn-secondary" data-act="print">🖨 Imprimer</button>
         <button class="btn btn-secondary" data-act="pdf-save">📄 Enregistrer en PDF</button>
         <button class="btn btn-primary" data-act="pdf-send">📤 Envoyer le PDF</button>
+        <a class="btn btn-secondary" href="#/mon-espace-sante">🏥 Ajouter à Mon Espace Santé</a>
       </div>
       <p class="muted small">Pour l’enregistrement comme pour l’envoi, je peux <strong>protéger le PDF par un code</strong> : il sera demandé à l’ouverture du fichier.</p>
       <details class="more">
@@ -1131,6 +1223,13 @@ function closeMenu() {
 app.addEventListener('input', (e) => {
   const el = e.target;
   if (!plan || el.type === 'file') return;
+  if (el.dataset.card !== undefined) {
+    carte()[el.dataset.card] = el.value;
+    scheduleSave(false); // la carte ne fait pas partie du plan signé
+    clearTimeout(cardTimer);
+    cardTimer = setTimeout(refreshCardPreview, 400);
+    return;
+  }
   if (el.dataset.tb !== undefined) {
     toolbox()[+el.dataset.tb].title = el.value;
     scheduleSave();
@@ -1358,6 +1457,19 @@ document.addEventListener('click', async (e) => {
     }
     case 'print': window.print(); break;
     case 'pdf-save': pdfSave(); break;
+    case 'mes-pdf':
+      try {
+        const file = await makePlanPdf('');
+        download(file, file.name);
+        toast('PDF téléchargé : je peux maintenant l’ajouter dans Mon Espace Santé.');
+      } catch { toast('Impossible de créer le PDF sur cet appareil.'); }
+      break;
+    case 'card-img':
+      try { download(await toJpeg(renderCrisisCard(carte())), 'carte-de-crise.jpg'); } catch { toast('Impossible de préparer l’image.'); }
+      break;
+    case 'card-print':
+      try { download(await crisisCardPdf(await toJpeg(renderCrisisCard(carte()))), 'carte-de-crise.pdf'); } catch { toast('Impossible de préparer le PDF.'); }
+      break;
     case 'pdf-send': pdfSend(); break;
     case 'share-text': shareText(); break;
     case 'export': {
