@@ -26,3 +26,9 @@ Modifications : découpage en étapes, conseils de rédaction, suggestions et
 exemples ajoutés, numéros d'urgence adaptés à la France, mise en forme
 numérique. Mon PCC n'est pas affilié à la Haute École de la Santé La Source
 ni aux auteur·es du PCC, qui ne l'ont pas validé.
+
+Composant tiers
+---------------
+js/vendor/qrcode.js : QR Code Generator for JavaScript, Copyright (c) 2009
+Kazuhiko Arase, sous licence MIT (https://opensource.org/licenses/MIT).
+« QR Code » est une marque déposée de DENSO WAVE INCORPORATED.

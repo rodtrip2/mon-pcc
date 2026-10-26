@@ -2,6 +2,7 @@
 import { STEPS, PROCESS, SOURCE } from './data.js';
 import * as store from './storage.js';
 import * as media from './media.js';
+import { appUrl, displayUrl, makeQr, qrSvg, renderCard, canvasToJpeg, buildSheetPdf } from './share.js';
 import {
   esc, fmtDate, addMonths, stepIsFilled, progress, documentHTML, planText,
   standaloneHTML, fileBaseName,
@@ -14,7 +15,6 @@ const saveState = $('#save-state');
 let plan = null;
 let locked = false;
 let saveTimer = null;
-let installEvent = null;
 let hiddenAt = 0;
 const openExamples = new Set(); // groupes dont les exemples sont affichés
 const AUTO_LOCK_MS = 5 * 60 * 1000;
@@ -116,6 +116,7 @@ function route() {
     case 'etape': renderStep(Math.max(0, Math.min(STEPS.length - 1, parseInt(arg, 10) || 0))); break;
     case 'plan': renderPlan(); break;
     case 'reglages': renderSettings(); break;
+    case 'partager': renderShare(); break;
     case 'boite-outils': renderToolbox(arg === 'etape'); break;
     case 'apropos': renderAbout(); break;
     case 'confidentialite': renderPrivacy(); break;
@@ -142,7 +143,7 @@ function renderHome() {
       <section class="hero">
         <div class="hero-logo" aria-hidden="true">${logoSVG()}</div>
         <h1>Mon PCC</h1>
-        <p class="lead">Préparer mon <strong>plan de crise conjoint</strong>, pas à pas, avec des suggestions à cocher.</p>
+        <p class="lead">Préparer mon <strong>plan de crise conjoint</strong>, pas à pas, avec mes propres mots.</p>
         <a class="btn btn-primary btn-lg" href="#/demarche">Commencer</a>
       </section>
       <section class="card">
@@ -155,9 +156,7 @@ function renderHome() {
         <p>Pas de compte, pas de serveur, pas de publicité. Ce que j’écris est enregistré uniquement sur ce téléphone. C’est moi qui décide de l’envoyer, et à qui.</p>
         <p><a href="#/confidentialite">En savoir plus sur la confidentialité</a></p>
       </section>
-      ${installCard()}
       ${emergencyNote()}`;
-    bindInstall();
     return;
   }
   const p = progress(plan.data);
@@ -187,9 +186,7 @@ function renderHome() {
       ${stepsListHTML()}
     </section>
     <p class="center"><a href="#/demarche">Revoir la démarche</a></p>
-    ${installCard()}
     ${emergencyNote()}`;
-  bindInstall();
 }
 
 function stepsListHTML() {
@@ -761,10 +758,14 @@ function renderSettings() {
     </section>
     <section class="card">
       <h2>Installer l’application</h2>
-      ${installEvent ? '<button class="btn btn-primary" data-act="install">Installer Mon PCC</button>' : ''}
-      <p><strong>Android (Chrome) :</strong> menu ⋮ puis « Installer l’application » ou « Ajouter à l’écran d’accueil ».</p>
-      <p><strong>iPhone (Safari) :</strong> bouton Partager puis « Sur l’écran d’accueil ».</p>
+      ${isStandalone() ? '<p>✓ Mon PCC est installé sur cet appareil.</p>' : `<button class="btn btn-primary" data-act="install-open">Installer Mon PCC</button>
+      <label class="check"><input type="checkbox" data-act="ib-toggle" ${installPref() === 'never' ? '' : 'checked'}> Proposer l’installation par un bandeau</label>`}
       <p class="muted small">Une fois installée, l’application fonctionne même sans connexion.</p>
+    </section>
+    <section class="card">
+      <h2>Partager l’application</h2>
+      <p>Lien, QR code, carte ou planche de cartes à imprimer.</p>
+      <a class="btn btn-secondary" href="#/partager">📤 Partager Mon PCC</a>
     </section>
     <section class="card card-danger">
       <h2>Effacer mes données</h2>
@@ -794,7 +795,7 @@ function renderAbout() {
       <p>Ce support est diffusé sous licence <a href="${SOURCE.licenseUrl}" target="_blank" rel="noopener">Creative Commons BY-NC-SA</a> (attribution, pas d’utilisation commerciale, partage dans les mêmes conditions). Mon PCC respecte ces conditions : il cite la source, reste gratuit et non commercial, et ses contenus sont partagés sous la même licence.</p>
       <p><strong>Modifications apportées</strong> : découpage en étapes, conseils de rédaction, suggestions et exemples ajoutés, numéros d’urgence adaptés à la France, mise en page.</p>
       <p>Mon PCC est un projet indépendant, <strong>non affilié</strong> à la Haute École de la Santé La Source ni aux auteur·es du PCC, qui ne l’ont pas validé.</p>
-      <p>Code source libre : voir le dépôt GitHub du projet (fichiers LICENSE).</p>
+      <p>Code source libre : voir le dépôt GitHub du projet (fichiers LICENSE). Le QR code est généré par la bibliothèque <em>qrcode-generator</em> de Kazuhiko Arase (licence MIT).</p>
     </section>
     <p class="center"><a href="#/confidentialite">Confidentialité</a></p>`;
 }
@@ -848,11 +849,167 @@ function renderLock() {
 
 /* ---------- installation ---------- */
 
-function installCard() {
-  if (!installEvent) return '';
-  return `<section class="card card-soft install"><h2>Installer sur mon téléphone</h2><p>Pour retrouver Mon PCC comme une application, même sans connexion.</p><button class="btn btn-secondary" data-act="install">Installer</button></section>`;
+/* ---------- installation (bandeau désactivable) ---------- */
+
+const INSTALL_KEY = 'monpcc.install';   // 'never' ou date (ms) jusqu'à laquelle ne pas proposer
+const env = (() => {
+  const ua = navigator.userAgent || '';
+  const isIos = /iPad|iPhone|iPod/.test(ua) || (/Macintosh/.test(ua) && navigator.maxTouchPoints > 1);
+  const isAndroid = /Android/i.test(ua);
+  const isMobile = isIos || isAndroid || (matchMedia('(pointer: coarse)').matches && Math.min(screen.width, screen.height) < 900);
+  return { isIos, isAndroid, isMobile };
+})();
+const isStandalone = () => matchMedia('(display-mode: standalone)').matches || matchMedia('(display-mode: fullscreen)').matches || navigator.standalone === true;
+const canPrompt = () => !!window.__pccInstall;
+
+function installPref() {
+  try { return localStorage.getItem(INSTALL_KEY); } catch { return null; }
 }
-function bindInstall() { /* délégation globale */ }
+function setInstallPref(v) {
+  try { if (v === null) localStorage.removeItem(INSTALL_KEY); else localStorage.setItem(INSTALL_KEY, v); } catch { /* ignoré */ }
+}
+function bannerAllowed() {
+  const p = installPref();
+  if (p === 'never') return false;
+  return !(p && Number(p) > Date.now());
+}
+
+function installStepsHTML() {
+  if (canPrompt()) return '';
+  if (env.isIos) {
+    return `<ol class="ib-steps"><li>Touchez le bouton <strong>Partager</strong> <span aria-hidden="true">⎋</span> en bas de l’écran (sur iPad, en haut).</li>
+      <li>Faites défiler et touchez <strong>« Sur l’écran d’accueil »</strong>.</li><li>Touchez <strong>« Ajouter »</strong>.</li></ol>
+      <p class="muted small">Avec Safari. Sur un autre navigateur, ouvrez d’abord Mon PCC dans Safari.</p>`;
+  }
+  return `<ol class="ib-steps"><li>Ouvrez le menu du navigateur (<strong>⋮</strong> en haut à droite, ou <strong>≡</strong> en bas).</li>
+    <li>Touchez <strong>« Installer l’application »</strong> ou <strong>« Ajouter à l’écran d’accueil »</strong>.</li><li>Confirmez : l’icône Mon PCC apparaît sur l’écran d’accueil.</li></ol>`;
+}
+
+function showInstallBanner(manual = false) {
+  const b = $('#install-banner');
+  if (isStandalone()) {
+    if (manual) toast('Mon PCC est déjà installé sur cet appareil.');
+    return;
+  }
+  b.innerHTML = `<div class="ib-inner">
+    <img src="icons/icon-192.png" alt="" class="ib-icon" width="48" height="48">
+    <div class="ib-text">
+      <p id="ib-title" class="ib-title">${canPrompt() ? 'Installer Mon PCC' : env.isIos ? 'Ajouter Mon PCC à l’écran d’accueil' : 'Installer Mon PCC sur mon téléphone'}</p>
+      <p class="muted small">Pour l’ouvrir comme une application, même sans connexion. Rien n’est envoyé : mon plan reste sur ce téléphone.</p>
+      ${installStepsHTML()}
+      <div class="ib-actions">
+        ${canPrompt() ? '<button type="button" class="btn btn-primary btn-sm" data-act="install">Installer</button>' : ''}
+        <button type="button" class="btn btn-ghost btn-sm" data-act="ib-later">Plus tard</button>
+        <button type="button" class="link small" data-act="ib-never">Ne plus proposer</button>
+      </div>
+    </div>
+    <button type="button" class="icon ib-close" data-act="ib-later" aria-label="Fermer">✕</button>
+  </div>`;
+  b.hidden = false;
+  if (manual) b.querySelector('button')?.focus();
+}
+function hideInstallBanner() { $('#install-banner').hidden = true; }
+
+function refreshInstallUI() {
+  const mi = $('#menu-install');
+  if (mi) mi.hidden = isStandalone();
+  if (!$('#install-banner').hidden) showInstallBanner();
+}
+
+/* ---------- partager l'application ---------- */
+
+let shareCache = null; // { url, qr, canvas, blob, preview }
+
+async function prepareShare() {
+  const url = appUrl();
+  if (shareCache && shareCache.url === url) return shareCache;
+  if (!window.qrcode) throw new Error('qrcode');
+  const qr = makeQr(url);
+  const canvas = renderCard(url, qr);
+  const blob = await canvasToJpeg(canvas);
+  shareCache = { url, qr, canvas, blob, preview: URL.createObjectURL(blob) };
+  return shareCache;
+}
+
+function renderShare() {
+  const url = appUrl();
+  app.innerHTML = `
+    <h1>📤 Partager l’application</h1>
+    <p class="lead">Faire connaître Mon PCC : gratuit, sans inscription, sans publicité. Seule l’adresse de l’application est partagée, jamais mon plan.</p>
+    <section class="card">
+      <h2>🔗 Le lien</h2>
+      <div class="share-link"><span>${esc(displayUrl(url))}</span><button type="button" class="btn btn-ghost btn-sm" data-act="share-copy">Copier</button></div>
+      ${navigator.share ? '<button type="button" class="btn btn-primary" data-act="share-app">Partager le lien</button>' : ''}
+    </section>
+    <section class="card">
+      <h2>▦ QR code en plein écran</h2>
+      <p class="muted">À montrer pour qu’une personne ouvre Mon PCC en le scannant avec son téléphone.</p>
+      <button type="button" class="btn btn-secondary" data-act="qr-open">Afficher le QR code</button>
+    </section>
+    <section class="card">
+      <h2>🖼 Carte à partager (JPG)</h2>
+      <p class="muted">Une image avec le QR code, à envoyer par message, publier ou imprimer.</p>
+      <div class="card-preview" id="card-preview"><span class="muted">Préparation…</span></div>
+      <div class="stack">
+        ${navigator.canShare ? '<button type="button" class="btn btn-primary" data-act="card-share" hidden>Partager l’image</button>' : ''}
+        <button type="button" class="btn btn-secondary" data-act="card-download">Télécharger le JPG</button>
+      </div>
+    </section>
+    <section class="card">
+      <h2>🖨 Planche de cartes (PDF)</h2>
+      <p class="muted">10 cartes au format carte de visite (85 × 55 mm) sur une page A4, à imprimer à 100 % (taille réelle) puis découper. Idéal pour un service, une salle d’attente ou un groupe d’entraide.</p>
+      <button type="button" class="btn btn-secondary" data-act="sheet-download">Télécharger le PDF</button>
+    </section>`;
+  prepareShare().then((c) => {
+    const box = $('#card-preview');
+    if (!box) return;
+    box.innerHTML = `<img src="${c.preview}" alt="Aperçu de la carte Mon PCC avec QR code">`;
+    try {
+      const f = new File([c.blob], 'carte-mon-pcc.jpg', { type: 'image/jpeg' });
+      const btn = app.querySelector('[data-act="card-share"]');
+      if (btn && navigator.canShare({ files: [f] })) btn.hidden = false;
+    } catch { /* partage de fichier indisponible */ }
+  }).catch(() => {
+    const box = $('#card-preview');
+    if (box) box.innerHTML = '<p class="error">Impossible de préparer la carte sur ce navigateur.</p>';
+  });
+}
+
+let wakeLock = null;
+async function openQrFull() {
+  let c;
+  try { c = await prepareShare(); } catch { toast('QR code indisponible.'); return; }
+  const el = $('#qr-full');
+  el.innerHTML = `<div class="qr-head"><img src="icons/icon-192.png" alt="" width="44" height="44"><p>Mon PCC</p></div>
+    ${qrSvg(c.qr, 'Scannez pour ouvrir Mon PCC')}
+    <p class="qr-scan">Scannez pour ouvrir l’application</p>
+    <p class="qr-url">${esc(displayUrl(c.url))}</p>
+    <button type="button" class="btn btn-ghost" data-act="qr-close">✕ Fermer</button>`;
+  el.hidden = false;
+  el.querySelector('button').focus();
+  try { await el.requestFullscreen?.(); } catch { /* indisponible (iPhone) */ }
+  try { wakeLock = await navigator.wakeLock?.request('screen'); } catch { wakeLock = null; }
+}
+async function closeQrFull() {
+  const el = $('#qr-full');
+  if (el.hidden) return;
+  el.hidden = true;
+  try { if (document.fullscreenElement) await document.exitFullscreen(); } catch { /* rien */ }
+  try { await wakeLock?.release(); } catch { /* rien */ }
+  wakeLock = null;
+}
+document.addEventListener('fullscreenchange', () => { if (!document.fullscreenElement) closeQrFull(); });
+
+async function copyText(text) {
+  try { await navigator.clipboard.writeText(text); return true; } catch {
+    const ta = document.createElement('textarea');
+    ta.value = text; document.body.appendChild(ta); ta.select();
+    let ok = false;
+    try { ok = document.execCommand('copy'); } catch { /* rien */ }
+    ta.remove();
+    return ok;
+  }
+}
 
 function logoSVG() {
   return `<svg viewBox="0 0 64 64" width="64" height="64"><rect width="64" height="64" rx="16" fill="var(--brand)"/><circle cx="25" cy="32" r="12" fill="none" stroke="#fff" stroke-width="5"/><circle cx="39" cy="32" r="12" fill="none" stroke="#fff" stroke-width="5" opacity=".85"/></svg>`;
@@ -1151,13 +1308,36 @@ document.addEventListener('click', async (e) => {
         route();
       }
       break;
-    case 'install':
-      if (installEvent) {
-        installEvent.prompt();
-        await installEvent.userChoice;
-        installEvent = null;
-        route();
-      }
+    case 'install': {
+      const ev = window.__pccInstall;
+      if (!ev) { showInstallBanner(true); break; }
+      ev.prompt();
+      await ev.userChoice.catch(() => null);
+      window.__pccInstall = null;
+      hideInstallBanner();
+      break;
+    }
+    case 'install-open': closeMenu(); showInstallBanner(true); break;
+    case 'ib-later': hideInstallBanner(); if (installPref() !== 'never') setInstallPref(String(Date.now() + 30 * 24 * 3600 * 1000)); break;
+    case 'ib-never': hideInstallBanner(); setInstallPref('never'); toast('Le bandeau ne sera plus proposé. Installation possible depuis le menu.'); break;
+    case 'share-copy': toast((await copyText(appUrl())) ? 'Lien copié.' : 'Copie impossible sur cet appareil.'); break;
+    case 'share-app':
+      try { await navigator.share({ title: 'Mon PCC', text: 'Mon PCC : préparer son plan de crise conjoint pas à pas. Gratuit, sans inscription, les réponses restent sur le téléphone.', url: appUrl() }); } catch { /* annulé */ }
+      break;
+    case 'qr-open': openQrFull(); break;
+    case 'qr-close': closeQrFull(); break;
+    case 'card-share': {
+      const c = await prepareShare();
+      const f = new File([c.blob], 'carte-mon-pcc.jpg', { type: 'image/jpeg' });
+      try { await navigator.share({ files: [f], title: 'Mon PCC', text: 'Mon PCC : préparer son plan de crise conjoint pas à pas. ' + c.url }); } catch (err) { if (err?.name !== 'AbortError') download(c.blob, 'carte-mon-pcc.jpg'); }
+      break;
+    }
+    case 'card-download': try { download((await prepareShare()).blob, 'carte-mon-pcc.jpg'); } catch { toast('Impossible de préparer la carte.'); } break;
+    case 'sheet-download':
+      try {
+        const c = await prepareShare();
+        download(await buildSheetPdf(c.blob, 'Mon PCC - 10 cartes 85 x 55 mm - imprimer à 100 % (taille réelle), puis découper le long des pointillés'), 'planche-cartes-mon-pcc.pdf');
+      } catch { toast('Impossible de préparer le PDF.'); }
       break;
     case 'menu': openMenu(); break;
     case 'menu-close': closeMenu(); break;
@@ -1165,13 +1345,21 @@ document.addEventListener('click', async (e) => {
   }
 });
 
+document.addEventListener('change', (e) => {
+  if (e.target.dataset?.act === 'ib-toggle') {
+    setInstallPref(e.target.checked ? null : 'never');
+    toast(e.target.checked ? 'Le bandeau d’installation sera proposé.' : 'Le bandeau ne sera plus proposé.');
+  }
+});
+
 document.addEventListener('keydown', (e) => {
+  if (e.key === 'Escape' && !$('#qr-full').hidden) { closeQrFull(); return; }
   if (e.key === 'Escape' && !$('#menu').hidden) closeMenu();
 });
 
 window.addEventListener('hashchange', route);
-window.addEventListener('beforeinstallprompt', (e) => { e.preventDefault(); installEvent = e; });
-window.addEventListener('appinstalled', () => { installEvent = null; });
+window.addEventListener('pcc-installable', refreshInstallUI);
+window.addEventListener('appinstalled', () => { window.__pccInstall = null; hideInstallBanner(); refreshInstallUI(); });
 
 document.addEventListener('visibilitychange', () => {
   if (document.hidden) { hiddenAt = Date.now(); return; }
@@ -1199,6 +1387,8 @@ function start() {
   store.requestPersistence();
   if (plan) media.prune(usedMediaIds()).catch(() => {});
   route();
+  refreshInstallUI();
+  if (env.isMobile && !isStandalone() && bannerAllowed()) setTimeout(() => { if (!isStandalone()) showInstallBanner(); }, 2500);
   if ('serviceWorker' in navigator && location.protocol === 'https:') {
     navigator.serviceWorker.register('./sw.js').catch(() => {});
   }

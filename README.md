@@ -18,6 +18,8 @@ un·e professionnel·le qui l’accompagne et, si elle le souhaite, ses proches.
 - **Contacts du téléphone** (Android/Chrome) : aux étapes Partenaires, À qui demander de l’aide et Démarches, bouton « Choisir dans mes contacts » après information et accord. Seuls les contacts cochés sont transmis (API Contact Picker) ; le bouton n’apparaît pas sur les appareils non compatibles (iPhone, ordinateur) ni dans Brave, qui expose l’API sans la faire fonctionner ([brave-browser#18908](https://github.com/brave/brave-browser/issues/18908)) ; un message invite alors à utiliser Chrome.
 - **Signature sur l’écran** : la personne et chaque partenaire peuvent signer au doigt sur le smartphone (ou à la main sur la version imprimée). Alerte si le plan est modifié après les signatures.
 - **Partage au choix de la personne** : impression / PDF avec cadres de signature, envoi d’un document lisible partout (HTML autonome), ou envoi en texte via le menu de partage du téléphone.
+- **Installation** : bandeau proposé sur smartphone (« Plus tard » = 30 jours, « Ne plus proposer » = définitif, réactivable dans les Réglages), aussi accessible depuis le menu.
+- **Partager l’application** (menu) : lien, QR code en plein écran, carte JPG et planche A4 de 10 cartes 85 × 55 mm en PDF, générés sur l’appareil. Seule l’adresse de l’application est partagée, jamais le plan.
 - **Hors connexion** une fois installée.
 - **Accessibilité** : grandes zones tactiles, mode sombre, navigation clavier, lecteurs d’écran.
 
@@ -51,6 +53,9 @@ css/style.css           styles (clair/sombre, impression)
 js/data.js              trame PCC, conseils et suggestions  ← contenu à relire
 js/app.js               interface et navigation
 js/storage.js           stockage local et chiffrement
+js/share.js             carte, QR code, planche PDF
+js/early.js             capture de l’invitation à installer
+js/vendor/qrcode.js     générateur de QR code (MIT)
 js/media.js             fichiers de la boîte à outils (IndexedDB)
 js/export.js            mise en forme, impression, texte, document autonome
 sw.js                   hors connexion
@@ -71,6 +76,9 @@ Les étapes de la démarche s’appuient sur la FAQ du site et sur le *Guide pou
 Mon PCC est un projet **indépendant, gratuit et non commercial**, non affilié à la Haute École de la Santé La Source ni aux auteur·es du PCC, qui ne l’ont pas validé.
 
 ## Licence
+
+Composant tiers : `js/vendor/qrcode.js` — QR Code Generator, © Kazuhiko Arase, licence MIT.
+
 
 Conformément à la clause « partage dans les mêmes conditions » du PCC, l’ensemble de ce projet est diffusé sous licence
 [Creative Commons Attribution – Pas d’utilisation commerciale – Partage dans les mêmes conditions 4.0 International (CC BY-NC-SA 4.0)](https://creativecommons.org/licenses/by-nc-sa/4.0/deed.fr). Voir [LICENSE](LICENSE).

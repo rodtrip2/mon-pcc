@@ -14,6 +14,8 @@
   <meta name="apple-mobile-web-app-capable" content="yes">
   <meta name="apple-mobile-web-app-title" content="Mon PCC">
   <link rel="stylesheet" href="css/style.css">
+  <script src="js/early.js"></script>
+  <script src="js/vendor/qrcode.js" defer></script>
   <script type="module" src="js/app.js"></script>
 </head>
 <body>
@@ -40,6 +42,8 @@
       <div id="menu-steps"></div>
       <a class="menu-link tb-link-menu" href="#/boite-outils">🧰 Ma boîte à outils</a>
       <a class="menu-link strong" href="#/plan">Mon plan · imprimer · envoyer</a>
+      <button type="button" class="menu-link menu-btn-link" data-act="install-open" id="menu-install">📲 Installer l’application</button>
+      <a class="menu-link" href="#/partager">📤 Partager l’application</a>
       <a class="menu-link" href="#/reglages">Réglages et sauvegarde</a>
       <a class="menu-link" href="#/apropos">À propos et sources</a>
       <a class="menu-link" href="#/confidentialite">Confidentialité</a>
@@ -55,6 +59,8 @@
     <p><a href="#/apropos">À propos</a> · <a href="#/confidentialite">Confidentialité</a></p>
   </footer>
 
+  <div id="install-banner" class="install-banner no-print" role="dialog" aria-labelledby="ib-title" hidden></div>
+  <div id="qr-full" class="qr-full" role="dialog" aria-modal="true" aria-label="QR code de Mon PCC" hidden></div>
   <div id="toast" class="toast no-print" role="status" hidden></div>
   <dialog id="modal" class="modal"></dialog>
   <dialog id="sigpad" class="modal sigpad" aria-label="Signature"></dialog>
