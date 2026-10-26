@@ -8,6 +8,7 @@ import {
   fileBaseName, sigValid, lastUpdate, fmtDateTime,
 } from './export.js';
 import { buildPlanPdf } from './planpdf.js';
+import { RESOURCES, CHECKED } from './resources.js';
 import { renderCrisisCard, toJpeg, crisisCardPdf } from './crisiscard.js';
 
 const $ = (sel, root = document) => root.querySelector(sel);
@@ -120,6 +121,7 @@ function route() {
     case 'reglages': renderSettings(); break;
     case 'partager': renderShare(); break;
     case 'mon-espace-sante': renderMES(); break;
+    case 'ressources': renderResources(); break;
     case 'boite-outils': renderToolbox(arg === 'etape'); break;
     case 'apropos': renderAbout(); break;
     case 'confidentialite': renderPrivacy(); break;
@@ -137,6 +139,7 @@ function emergencyNote() {
     <strong>Besoin d’aide maintenant ?</strong>
     Appelez le <a href="tel:15">15</a> ou le <a href="tel:112">112</a>.
     Si vous pensez au suicide, le <a href="tel:3114">3114</a> répond 24 h/24, 7 j/7 (France).
+    <a class="res-link" href="#/ressources">Toutes les ressources d’aide →</a>
   </aside>`;
 }
 
@@ -704,6 +707,37 @@ function renderMES() {
     </section>
     <div class="nav-bottom"><a class="btn btn-ghost" href="#/plan">← Mon plan</a></div>`;
   refreshCardPreview();
+}
+
+/* ---------- ressources ---------- */
+
+const telHref = (t) => 'tel:' + t.replace(/[^\d+]/g, '');
+
+function renderResources() {
+  const inPlan = (it) => (plan?.data.aide?.garde || []).some((r) => r.tel && r.tel.replace(/\D/g, '') === it.tel.replace(/\D/g, ''));
+  app.innerHTML = `
+    <h1>📞 Ressources</h1>
+    <p class="lead">Des lignes d’écoute et des sites fiables, en France. Je peux ajouter un numéro à mon plan, dans « À qui demander de l’aide ».</p>
+    <nav class="res-jump" aria-label="Catégories">${RESOURCES.map((c) => `<a class="chip" href="#res-${c.id}" data-act="res-jump" data-id="${c.id}">${c.icon} ${esc(c.title)}</a>`).join('')}</nav>
+    ${RESOURCES.map((c) => `
+      <section class="card res-cat" id="res-${c.id}">
+        <h2>${c.icon} ${esc(c.title)}</h2>
+        ${c.intro ? `<p class="muted small">${esc(c.intro)}</p>` : ''}
+        <ul class="res-list">${c.items.map((it, k) => `
+          <li class="res-item">
+            <p class="res-name">${esc(it.name)}</p>
+            ${it.hours ? `<p class="res-hours">🕑 ${esc(it.hours)}</p>` : ''}
+            <p class="res-desc">${esc(it.desc)}</p>
+            <div class="res-actions">
+              ${it.tel ? `<a class="btn btn-primary btn-sm" href="${telHref(it.tel)}">☎ ${esc(it.tel)}</a>` : ''}
+              ${it.url ? `<a class="btn btn-secondary btn-sm" href="${esc(it.url)}" target="_blank" rel="noopener noreferrer">Site ↗</a>` : ''}
+              ${it.tel && plan ? (inPlan(it)
+                ? '<span class="res-added">✓ Dans mon plan</span>'
+                : `<button type="button" class="btn btn-ghost btn-sm" data-act="res-add" data-c="${c.id}" data-k="${k}" data-fk="res:${c.id}:${k}">+ Ajouter à mon plan</button>`) : ''}
+            </div>
+          </li>`).join('')}</ul>
+      </section>`).join('')}
+    <p class="muted small center">Informations vérifiées le ${CHECKED}. Les horaires peuvent évoluer : en cas de doute, consulter le site du service.</p>`;
 }
 
 /* ---------- plan complet et partage ---------- */
@@ -1462,6 +1496,22 @@ document.addEventListener('click', async (e) => {
     }
     case 'print': window.print(); break;
     case 'pdf-save': pdfSave(); break;
+    case 'res-jump': {
+      e.preventDefault();
+      document.getElementById('res-' + btn.dataset.id)?.scrollIntoView({ behavior: 'smooth', block: 'start' });
+      break;
+    }
+    case 'res-add': {
+      const cat = RESOURCES.find((c) => c.id === btn.dataset.c);
+      const it = cat.items[+btn.dataset.k];
+      plan.data.aide ??= {};
+      plan.data.aide.garde ??= [];
+      plan.data.aide.garde.push({ nom: it.name, lien: [cat.title, it.hours].filter(Boolean).join(' · '), tel: it.tel });
+      scheduleSave();
+      rerender(renderResources);
+      toast('Ajouté à mon plan (étape 8, services et institutions de garde).');
+      break;
+    }
     case 'mes-pdf':
       try {
         const file = await makePlanPdf('');

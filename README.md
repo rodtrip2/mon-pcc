@@ -18,6 +18,7 @@ un·e professionnel·le qui l’accompagne et, si elle le souhaite, ses proches.
 - **Contacts du téléphone** (Android/Chrome) : aux étapes Partenaires, À qui demander de l’aide et Démarches, bouton « Choisir dans mes contacts » après information et accord. Seuls les contacts cochés sont transmis (API Contact Picker) ; le bouton n’apparaît pas sur les appareils non compatibles (iPhone, ordinateur) ni dans Brave, qui expose l’API sans la faire fonctionner ([brave-browser#18908](https://github.com/brave/brave-browser/issues/18908)) ; un message invite alors à utiliser Chrome.
 - **Signature sur l’écran** : la personne et chaque partenaire peuvent signer au doigt sur le smartphone (ou à la main sur la version imprimée). Alerte si le plan est modifié après les signatures.
 - **Imprimer, enregistrer, envoyer** : impression séparée de l’export ; **PDF généré sur l’appareil** (enregistré ou envoyé via le menu de partage du téléphone), **protégeable par un code** (chiffrement PDF standard AES-256, ISO 32000-2, demandé à l’ouverture par tous les lecteurs PDF récents). Générateur de code, rappel de transmettre le code par un autre canal. Envoi en texte possible, signalé comme non protégé.
+- **Ressources** (menu et encadré d’urgence) : lignes d’écoute et sites fiables classés par besoin (urgence, écoute, jeunes et étudiant·es, monde agricole, proches, addictions, violences, information et soins), avec appel direct, lien et ajout du numéro au plan (étape 8). Données dans `js/resources.js`, vérifiées le 26 octobre 2026 : à revérifier régulièrement.
 - **Ajouter à Mon Espace Santé** (page Mon plan et menu) : PDF sans code à déposer soi-même (Documents › Ajouter un document), étapes guidées, conseil d’autoriser l’accès en cas d’urgence, pistes en cas d’hospitalisation (DPI relié au DMP, remise à l’équipe, MSSanté par le soignant). Aucune connexion directe : Mon PCC n’est pas référencé au catalogue Mon Espace Santé.
 - **Carte de crise** (même page) : carte 85 × 55 mm pour le portefeuille (« J’ai un plan de crise conjoint », où le trouver, personne à prévenir, soignant référent), sans information de santé ; image ou PDF à imprimer.
 - **Installation** : bandeau proposé sur smartphone (« Plus tard » = 30 jours, « Ne plus proposer » = définitif, réactivable dans les Réglages), aussi accessible depuis le menu.
@@ -58,6 +59,7 @@ js/storage.js           stockage local et chiffrement
 js/pdf.js               écriture PDF et chiffrement AES-256
 js/planpdf.js           mise en page du plan en PDF
 js/crisiscard.js        carte de crise (image et PDF)
+js/resources.js         ressources d’aide (numéros, horaires, sites)
 js/share.js             carte, QR code, planche PDF
 js/early.js             capture de l’invitation à installer
 js/vendor/qrcode.js     générateur de QR code (MIT)

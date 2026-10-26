@@ -265,6 +265,20 @@ img.tb-media { background: transparent; }
 .home-tb { margin-top: 1rem; padding: 0; overflow: hidden; }
 .home-tb .tb-teaser { margin: 0; border-radius: 0; }
 
+/* Ressources */
+.res-jump { display: flex; gap: .4rem; overflow-x: auto; padding: .2rem 0 .8rem; margin: 0 -1rem; padding-left: 1rem; padding-right: 1rem; scrollbar-width: none; }
+.res-jump .chip { white-space: nowrap; text-decoration: none; display: inline-flex; align-items: center; }
+.res-cat { scroll-margin-top: 5rem; }
+.res-list { list-style: none; padding: 0; margin: 0; }
+.res-item { padding: .7rem 0; border-top: 1px solid var(--line); }
+.res-item:first-child { border-top: 0; padding-top: .2rem; }
+.res-name { font-weight: 700; margin: 0; }
+.res-hours { margin: .15rem 0; font-size: .9rem; color: var(--brand-ink); }
+.res-desc { margin: .2rem 0 .5rem; font-size: .93rem; color: var(--muted); }
+.res-actions { display: flex; flex-wrap: wrap; gap: .4rem; align-items: center; }
+.res-added { font-size: .9rem; font-weight: 600; color: var(--brand-ink); }
+.res-link { display: block; margin-top: .4rem; font-weight: 700; }
+
 /* Exemples */
 .sugg { margin-top: .6rem; }
 .ex-btn { margin-bottom: .5rem; }
