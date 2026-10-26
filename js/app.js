@@ -344,6 +344,7 @@ function recordsGroupHTML(step, g) {
       <button type="button" class="btn btn-secondary btn-sm" data-act="empty" data-g="${g.id}" data-fk="empty:${g.id}">+ Ajouter une ligne</button>
       ${contactsEnabled(step, g) ? `<button type="button" class="btn btn-secondary btn-sm" data-act="contacts" data-g="${g.id}" data-fk="contacts:${g.id}">👤 Choisir dans mes contacts</button>` : ''}
     </div>
+    ${contactsNoteHTML(step, g)}
     ${suggestionsHTML(step, g, isOn)}
   </section>`;
 }
@@ -639,11 +640,22 @@ function renderPlan() {
 
 /* ---------- contacts du téléphone (API Contact Picker, Android/Chrome) ---------- */
 
-const contactsSupported = () => 'contacts' in navigator && 'ContactsManager' in window && typeof navigator.contacts.select === 'function';
+// Brave (Android) expose l'API mais select() ne fait rien : bug connu
+// https://github.com/brave/brave-browser/issues/18908
+const isBrave = () => !!navigator.brave;
+const contactsSupported = () => 'contacts' in navigator && 'ContactsManager' in window
+  && typeof navigator.contacts.select === 'function' && !isBrave();
 
-function contactsEnabled(step, g) {
-  if (!step.contacts || !contactsSupported()) return false;
+function contactsWanted(step, g) {
+  if (!step.contacts) return false;
   return step.contactGroupsOnly ? !!g.contacts : true;
+}
+function contactsEnabled(step, g) {
+  return contactsWanted(step, g) && contactsSupported();
+}
+function contactsNoteHTML(step, g) {
+  if (!contactsWanted(step, g) || contactsSupported() || !isBrave() || !/Android/i.test(navigator.userAgent)) return '';
+  return '<p class="muted small contacts-note">Pour choisir directement dans mes contacts, j’ouvre Mon PCC dans <strong>Chrome</strong> : le navigateur Brave ne le permet pas encore.</p>';
 }
 
 async function confirmContacts() {
