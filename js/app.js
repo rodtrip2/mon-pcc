@@ -633,7 +633,7 @@ function renderPlan() {
       <p class="muted small">Pour l’enregistrement comme pour l’envoi, je peux <strong>protéger le PDF par un code</strong> : il sera demandé à l’ouverture du fichier.</p>
       <details class="more">
         <summary>Autre option : envoyer en texte</summary>
-        <p class="muted small">Le texte se colle dans un message. Il <strong>ne peut pas être protégé</strong> par un code : je préfère le PDF protégé pour un envoi.</p>
+        <p class="muted small">Le texte se colle dans un message. Il <strong>ne peut pas être protégé</strong> par un code : préférez le PDF protégé pour un envoi.</p>
         <button class="btn btn-ghost btn-sm" data-act="share-text">${canShare ? 'Envoyer en texte (non protégé)' : 'Copier le texte (non protégé)'}</button>
       </details>
     </section>
