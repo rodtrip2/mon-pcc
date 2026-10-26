@@ -151,7 +151,7 @@ export const STEPS = [
     short: 'Ce que je peux faire',
     title: 'Ce que je peux faire pour gérer la situation',
     question: 'Que pourrais-je faire concrètement pour gérer cette situation difficile ? (mettre par ordre de priorité en favorisant d’abord les stratégies personnelles, puis celles de l’entourage et finalement celles nécessitant l’intervention de professionnels)',
-    tip: 'Je classe par ordre de priorité avec les flèches : ce que je fais en premier en haut. Je commence par ce que je peux faire seul·e.',
+    tip: 'Je classe par ordre de priorité avec les flèches : ce que je fais en premier en haut. Je commence par ce que je peux faire seul·e. Dans ma boîte à outils, je peux garder des photos, musiques, vidéos ou liens qui m’aident.',
     groups: [
       { id: 'moi', label: '1. Ce que je fais moi-même', suggestions: [
         'Je respire calmement quelques minutes', 'Je vais marcher', 'J’écoute de la musique qui m’apaise',

@@ -120,3 +120,19 @@ export async function requestPersistence() {
   } catch { /* sans importance */ }
   return false;
 }
+
+/* Chiffrement des fichiers (boîte à outils) avec la même clé que le plan */
+export const hasKey = () => !!sessionKey;
+
+export async function encryptBytes(buf) {
+  if (!sessionKey) return { enc: false, data: buf };
+  const iv = crypto.getRandomValues(new Uint8Array(12));
+  const data = await crypto.subtle.encrypt({ name: 'AES-GCM', iv }, sessionKey, buf);
+  return { enc: true, iv, data };
+}
+
+export async function decryptBytes(rec) {
+  if (!rec.enc) return rec.data;
+  if (!sessionKey) throw new Error('verrouillé');
+  return crypto.subtle.decrypt({ name: 'AES-GCM', iv: rec.iv }, sessionKey, rec.data);
+}

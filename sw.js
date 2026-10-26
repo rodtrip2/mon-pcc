@@ -1,9 +1,9 @@
 /* Mon PCC — service worker : fonctionnement hors connexion.
    Il ne met en cache que les fichiers de l'application, jamais les données du plan. */
-const CACHE = 'mon-pcc-v1.2.0';
+const CACHE = 'mon-pcc-v1.3.0';
 const FILES = [
   './', './index.html', './css/style.css',
-  './js/app.js', './js/data.js', './js/storage.js', './js/export.js',
+  './js/app.js', './js/data.js', './js/storage.js', './js/export.js', './js/media.js',
   './manifest.webmanifest', './icons/icon.svg', './icons/icon-192.png', './icons/icon-512.png',
   './icons/icon-maskable-512.png', './icons/apple-touch-icon.png',
 ];

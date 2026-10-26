@@ -1,6 +1,7 @@
 /* Mon PCC — application (sans dépendance, sans serveur, sans traceur) */
 import { STEPS, PROCESS, SOURCE } from './data.js';
 import * as store from './storage.js';
+import * as media from './media.js';
 import {
   esc, fmtDate, addMonths, stepIsFilled, progress, documentHTML, planText,
   standaloneHTML, fileBaseName,
@@ -115,6 +116,7 @@ function route() {
     case 'etape': renderStep(Math.max(0, Math.min(STEPS.length - 1, parseInt(arg, 10) || 0))); break;
     case 'plan': renderPlan(); break;
     case 'reglages': renderSettings(); break;
+    case 'boite-outils': renderToolbox(arg === 'etape'); break;
     case 'apropos': renderAbout(); break;
     case 'confidentialite': renderPrivacy(); break;
     default: renderHome();
@@ -177,6 +179,7 @@ function renderHome() {
       <div class="stack">
         ${next >= 0 ? `<a class="btn btn-primary" href="#/etape/${next}">Continuer : ${esc(STEPS[next].short)}</a>` : ''}
         <a class="btn ${next >= 0 ? 'btn-secondary' : 'btn-primary'}" href="#/plan">Voir, imprimer ou envoyer mon plan</a>
+        ${(plan.data.boiteOutils || []).length ? '<a class="btn btn-secondary" href="#/boite-outils">🧰 Ma boîte à outils</a>' : ''}
       </div>
     </section>
     <section class="card">
@@ -307,6 +310,7 @@ function listGroupHTML(step, g) {
     </form>
     ${arr.length ? `<p class="kept-label">Ce que je retiens${step.ordered ? ' <span class="muted">(par ordre de priorité)</span>' : ''}</p><ol class="items ${step.ordered ? 'ordered' : ''}">${items}</ol>` : ''}
     ${suggestionsHTML(step, g, (s) => arr.includes(s))}
+    ${step.id === 'strategies' && g.id === 'moi' ? toolboxTeaserHTML() : ''}
   </section>`;
 }
 
@@ -452,6 +456,163 @@ function signaturePad(who) {
   });
 }
 
+/* ---------- boîte à outils (photos, vidéos, sons, liens) ---------- */
+
+const KINDS = {
+  photo: { icon: '📷', label: 'Photo', accept: 'image/*' },
+  video: { icon: '🎬', label: 'Vidéo', accept: 'video/*' },
+  audio: { icon: '🎵', label: 'Son ou musique', accept: 'audio/*' },
+  voix: { icon: '🎙', label: 'Message vocal' },
+  lien: { icon: '🔗', label: 'Lien' },
+};
+const mediaURLs = new Map(); // id -> URL d'affichage (session)
+const canRecord = () => !!(navigator.mediaDevices?.getUserMedia && window.MediaRecorder);
+const toolbox = () => (plan.data.boiteOutils ??= []);
+
+function toolboxTeaserHTML() {
+  const items = plan.data.boiteOutils || [];
+  return `<div class="tb-teaser">
+    <h3>🧰 Ma boîte à outils</h3>
+    <p class="muted small">J’y range ce qui m’aide à aller mieux : une photo qui m’apaise, une musique, une vidéo, un message que je me suis enregistré, un lien…</p>
+    ${items.length ? `<p class="small"><strong>${items.length} élément${items.length > 1 ? 's' : ''}</strong> : ${items.slice(0, 4).map((it) => esc(KINDS[it.kind].icon + ' ' + (it.title || KINDS[it.kind].label))).join(' · ')}${items.length > 4 ? '…' : ''}</p>` : ''}
+    <a class="btn btn-secondary btn-sm" href="#/boite-outils/etape">${items.length ? 'Ouvrir ma boîte à outils' : 'Créer ma boîte à outils'}</a>
+  </div>`;
+}
+
+function renderToolbox(fromStep) {
+  const items = toolbox();
+  const stepIdx = STEPS.findIndex((x) => x.id === 'strategies');
+  app.innerHTML = `
+    <h1>🧰 Ma boîte à outils</h1>
+    <p class="lead">Ce qui m’aide quand ça ne va pas : une photo qui m’apaise, une musique, une vidéo, un message vocal que je me suis enregistré quand j’allais bien, un lien utile…</p>
+    <section class="card tb-add">
+      <h2>Ajouter</h2>
+      <div class="tb-add-grid">
+        ${['photo', 'video', 'audio'].map((k) => `<label class="btn btn-secondary tb-add-btn"><span aria-hidden="true">${KINDS[k].icon}</span> ${KINDS[k].label}<input type="file" accept="${KINDS[k].accept}" data-act="tb-file" data-kind="${k}" hidden></label>`).join('')}
+        ${canRecord() ? `<button type="button" class="btn btn-secondary tb-add-btn" data-act="tb-record"><span aria-hidden="true">🎙</span> M’enregistrer</button>` : ''}
+      </div>
+      <form class="tb-link" data-act="tb-link">
+        <label class="field"><span>🔗 Ajouter un lien (playlist, vidéo, site…)</span>
+          <input type="text" name="url" inputmode="url" autocapitalize="off" spellcheck="false" placeholder="https://…" autocomplete="off" required></label>
+        <button class="btn btn-secondary btn-sm">Ajouter le lien</button>
+      </form>
+      <p class="muted small">Tout reste sur ce téléphone${store.isProtected() ? ', chiffré avec mon code' : ''}. Dans le plan imprimé ou envoyé, seuls les titres et les liens apparaissent, jamais les photos, vidéos ou sons.</p>
+    </section>
+    ${items.length ? `<ol class="tb-list">${items.map((it, idx) => toolboxItemHTML(it, idx, items.length)).join('')}</ol>` : '<p class="muted empty center">Ma boîte à outils est vide pour l’instant.</p>'}
+    <div class="nav-bottom">
+      ${fromStep ? `<a class="btn btn-ghost" href="#/etape/${stepIdx}">← Retour à l’étape 7</a>` : '<a class="btn btn-ghost" href="#/">← Accueil</a>'}
+    </div>`;
+  fillMedia();
+}
+
+function toolboxItemHTML(it, idx, n) {
+  const k = KINDS[it.kind];
+  let body = '';
+  if (it.kind === 'photo') body = `<img class="tb-media" data-media="${esc(it.file)}" alt="${esc(it.title || 'Photo')}">`;
+  else if (it.kind === 'video') body = `<video class="tb-media" data-media="${esc(it.file)}" controls playsinline preload="metadata"></video>`;
+  else if (it.kind === 'audio' || it.kind === 'voix') body = `<audio class="tb-audio" data-media="${esc(it.file)}" controls preload="metadata"></audio>`;
+  else if (it.kind === 'lien') {
+    let host = '';
+    try { host = new URL(it.url).hostname.replace(/^www\./, ''); } catch { /* lien invalide */ }
+    body = `<a class="btn btn-primary btn-sm tb-open" href="${esc(it.url)}" target="_blank" rel="noopener noreferrer">Ouvrir ${esc(host || 'le lien')} ↗</a>`;
+  }
+  return `<li class="card tb-item">
+    <div class="tb-head">
+      <span class="tb-kind" aria-hidden="true">${k.icon}</span>
+      <label class="sr-only" for="tb-t-${idx}">Titre</label>
+      <input id="tb-t-${idx}" class="tb-title" data-tb="${idx}" data-fk="tb:${idx}" value="${esc(it.title || '')}" placeholder="${esc(k.label)} — donner un titre…">
+    </div>
+    <div class="tb-body">${body}</div>
+    <div class="tb-tools">
+      <button type="button" class="icon" data-act="tb-up" data-i="${idx}" data-fk="tb-up:${idx}" aria-label="Monter" ${idx === 0 ? 'disabled' : ''}>↑</button>
+      <button type="button" class="icon" data-act="tb-down" data-i="${idx}" data-fk="tb-down:${idx}" aria-label="Descendre" ${idx === n - 1 ? 'disabled' : ''}>↓</button>
+      <button type="button" class="icon icon-del" data-act="tb-del" data-i="${idx}" aria-label="Supprimer">✕</button>
+    </div>
+  </li>`;
+}
+
+async function fillMedia() {
+  for (const el of app.querySelectorAll('[data-media]')) {
+    const id = el.dataset.media;
+    try {
+      if (!mediaURLs.has(id)) {
+        const blob = await media.get(id);
+        if (!blob) { el.replaceWith(Object.assign(document.createElement('p'), { className: 'muted small', textContent: 'Fichier introuvable sur ce téléphone.' })); continue; }
+        mediaURLs.set(id, URL.createObjectURL(blob));
+      }
+      el.src = mediaURLs.get(id);
+    } catch {
+      el.replaceWith(Object.assign(document.createElement('p'), { className: 'muted small', textContent: 'Impossible d’afficher ce fichier.' }));
+    }
+  }
+}
+
+function forgetMediaURLs() {
+  for (const u of mediaURLs.values()) URL.revokeObjectURL(u);
+  mediaURLs.clear();
+}
+
+async function addToolboxBlob(kind, blob, title = '') {
+  if (blob.size > media.MAX_BYTES) { toast('Fichier trop volumineux (150 Mo maximum).'); return; }
+  try {
+    const file = await media.put(blob);
+    toolbox().push({ kind, file, title, added: new Date().toISOString() });
+    scheduleSave();
+    rerender(() => renderToolbox(location.hash.endsWith('/etape')));
+    app.querySelector(`[data-fk="tb:${toolbox().length - 1}"]`)?.focus();
+    toast('Ajouté. Je peux lui donner un titre.');
+  } catch {
+    toast('Enregistrement impossible : la mémoire du téléphone est peut-être pleine.');
+  }
+}
+
+/* Enregistrement d'un message vocal */
+function recordVoice() {
+  return new Promise((resolve) => {
+    const d = $('#modal');
+    let rec = null; let stream = null; let chunks = []; let timer = null; let t0 = 0; let result = null;
+    d.innerHTML = `<div class="modal-inner">
+      <h2>🎙 M’enregistrer</h2>
+      <p class="muted small">Par exemple, un message que je m’adresse quand je vais bien, pour me le faire écouter dans les moments difficiles.</p>
+      <p class="rec-time" aria-live="polite">0:00</p>
+      <audio class="tb-audio" controls hidden></audio>
+      <div class="modal-actions">
+        <button type="button" class="btn btn-ghost" data-r="cancel">Annuler</button>
+        <button type="button" class="btn btn-primary" data-r="start">● Démarrer</button>
+        <button type="button" class="btn btn-danger" data-r="stop" hidden>■ Arrêter</button>
+        <button type="button" class="btn btn-primary" data-r="keep" hidden>Garder</button>
+      </div></div>`;
+    const $r = (k) => d.querySelector(`[data-r="${k}"]`);
+    const time = d.querySelector('.rec-time');
+    const player = d.querySelector('audio');
+    const cleanup = () => { clearInterval(timer); stream?.getTracks().forEach((t) => t.stop()); if (player.src) URL.revokeObjectURL(player.src); };
+    const finish = (v) => { cleanup(); d.close(); resolve(v); };
+    d.onclick = async (e) => {
+      const a = e.target.closest('[data-r]')?.dataset.r;
+      if (a === 'cancel') finish(null);
+      else if (a === 'start') {
+        try { stream = await navigator.mediaDevices.getUserMedia({ audio: true }); } catch { toast('Micro non autorisé.'); return; }
+        chunks = []; rec = new MediaRecorder(stream);
+        rec.ondataavailable = (ev) => { if (ev.data.size) chunks.push(ev.data); };
+        rec.onstop = () => {
+          result = new Blob(chunks, { type: rec.mimeType || 'audio/webm' });
+          stream.getTracks().forEach((t) => t.stop());
+          player.src = URL.createObjectURL(result); player.hidden = false;
+          $r('keep').hidden = false; $r('start').hidden = false; $r('start').textContent = '● Recommencer';
+        };
+        rec.start(); t0 = Date.now();
+        timer = setInterval(() => { const s = Math.floor((Date.now() - t0) / 1000); time.textContent = `${Math.floor(s / 60)}:${String(s % 60).padStart(2, '0')}`; }, 250);
+        $r('start').hidden = true; $r('keep').hidden = true; $r('stop').hidden = false; player.hidden = true;
+      } else if (a === 'stop') { clearInterval(timer); rec?.stop(); $r('stop').hidden = true; }
+      else if (a === 'keep' && result) finish(result);
+    };
+    d.oncancel = (e) => { e.preventDefault(); if (rec?.state === 'recording') rec.stop(); finish(null); };
+    d.showModal();
+  });
+}
+
+const usedMediaIds = () => (plan?.data.boiteOutils || []).map((it) => it.file).filter(Boolean);
+
 /* ---------- plan complet et partage ---------- */
 
 function renderPlan() {
@@ -584,7 +745,7 @@ function renderSettings() {
         <button class="btn btn-secondary" data-act="export">Exporter une sauvegarde</button>
         <label class="btn btn-ghost file-btn">Importer une sauvegarde<input type="file" accept="application/json,.json" data-act="import" hidden></label>
       </div>
-      <p class="muted small">Le fichier de sauvegarde n’est pas chiffré : je le garde en lieu sûr.</p>
+      <p class="muted small">Le fichier de sauvegarde contient aussi ma boîte à outils (photos, vidéos, sons) et n’est pas chiffré : je le garde en lieu sûr.</p>
     </section>
     <section class="card">
       <h2>Installer l’application</h2>
@@ -635,6 +796,7 @@ function renderPrivacy() {
         <li><strong>Aucune donnée n’est collectée</strong> par Mon PCC : pas de compte, pas de serveur, pas de base de données.</li>
         <li>Mes réponses sont enregistrées <strong>uniquement dans le navigateur de ce téléphone</strong>.</li>
         <li>Aucun cookie, aucune mesure d’audience, aucune publicité, aucune police ou ressource chargée depuis un autre site.</li>
+        <li>Les photos, vidéos et sons de ma <strong>boîte à outils</strong> restent sur ce téléphone (chiffrés si j’ai mis un code). Ils ne figurent jamais dans le plan imprimé ou envoyé : seuls leurs titres et les liens y apparaissent.</li>
         <li>Si mon téléphone le permet, je peux <strong>choisir des contacts</strong> dans mon carnet : seuls ceux que je coche sont ajoutés (nom et numéro), le reste de mon carnet n’est jamais lu.</li>
         <li>Je peux <strong>protéger</strong> mon plan par un code (chiffrement AES-256) et <strong>tout effacer</strong> à tout moment dans les Réglages.</li>
       </ul>
@@ -703,6 +865,11 @@ function closeMenu() {
 app.addEventListener('input', (e) => {
   const el = e.target;
   if (!plan || el.type === 'file') return;
+  if (el.dataset.tb !== undefined) {
+    toolbox()[+el.dataset.tb].title = el.value;
+    scheduleSave();
+    return;
+  }
   const stepEl = el.closest('[data-step]');
   if (!stepEl) return;
   const step = STEPS[+stepEl.dataset.step];
@@ -739,11 +906,25 @@ app.addEventListener('submit', async (e) => {
     scheduleSave();
     rerender(() => renderStep(STEPS.indexOf(step)));
     app.querySelector(`[data-fk="free:${form.dataset.g}"]`)?.focus({ preventScroll: true });
+  } else if (act === 'tb-link') {
+    let url = form.url.value.trim();
+    if (!/^https?:\/\//i.test(url)) url = 'https://' + url;
+    try {
+      const u = new URL(url);
+      if (!/^https?:$/.test(u.protocol)) throw new Error();
+      toolbox().push({ kind: 'lien', url: u.href, title: '', added: new Date().toISOString() });
+      scheduleSave();
+      rerender(() => renderToolbox(location.hash.endsWith('/etape')));
+      app.querySelector(`[data-fk="tb:${toolbox().length - 1}"]`)?.focus();
+    } catch {
+      toast('Ce lien ne semble pas valide.');
+    }
   } else if (act === 'unlock') {
     const err = form.querySelector('.error');
     try {
       plan = await store.unlock(form.code.value);
       locked = false;
+      media.prune(usedMediaIds()).catch(() => {});
       route();
     } catch {
       err.textContent = 'Code incorrect.';
@@ -751,7 +932,10 @@ app.addEventListener('submit', async (e) => {
     }
   } else if (act === 'protect') {
     if (form.c1.value !== form.c2.value) return toast('Les deux codes ne sont pas identiques.');
+    const files = await media.loadAll().catch(() => []);
     await store.protect(plan, form.c1.value);
+    await media.saveAll(files);
+    forgetMediaURLs();
     toast('Protection activée.');
     renderSettings();
   }
@@ -759,12 +943,21 @@ app.addEventListener('submit', async (e) => {
 
 app.addEventListener('change', async (e) => {
   const el = e.target;
+  if (el.dataset.act === 'tb-file' && el.files[0]) {
+    const f = el.files[0];
+    el.value = '';
+    await addToolboxBlob(el.dataset.kind, f, f.name.replace(/\.[^.]+$/, '').replace(/^(IMG|VID|PXL|DSC|Screenshot)[-_ ].*$/i, ''));
+    return;
+  }
   if (el.dataset.act !== 'import' || !el.files[0]) return;
   try {
     const obj = JSON.parse(await el.files[0].text());
     if (!obj || obj.app !== 'mon-pcc' || typeof obj.plan?.data !== 'object') throw new Error();
     if (hasData() && !(await modal({ title: 'Remplacer mon plan ?', body: '<p>Le plan actuellement enregistré sur ce téléphone sera remplacé par la sauvegarde.</p>', ok: 'Remplacer', danger: true }))) return;
     plan = obj.plan;
+    await media.clear();
+    forgetMediaURLs();
+    for (const m of obj.media || []) await media.put(media.dataURLToBlob(m.data), m.id);
     await store.save(plan);
     toast('Sauvegarde importée.');
     location.hash = '#/';
@@ -827,6 +1020,30 @@ document.addEventListener('click', async (e) => {
       break;
     }
     case 'contacts': await pickContacts(step, g); break;
+    case 'tb-record': {
+      const blob = await recordVoice();
+      if (blob) await addToolboxBlob('voix', blob, 'Mon message');
+      break;
+    }
+    case 'tb-up': case 'tb-down': {
+      const arr = toolbox();
+      const j = act === 'tb-up' ? i - 1 : i + 1;
+      if (j < 0 || j >= arr.length) return;
+      [arr[i], arr[j]] = [arr[j], arr[i]];
+      scheduleSave();
+      rerender(() => renderToolbox(location.hash.endsWith('/etape')));
+      (app.querySelector(`[data-fk="${act}:${j}"]`) || app.querySelector(`[data-fk="tb:${j}"]`))?.focus({ preventScroll: true });
+      break;
+    }
+    case 'tb-del': {
+      const it = toolbox()[i];
+      if (!(await modal({ title: 'Retirer de ma boîte à outils ?', body: `<p>« ${esc(it.title || KINDS[it.kind].label)} » sera supprimé de ce téléphone.</p>`, ok: 'Supprimer', danger: true }))) return;
+      toolbox().splice(i, 1);
+      if (it.file) { await media.remove(it.file).catch(() => {}); const u = mediaURLs.get(it.file); if (u) URL.revokeObjectURL(u); mediaURLs.delete(it.file); }
+      scheduleSave();
+      rerender(() => renderToolbox(location.hash.endsWith('/etape')));
+      break;
+    }
     case 'empty': {
       getArr(step, g).push({});
       redraw();
@@ -877,13 +1094,19 @@ document.addEventListener('click', async (e) => {
     case 'share-file': shareFile(); break;
     case 'share-text': shareText(); break;
     case 'export': {
-      const blob = new Blob([JSON.stringify({ app: 'mon-pcc', exported: new Date().toISOString(), plan }, null, 2)], { type: 'application/json' });
+      const files = [];
+      for (const id of usedMediaIds()) {
+        try { const b = await media.get(id); if (b) files.push({ id, data: await media.blobToDataURL(b) }); } catch { /* ignoré */ }
+      }
+      const blob = new Blob([JSON.stringify({ app: 'mon-pcc', exported: new Date().toISOString(), plan, media: files })], { type: 'application/json' });
       download(blob, 'sauvegarde-mon-pcc-' + new Date().toISOString().slice(0, 10) + '.json');
       break;
     }
     case 'wipe':
       if (await modal({ title: 'Tout effacer ?', body: '<p>Mon plan sera supprimé définitivement de ce téléphone. Pensez à exporter une sauvegarde si vous souhaitez le garder.</p>', ok: 'Tout effacer', danger: true })) {
         store.wipe();
+        await media.clear();
+        forgetMediaURLs();
         plan = store.emptyPlan();
         toast('Données effacées.');
         location.hash = '#/';
@@ -891,12 +1114,17 @@ document.addEventListener('click', async (e) => {
       }
       break;
     case 'unprotect':
-      await store.unprotect(plan);
+      {
+        const files = await media.loadAll().catch(() => []);
+        await store.unprotect(plan);
+        await media.saveAll(files);
+      }
       toast('Code retiré.');
       renderSettings();
       break;
     case 'lock-now':
       store.lock();
+      forgetMediaURLs();
       plan = null;
       locked = true;
       renderLock();
@@ -904,6 +1132,7 @@ document.addEventListener('click', async (e) => {
     case 'forgot':
       if (await modal({ title: 'Code oublié', body: '<p>Sans le code, le plan chiffré ne peut pas être récupéré. Vous pouvez l’effacer pour recommencer, ou réimporter une sauvegarde ensuite.</p>', ok: 'Effacer et recommencer', danger: true })) {
         store.wipe();
+        await media.clear();
         plan = store.emptyPlan();
         locked = false;
         location.hash = '#/';
@@ -935,7 +1164,7 @@ window.addEventListener('appinstalled', () => { installEvent = null; });
 document.addEventListener('visibilitychange', () => {
   if (document.hidden) { hiddenAt = Date.now(); return; }
   if (store.isProtected() && !locked && hiddenAt && Date.now() - hiddenAt > AUTO_LOCK_MS) {
-    store.lock(); plan = null; locked = true; renderLock();
+    store.lock(); forgetMediaURLs(); plan = null; locked = true; renderLock();
   }
 });
 
@@ -956,6 +1185,7 @@ function start() {
   if (plan && !plan.data) plan.data = {};
   saveState.textContent = st === 'none' ? '' : 'Enregistré sur ce téléphone';
   store.requestPersistence();
+  if (plan) media.prune(usedMediaIds()).catch(() => {});
   route();
   if ('serviceWorker' in navigator && location.protocol === 'https:') {
     navigator.serviceWorker.register('./sw.js').catch(() => {});

@@ -14,6 +14,7 @@ un·e professionnel·le qui l’accompagne et, si elle le souhaite, ses proches.
 - **Priorités** : stratégies et personnes ressources se classent par ordre de priorité (moi-même → entourage → professionnel·les → services de garde), comme le demande le PCC.
 - **Cohérence** : rappel si des soins à éviter sont indiqués sans alternative (champ indispensable selon le PCC).
 - **Démarche respectée** : remplir d’abord seul·e à la première personne, puis décision partagée, signature, diffusion, relecture au moins tous les 6 mois (rappel de date).
+- **Boîte à outils** (étape 7, partie 1, et menu) : photos, vidéos, sons, messages vocaux enregistrés dans l’application et liens qui aident à aller mieux. Fichiers stockés sur l’appareil (IndexedDB), chiffrés avec le code si le plan est protégé ; seuls les titres et liens figurent dans le plan imprimé ou envoyé.
 - **Contacts du téléphone** (Android/Chrome) : aux étapes Partenaires, À qui demander de l’aide et Démarches, bouton « Choisir dans mes contacts » après information et accord. Seuls les contacts cochés sont transmis (API Contact Picker) ; le bouton n’apparaît pas sur les appareils non compatibles (iPhone, ordinateur).
 - **Signature sur l’écran** : la personne et chaque partenaire peuvent signer au doigt sur le smartphone (ou à la main sur la version imprimée). Alerte si le plan est modifié après les signatures.
 - **Partage au choix de la personne** : impression / PDF avec cadres de signature, envoi d’un document lisible partout (HTML autonome), ou envoi en texte via le menu de partage du téléphone.
@@ -50,6 +51,7 @@ css/style.css           styles (clair/sombre, impression)
 js/data.js              trame PCC, conseils et suggestions  ← contenu à relire
 js/app.js               interface et navigation
 js/storage.js           stockage local et chiffrement
+js/media.js             fichiers de la boîte à outils (IndexedDB)
 js/export.js            mise en forme, impression, texte, document autonome
 sw.js                   hors connexion
 manifest.webmanifest    installation
