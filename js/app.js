@@ -5,7 +5,7 @@ import * as media from './media.js';
 import { appUrl, displayUrl, makeQr, qrSvg, renderCard, canvasToJpeg, buildSheetPdf } from './share.js';
 import {
   esc, fmtDate, addMonths, stepIsFilled, progress, documentHTML, planText,
-  fileBaseName,
+  fileBaseName, sigValid, lastUpdate, fmtDateTime,
 } from './export.js';
 import { buildPlanPdf } from './planpdf.js';
 
@@ -174,7 +174,7 @@ function renderHome() {
     <section class="card progress-card">
       <h2>Mon plan de crise conjoint</h2>
       <div class="bar" role="progressbar" aria-valuemin="0" aria-valuemax="${p.total}" aria-valuenow="${p.done}" aria-label="Étapes complétées"><span style="width:${(p.done / p.total) * 100}%"></span></div>
-      <p class="muted">${p.done} étape${p.done > 1 ? 's' : ''} sur ${p.total} complétée${p.done > 1 ? 's' : ''} · modifié le ${fmtDate(plan.updated)}</p>
+      <p class="muted">${p.done} étape${p.done > 1 ? 's' : ''} sur ${p.total} complétée${p.done > 1 ? 's' : ''} · modifié le ${fmtDate(lastUpdate(plan))}</p>
       ${review}
       <div class="stack">
         ${next >= 0 ? `<a class="btn btn-primary" href="#/etape/${next}">Continuer : ${esc(STEPS[next].short)}</a>` : ''}
@@ -356,7 +356,7 @@ function finalHTML(step) {
       <label class="field"><span>Date</span><input type="date" data-k="date" data-fk="fin:date" value="${esc(v.date || '')}"></label>
       <button type="button" class="btn btn-ghost btn-sm" data-act="today">Mettre la date du jour</button>
     </section>
-    ${modifiedAfterSigning() ? '<div class="warn" role="status"><strong>Le plan a été modifié après les signatures.</strong> Relisez-le ensemble et faites signer à nouveau si le contenu a changé.</div>' : ''}
+    ${modifiedAfterSigning() ? `<div class="warn" role="status"><strong>Le plan a été modifié le ${esc(fmtDateTime(lastUpdate(plan)))}, après certaines signatures.</strong> Ces signatures ne figurent plus sur l’impression ni sur le PDF : relisez le plan ensemble puis signez à nouveau.</div>` : ''}
     <section class="group card">
       <h2>Signataires</h2>
       <p class="muted small">Chacun·e peut signer avec le doigt directement sur ce téléphone, ou à la main sur le document imprimé.</p>
@@ -369,7 +369,8 @@ function finalHTML(step) {
           ${step.fields.map((f) => `<label class="field"><span>${esc(f.label)}</span><input data-g="_" data-i="${idx}" data-f="${f.key}" data-fk="rf:_:${idx}:${f.key}" value="${esc(r[f.key] || '')}" placeholder="${esc(f.placeholder)}"></label>`).join('')}
           <div class="sig-area">
             ${r.sig
-              ? `<img class="sig-img" src="${r.sig}" alt="Signature de ${esc(r.nom || 'ce·tte signataire')}"><p class="muted small">Signé le ${esc(fmtDate(r.signedAt))}</p>
+              ? `<img class="sig-img${sigValid(r, plan) ? '' : ' stale'}" src="${r.sig}" alt="Signature de ${esc(r.nom || 'ce·tte signataire')}"><p class="muted small">Signé le ${esc(fmtDateTime(r.signedAt))}</p>
+                 ${sigValid(r, plan) ? '' : '<p class="sig-stale">⚠ Signature antérieure à la dernière modification du plan : elle n’apparaîtra pas sur l’impression ni sur le PDF. À signer à nouveau.</p>'}
                  <div class="sig-tools"><button type="button" class="btn btn-ghost btn-sm" data-act="sign" data-i="${idx}" data-fk="sign:${idx}">Signer à nouveau</button>
                  <button type="button" class="btn btn-ghost btn-sm" data-act="unsign" data-i="${idx}">Effacer la signature</button></div>`
               : `<button type="button" class="btn btn-primary btn-sm" data-act="sign" data-i="${idx}" data-fk="sign:${idx}">✍ Signer sur l’écran</button>`}
@@ -380,10 +381,7 @@ function finalHTML(step) {
 }
 
 function modifiedAfterSigning() {
-  const sigs = (plan.data.signature?.signataires || []).filter((r) => r.sig && r.signedAt);
-  if (!sigs.length || !plan.contentUpdated) return false;
-  const first = sigs.map((r) => r.signedAt).sort()[0];
-  return plan.contentUpdated > first;
+  return (plan.data.signature?.signataires || []).some((r) => r.sig && !sigValid(r, plan));
 }
 
 /* Signature au doigt : renvoie une image PNG (data URL) ou null */
@@ -621,7 +619,7 @@ function renderPlan() {
   app.innerHTML = `
     <h1>Mon plan</h1>
     ${refused && !alt ? '<div class="warn" role="status"><strong>À compléter :</strong> j’ai indiqué des soins à éviter sans proposer d’alternative. <a href="#/etape/' + STEPS.findIndex((s) => s.id === 'alternatives') + '">Compléter les alternatives</a></div>' : ''}
-    ${modifiedAfterSigning() ? '<div class="warn" role="status"><strong>Le plan a été modifié après les signatures.</strong> <a href="#/etape/' + (STEPS.length - 1) + '">Vérifier les signatures</a></div>' : ''}
+    ${modifiedAfterSigning() ? '<div class="warn no-print" role="status"><strong>Le plan a été modifié après certaines signatures</strong> : elles ne figurent plus sur l’impression ni sur le PDF. <a href="#/etape/' + (STEPS.length - 1) + '">Signer à nouveau</a></div>' : ''}
     <section class="card actions no-print">
       <h2>Imprimer, enregistrer, envoyer</h2>
       <p class="muted">Rien ne part sans mon accord. Je choisis à qui j’envoie mon plan et par quel moyen.</p>

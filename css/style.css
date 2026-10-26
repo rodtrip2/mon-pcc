@@ -267,6 +267,8 @@ img.tb-media { background: transparent; }
 /* Signature */
 .sig-area { display: flex; flex-direction: column; gap: .3rem; align-items: flex-start; }
 .sig-img { background: #fff; border: 1px solid var(--line); border-radius: 8px; max-width: 100%; max-height: 110px; }
+.sig-img.stale { opacity: .35; }
+.sig-stale { margin: 0; font-size: .85rem; color: var(--danger); font-weight: 600; }
 .sig-tools { display: flex; gap: .4rem; flex-wrap: wrap; }
 .sigpad { width: min(720px, 96vw); max-height: 96vh; }
 .sig-inner { padding: 1rem; }
@@ -291,6 +293,7 @@ img.tb-media { background: transparent; }
 .doc-head { border-bottom: 3px solid #2f6f6a; margin-bottom: 1rem; padding-bottom: .5rem; }
 .doc-head h1 { font-size: 1.3rem; letter-spacing: .06em; margin: 0; color: #2f6f6a; }
 .doc-sub { margin: .2rem 0 0; color: #566; }
+.doc-date { margin: .3rem 0 0; font-size: .85rem; color: #24524e; }
 .doc-sec { margin: 0 0 1rem; break-inside: avoid; }
 .doc-sec h2 { font-size: .95rem; margin: 0 0 .35rem; color: #24524e; }
 .doc-sec h3 { font-size: .8rem; margin: .5rem 0 .2rem; text-transform: uppercase; letter-spacing: .04em; color: #566; }

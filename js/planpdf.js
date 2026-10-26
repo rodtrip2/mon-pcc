@@ -1,6 +1,6 @@
 /* Mon PCC — plan de crise conjoint au format PDF (A4), chiffrement facultatif */
 import { STEPS, SOURCE, PRINT_TITLE, PRINT_SUBTITLE } from './data.js';
-import { stepContent, fmtDate } from './export.js';
+import { stepContent, fmtDate, fmtDateTime, lastUpdate } from './export.js';
 import { PdfDoc, wrap, textWidth, jpegSize } from './pdf.js';
 
 const MM = 72 / 25.4;
@@ -53,13 +53,15 @@ export async function buildPlanPdf(plan, password = '') {
   doc.text(page, M, y + 16, PRINT_TITLE, 'B', 16, TEAL);
   y += 22;
   para(PRINT_SUBTITLE, { size: 10, color: GREY });
+  y += 2;
+  para(`Dernière mise à jour : ${fmtDateTime(lastUpdate(plan))}`, { font: 'B', size: 9.5, color: TEAL_DARK });
   y += 3;
   doc.line(page, M, y, M + CW, y, 2, 0.35);
   doc.op(page, ''); // séparation lisible
   y += 12;
 
   for (const step of STEPS) {
-    const content = stepContent(step, plan.data);
+    const content = stepContent(step, plan.data, plan);
     if (step.type === 'identity') {
       if (content.length) {
         const [first, ...rest] = content[0].lines;
@@ -102,13 +104,13 @@ export async function buildPlanPdf(plan, password = '') {
   doc.line(page, M, y, M + CW, y, 0.5, 0.75);
   y += 8;
   para(`Document rédigé avec Mon PCC, d’après le support : ${SOURCE.citation} ${SOURCE.url} — © ${SOURCE.holder}, licence ${SOURCE.license}. Mise en page adaptée.`, { size: 7.5, color: GREY });
-  para(`Dernière mise à jour : ${fmtDate(plan.updated)}. À relire après une crise, lors d’un changement important et au moins tous les six mois.`, { size: 7.5, color: GREY });
+  para(`Dernière mise à jour : ${fmtDateTime(lastUpdate(plan))}. À relire après une crise, lors d’un changement important et au moins tous les six mois.`, { size: 7.5, color: GREY });
 
   // Pied de page
   const id = plan.data.coordonnees || {};
   const who = [id.prenom, id.nom].filter(Boolean).join(' ');
   doc.pages.forEach((_, i) => {
-    const t = `Plan de crise conjoint${who ? ' — ' + who : ''}`;
+    const t = `Plan de crise conjoint${who ? ' — ' + who : ''} — mis à jour le ${fmtDate(lastUpdate(plan))}`;
     doc.text(i, M, PH - 10 * MM, t, 'R', 7.5, GREY);
     const pn = `Page ${i + 1} / ${doc.pages.length}`;
     doc.text(i, PW - M - textWidth(pn, 'R', 7.5), PH - 10 * MM, pn, 'R', 7.5, GREY);

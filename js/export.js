@@ -11,6 +11,19 @@ export function fmtDate(iso) {
   return d.toLocaleDateString('fr-FR', { day: 'numeric', month: 'long', year: 'numeric' });
 }
 
+export function fmtDateTime(iso) {
+  if (!iso) return '';
+  const d = new Date(iso);
+  if (isNaN(d)) return iso;
+  return fmtDate(iso) + ' à ' + d.toLocaleTimeString('fr-FR', { hour: '2-digit', minute: '2-digit' }).replace(':', ' h ');
+}
+
+/** Date de la dernière modification du contenu du plan */
+export const lastUpdate = (plan) => plan.contentUpdated || plan.updated;
+
+/** Une signature n'est valable que si elle est postérieure à la dernière modification */
+export const sigValid = (r, plan) => !!(r && r.sig && r.signedAt && (!plan || !plan.contentUpdated || r.signedAt >= plan.contentUpdated));
+
 export function addMonths(iso, n) {
   const d = new Date(iso.length === 10 ? iso + 'T12:00:00' : iso);
   d.setMonth(d.getMonth() + n);
@@ -21,7 +34,7 @@ const filled = (v) => typeof v === 'string' ? v.trim() !== '' : !!v;
 const recFilled = (r) => r && Object.values(r).some(filled);
 
 /** Contenu d'une étape sous forme neutre : [{label?, lines:[...]}] */
-export function stepContent(step, data) {
+export function stepContent(step, data, plan = null) {
   const v = data[step.id];
   const out = [];
   if (step.type === 'identity') {
@@ -42,7 +55,9 @@ export function stepContent(step, data) {
     if (filled(ld)) lines.push(ld);
     if (lines.length) out.push({ lines });
     const sig = (f.signataires || []).filter(recFilled);
-    if (sig.length) out.push({ label: 'Rôles & signatures', lines: sig.map((r) => [r.nom, r.role].filter(filled).join(' — ') + (r.sig ? ' (signé le ' + fmtDate(r.signedAt) + ')' : '')), signers: sig, signatures: true });
+    // signatures antérieures à la dernière modification : non reprises
+    const signers = sig.map((r) => (plan && r.sig && !sigValid(r, plan) ? { nom: r.nom, role: r.role } : r));
+    if (sig.length) out.push({ label: 'Rôles & signatures', lines: signers.map((r) => [r.nom, r.role].filter(filled).join(' — ') + (r.sig ? ' (signé le ' + fmtDate(r.signedAt) + ')' : '')), signers, signatures: true });
     return out;
   }
   const groups = step.groups || [{ id: null }];
@@ -86,9 +101,9 @@ export function progress(data) {
 /** Document HTML (sans <html>), réutilisé pour l'aperçu, l'impression et le fichier */
 export function documentHTML(plan) {
   const data = plan.data;
-  let h = `<header class="doc-head"><h1>${PRINT_TITLE}</h1><p class="doc-sub">${esc(PRINT_SUBTITLE)}</p></header>`;
+  let h = `<header class="doc-head"><h1>${PRINT_TITLE}</h1><p class="doc-sub">${esc(PRINT_SUBTITLE)}</p><p class="doc-date">Dernière mise à jour : <strong>${esc(fmtDateTime(lastUpdate(plan)))}</strong></p></header>`;
   for (const step of STEPS) {
-    const content = stepContent(step, data);
+    const content = stepContent(step, data, plan);
     if (step.type === 'identity') {
       h += `<section class="doc-sec doc-id">${content.length ? content[0].lines.map((l) => `<p>${esc(l)}</p>`).join('') : '<p class="doc-empty">Coordonnées non renseignées</p>'}</section>`;
       continue;
@@ -118,15 +133,15 @@ export function documentHTML(plan) {
     }
     h += '</section>';
   }
-  h += `<footer class="doc-foot"><p>Document rédigé avec Mon PCC, d’après le support : ${esc(SOURCE.citation)} ${esc(SOURCE.url)} — © ${esc(SOURCE.holder)}, licence ${esc(SOURCE.license)}. Mise en page adaptée.</p><p>Dernière mise à jour : ${esc(fmtDate(plan.updated))}. À relire après une crise, lors d’un changement important et au moins tous les six mois.</p></footer>`;
+  h += `<footer class="doc-foot"><p>Document rédigé avec Mon PCC, d’après le support : ${esc(SOURCE.citation)} ${esc(SOURCE.url)} — © ${esc(SOURCE.holder)}, licence ${esc(SOURCE.license)}. Mise en page adaptée.</p><p>Dernière mise à jour : ${esc(fmtDateTime(lastUpdate(plan)))}. À relire après une crise, lors d’un changement important et au moins tous les six mois.</p></footer>`;
   return h;
 }
 
 export function planText(plan) {
   const data = plan.data;
-  const L = [PRINT_TITLE, PRINT_SUBTITLE, ''];
+  const L = [PRINT_TITLE, PRINT_SUBTITLE, `Dernière mise à jour : ${fmtDateTime(lastUpdate(plan))}`, ''];
   for (const step of STEPS) {
-    const content = stepContent(step, data);
+    const content = stepContent(step, data, plan);
     if (step.type === 'identity') {
       if (content.length) L.push(...content[0].lines, '');
       continue;
@@ -139,7 +154,7 @@ export function planText(plan) {
     }
     L.push('');
   }
-  L.push(`Mis à jour le ${fmtDate(plan.updated)}.`);
+  L.push(`Dernière mise à jour : ${fmtDateTime(lastUpdate(plan))}.`);
   L.push(`D’après : ${SOURCE.citation} ${SOURCE.url} — ${SOURCE.license}.`);
   return L.join('\n');
 }
@@ -149,6 +164,7 @@ export const DOC_CSS = `
 .doc-head{border-bottom:3px solid #2f6f6a;margin-bottom:1rem;padding-bottom:.5rem}
 .doc-head h1{font-size:1.35rem;letter-spacing:.06em;margin:0;color:#2f6f6a}
 .doc-sub{margin:.2rem 0 0;color:#566}
+.doc-date{margin:.3rem 0 0;font-size:.85rem;color:#24524e}
 .doc-sec{margin:0 0 1rem;break-inside:avoid}
 .doc-sec h2{font-size:.95rem;margin:0 0 .35rem;color:#24524e}
 .doc-sec h3{font-size:.85rem;margin:.5rem 0 .2rem;text-transform:uppercase;letter-spacing:.04em;color:#566}
