@@ -262,6 +262,9 @@ img.tb-media { background: transparent; }
 .mes-steps { padding-left: 1.3rem; margin: .3rem 0 .8rem; }
 .mes-steps li { margin: .35rem 0; }
 
+.home-tb { margin-top: 1rem; padding: 0; overflow: hidden; }
+.home-tb .tb-teaser { margin: 0; border-radius: 0; }
+
 /* Exemples */
 .sugg { margin-top: .6rem; }
 .ex-btn { margin-bottom: .5rem; }

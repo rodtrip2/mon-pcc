@@ -159,7 +159,8 @@ function renderHome() {
         <p>Pas de compte, pas de serveur, pas de publicité. Ce que j’écris est enregistré uniquement sur ce téléphone. C’est moi qui décide de l’envoyer, et à qui.</p>
         <p><a href="#/confidentialite">En savoir plus sur la confidentialité</a></p>
       </section>
-      ${emergencyNote()}`;
+      ${emergencyNote()}
+    ${toolboxHomeHTML()}`;
     return;
   }
   const p = progress(plan.data);
@@ -181,7 +182,6 @@ function renderHome() {
       <div class="stack">
         ${next >= 0 ? `<a class="btn btn-primary" href="#/etape/${next}">Continuer : ${esc(STEPS[next].short)}</a>` : ''}
         <a class="btn ${next >= 0 ? 'btn-secondary' : 'btn-primary'}" href="#/plan">Voir, imprimer ou envoyer mon plan</a>
-        ${(plan.data.boiteOutils || []).length ? '<a class="btn btn-secondary" href="#/boite-outils">🧰 Ma boîte à outils</a>' : ''}
       </div>
     </section>
     <section class="card">
@@ -189,7 +189,8 @@ function renderHome() {
       ${stepsListHTML()}
     </section>
     <p class="center"><a href="#/demarche">Revoir la démarche</a></p>
-    ${emergencyNote()}`;
+    ${emergencyNote()}
+    ${toolboxHomeHTML()}`;
 }
 
 function stepsListHTML() {
@@ -468,13 +469,17 @@ const mediaURLs = new Map(); // id -> URL d'affichage (session)
 const canRecord = () => !!(navigator.mediaDevices?.getUserMedia && window.MediaRecorder);
 const toolbox = () => (plan.data.boiteOutils ??= []);
 
-function toolboxTeaserHTML() {
+function toolboxHomeHTML() {
+  return `<section class="card home-tb">${toolboxTeaserHTML('#/boite-outils')}</section>`;
+}
+
+function toolboxTeaserHTML(href = '#/boite-outils/etape') {
   const items = plan.data.boiteOutils || [];
   return `<div class="tb-teaser">
     <h3>🧰 Ma boîte à outils</h3>
     <p class="muted small">J’y range ce qui m’aide à aller mieux : une photo qui m’apaise, une musique, une vidéo, un message que je me suis enregistré, un lien…</p>
     ${items.length ? `<p class="small"><strong>${items.length} élément${items.length > 1 ? 's' : ''}</strong> : ${items.slice(0, 4).map((it) => esc(KINDS[it.kind].icon + ' ' + (it.title || KINDS[it.kind].label))).join(' · ')}${items.length > 4 ? '…' : ''}</p>` : ''}
-    <a class="btn btn-secondary btn-sm" href="#/boite-outils/etape">${items.length ? 'Ouvrir ma boîte à outils' : 'Créer ma boîte à outils'}</a>
+    <a class="btn btn-secondary btn-sm" href="${href}">${items.length ? 'Ouvrir ma boîte à outils' : 'Créer ma boîte à outils'}</a>
   </div>`;
 }
 
