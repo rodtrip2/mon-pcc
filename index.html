@@ -1,0 +1,60 @@
+<!doctype html>
+<html lang="fr">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+  <meta http-equiv="Content-Security-Policy" content="default-src 'self'; script-src 'self'; style-src 'self' 'unsafe-inline'; img-src 'self' data:; connect-src 'self'; object-src 'none'; base-uri 'none'">
+  <meta name="referrer" content="no-referrer">
+  <title>Mon PCC — mon plan de crise conjoint</title>
+  <meta name="description" content="Préparer son plan de crise conjoint pas à pas, gratuitement. Les réponses restent sur votre téléphone.">
+  <meta name="theme-color" content="#2f6f6a">
+  <link rel="manifest" href="manifest.webmanifest">
+  <link rel="icon" href="icons/icon.svg" type="image/svg+xml">
+  <link rel="apple-touch-icon" href="icons/apple-touch-icon.png">
+  <meta name="apple-mobile-web-app-capable" content="yes">
+  <meta name="apple-mobile-web-app-title" content="Mon PCC">
+  <link rel="stylesheet" href="css/style.css">
+  <script type="module" src="js/app.js"></script>
+</head>
+<body>
+  <a class="skip" href="#app">Aller au contenu</a>
+  <header class="topbar no-print">
+    <a class="brand" href="#/" aria-label="Mon PCC, accueil">
+      <svg viewBox="0 0 64 64" width="28" height="28" aria-hidden="true"><rect width="64" height="64" rx="16" fill="currentColor"/><circle cx="25" cy="32" r="12" fill="none" stroke="#fff" stroke-width="5"/><circle cx="39" cy="32" r="12" fill="none" stroke="#fff" stroke-width="5" opacity=".85"/></svg>
+      <span>Mon PCC</span>
+    </a>
+    <span id="save-state" class="save-state" aria-live="polite"></span>
+    <button id="menu-btn" class="menu-btn" data-act="menu" aria-controls="menu" aria-expanded="false">
+      <span aria-hidden="true">☰</span><span class="sr-only">Menu</span>
+    </button>
+  </header>
+
+  <nav id="menu" class="menu no-print" hidden aria-label="Sommaire">
+    <div class="menu-panel">
+      <div class="menu-head">
+        <strong>Sommaire</strong>
+        <button id="menu-close" class="icon" data-act="menu-close" aria-label="Fermer le menu">✕</button>
+      </div>
+      <a class="menu-link" href="#/">Accueil</a>
+      <a class="menu-link" href="#/demarche">La démarche</a>
+      <div id="menu-steps"></div>
+      <a class="menu-link strong" href="#/plan">Mon plan · imprimer · envoyer</a>
+      <a class="menu-link" href="#/reglages">Réglages et sauvegarde</a>
+      <a class="menu-link" href="#/apropos">À propos et sources</a>
+      <a class="menu-link" href="#/confidentialite">Confidentialité</a>
+    </div>
+  </nav>
+
+  <main id="app" tabindex="-1">
+    <noscript><p>Mon PCC a besoin de JavaScript pour fonctionner. Aucune donnée n’est envoyée sur Internet.</p></noscript>
+  </main>
+
+  <footer class="footer no-print">
+    <p>D’après le <a href="https://plandecriseconjoint.ch/" target="_blank" rel="noopener">Plan de Crise Conjoint</a> (Ferrari, Suter, Martino, 2026) © Haute École de la Santé La Source — <a href="https://creativecommons.org/licenses/by-nc-sa/4.0/deed.fr" target="_blank" rel="noopener">CC BY-NC-SA</a>. Projet indépendant, gratuit et non commercial.</p>
+    <p><a href="#/apropos">À propos</a> · <a href="#/confidentialite">Confidentialité</a></p>
+  </footer>
+
+  <div id="toast" class="toast no-print" role="status" hidden></div>
+  <dialog id="modal" class="modal"></dialog>
+</body>
+</html>
