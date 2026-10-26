@@ -336,7 +336,10 @@ function recordsGroupHTML(step, g) {
   return `<section class="group card">
     ${g.label ? `<h2>${esc(g.label)}</h2>` : ''}
     ${arr.length ? `<ol class="records">${cards}</ol>` : ''}
-    <button type="button" class="btn btn-secondary btn-sm" data-act="empty" data-g="${g.id}" data-fk="empty:${g.id}">+ Ajouter une ligne</button>
+    <div class="row-btns">
+      <button type="button" class="btn btn-secondary btn-sm" data-act="empty" data-g="${g.id}" data-fk="empty:${g.id}">+ Ajouter une ligne</button>
+      ${contactsEnabled(step, g) ? `<button type="button" class="btn btn-secondary btn-sm" data-act="contacts" data-g="${g.id}" data-fk="contacts:${g.id}">👤 Choisir dans mes contacts</button>` : ''}
+    </div>
     ${suggestionsHTML(step, g, isOn)}
   </section>`;
 }
@@ -473,6 +476,56 @@ function renderPlan() {
     <div class="nav-bottom no-print"><a class="btn btn-ghost" href="#/etape/${STEPS.length - 1}">← Modifier</a><a class="btn btn-ghost" href="#/">Accueil</a></div>`;
 }
 
+/* ---------- contacts du téléphone (API Contact Picker, Android/Chrome) ---------- */
+
+const contactsSupported = () => 'contacts' in navigator && 'ContactsManager' in window && typeof navigator.contacts.select === 'function';
+
+function contactsEnabled(step, g) {
+  if (!step.contacts || !contactsSupported()) return false;
+  return step.contactGroupsOnly ? !!g.contacts : true;
+}
+
+async function confirmContacts() {
+  if (sessionStorage.getItem('monpcc.contactsOk')) return true;
+  const ok = await modal({
+    title: 'Accéder à mes contacts',
+    body: `<p>Mon téléphone va afficher sa liste de contacts. <strong>Seuls les contacts que je coche</strong> seront ajoutés à mon plan (nom et numéro). Mon PCC n’a pas accès au reste de mon carnet.</p>
+      <ul><li>Les contacts choisis restent enregistrés sur ce téléphone, comme le reste de mon plan.</li>
+      <li>Je vérifie avec chaque personne qu’elle est d’accord pour figurer dans mon plan et pour être contactée.</li></ul>`,
+    ok: 'Ouvrir mes contacts',
+  });
+  if (ok) sessionStorage.setItem('monpcc.contactsOk', '1');
+  return ok;
+}
+
+async function pickContacts(step, gid) {
+  if (!(await confirmContacts())) return;
+  const map = step.contacts;
+  const props = map.tel ? ['name', 'tel'] : ['name'];
+  let picked;
+  try {
+    picked = await navigator.contacts.select(props, { multiple: true });
+  } catch {
+    toast('Impossible d’ouvrir les contacts sur cet appareil.');
+    return;
+  }
+  if (!picked || !picked.length) return;
+  const arr = getArr(step, gid);
+  let added = 0;
+  for (const c of picked) {
+    const name = (c.name || []).find((n) => n && n.trim()) || '';
+    const tel = (c.tel || []).find((t) => t && t.trim()) || '';
+    if (!name && !tel) continue;
+    const rec = { [map.name]: name.trim() };
+    if (map.tel) rec[map.tel] = tel.trim();
+    const dup = arr.some((r) => r[map.name] === rec[map.name] && (!map.tel || r[map.tel] === rec[map.tel]));
+    if (!dup) { arr.push(rec); added++; }
+  }
+  scheduleSave();
+  rerender(() => renderStep(STEPS.indexOf(step)));
+  toast(added ? `${added} contact${added > 1 ? 's' : ''} ajouté${added > 1 ? 's' : ''}. Pensez à préciser le lien ou le rôle.` : 'Ces contacts figurent déjà dans la liste.');
+}
+
 async function confirmShare() {
   if (sessionStorage.getItem('monpcc.shareOk')) return true;
   const ok = await modal({
@@ -582,6 +635,7 @@ function renderPrivacy() {
         <li><strong>Aucune donnée n’est collectée</strong> par Mon PCC : pas de compte, pas de serveur, pas de base de données.</li>
         <li>Mes réponses sont enregistrées <strong>uniquement dans le navigateur de ce téléphone</strong>.</li>
         <li>Aucun cookie, aucune mesure d’audience, aucune publicité, aucune police ou ressource chargée depuis un autre site.</li>
+        <li>Si mon téléphone le permet, je peux <strong>choisir des contacts</strong> dans mon carnet : seuls ceux que je coche sont ajoutés (nom et numéro), le reste de mon carnet n’est jamais lu.</li>
         <li>Je peux <strong>protéger</strong> mon plan par un code (chiffrement AES-256) et <strong>tout effacer</strong> à tout moment dans les Réglages.</li>
       </ul>
     </section>
@@ -772,6 +826,7 @@ document.addEventListener('click', async (e) => {
       target?.focus({ preventScroll: true });
       break;
     }
+    case 'contacts': await pickContacts(step, g); break;
     case 'empty': {
       getArr(step, g).push({});
       redraw();

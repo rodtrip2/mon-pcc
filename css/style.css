@@ -198,6 +198,9 @@ input:focus, textarea:focus { border-color: var(--brand); outline: none; box-sha
 .menu-link.strong { font-weight: 700; color: var(--brand-ink); }
 #menu-steps { margin: .4rem 0; padding-left: .3rem; font-size: .95rem; }
 
+/* Boutons d'ajout */
+.row-btns { display: flex; flex-wrap: wrap; gap: .5rem; }
+
 /* Exemples */
 .sugg { margin-top: .6rem; }
 .ex-btn { margin-bottom: .5rem; }

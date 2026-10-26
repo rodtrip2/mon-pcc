@@ -59,6 +59,7 @@ export const STEPS = [
       { key: 'role', label: 'Rôle', placeholder: 'Ex. : infirmière référente' },
     ],
     suggestField: 'role',
+    contacts: { name: 'nom' },
     suggestLabel: 'Ajouter un partenaire selon son rôle',
     suggestions: [
       'Infirmier·ère référent·e', 'Psychiatre', 'Médecin traitant', 'Psychologue',
@@ -175,6 +176,8 @@ export const STEPS = [
     id: 'aide',
     type: 'records',
     ordered: true,
+    contacts: { name: 'nom', tel: 'tel' },
+    contactGroupsOnly: true,
     short: 'À qui demander de l’aide',
     title: 'À qui demander de l’aide',
     question: 'En cas de besoin, à qui puis-je demander de l’aide ? (nom, nature du lien ou rôle, tél ; mettre par ordre de priorité en favorisant d’abord le réseau des proches, puis des professionnels du réseau habituel, puis les services et institutions de garde)',
@@ -185,10 +188,10 @@ export const STEPS = [
       { key: 'tel', label: 'Téléphone', placeholder: '06 …', type: 'tel' },
     ],
     groups: [
-      { id: 'proches', label: '1. Mes proches', suggestField: 'lien', suggestions: [
+      { id: 'proches', label: '1. Mes proches', contacts: true, suggestField: 'lien', suggestions: [
         'Parent', 'Frère ou sœur', 'Conjoint·e', 'Ami·e', 'Voisin·e', 'Personne de confiance',
       ] },
-      { id: 'pros', label: '2. Mes professionnel·les habituel·les', suggestField: 'lien', suggestions: [
+      { id: 'pros', label: '2. Mes professionnel·les habituel·les', contacts: true, suggestField: 'lien', suggestions: [
         'Infirmier·ère référent·e', 'Psychiatre', 'Médecin traitant', 'Psychologue', 'CMP de mon secteur', 'Pair-aidant·e',
       ] },
       { id: 'garde', label: '3. Services et institutions de garde', suggestions: [
@@ -264,6 +267,7 @@ export const STEPS = [
       { key: 'contact', label: 'Coordonnées', placeholder: 'Téléphone, adresse…', type: 'tel' },
     ],
     suggestField: 'quoi',
+    contacts: { name: 'qui', tel: 'contact' },
     suggestLabel: 'Ajouter une démarche',
     suggestions: [
       'Récupérer mon courrier', 'Garder ou accompagner mes enfants', 'Prévenir l’école ou la crèche',

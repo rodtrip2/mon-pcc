@@ -1,6 +1,6 @@
 /* Mon PCC — service worker : fonctionnement hors connexion.
    Il ne met en cache que les fichiers de l'application, jamais les données du plan. */
-const CACHE = 'mon-pcc-v1.1.0';
+const CACHE = 'mon-pcc-v1.2.0';
 const FILES = [
   './', './index.html', './css/style.css',
   './js/app.js', './js/data.js', './js/storage.js', './js/export.js',
