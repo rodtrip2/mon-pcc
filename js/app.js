@@ -484,8 +484,9 @@ const KINDS = {
 };
 
 /* Exemples de citations (affichés seulement sur demande) :
-   phrases-repères rédigées pour Mon PCC, proverbes, et extraits d'auteurs
-   du domaine public (traductions reformulées). */
+   phrases-repères rédigées pour Mon PCC et extraits d'auteurs
+   (traductions reformulées). La « prière de la sérénité », souvent attribuée
+   à Marc Aurèle, est du théologien Reinhold Niebuhr (années 1930-1940). */
 const QUOTES = [
   { text: 'Cette vague passera, comme les autres sont passées.' },
   { text: 'J’ai déjà traversé des moments difficiles. Je peux traverser celui-ci.' },
@@ -494,11 +495,9 @@ const QUOTES = [
   { text: 'Demander de l’aide, c’est prendre soin de moi.' },
   { text: 'Je suis plus que ce moment difficile.' },
   { text: 'Une respiration à la fois.' },
-  { text: 'Après la pluie, le beau temps.', author: 'Proverbe' },
-  { text: 'Petit à petit, l’oiseau fait son nid.', author: 'Proverbe' },
   { text: 'Parmi les choses, les unes dépendent de nous, les autres n’en dépendent pas.', author: 'Épictète, Manuel' },
   { text: 'Ce ne sont pas les choses qui nous troublent, mais les jugements que nous portons sur elles.', author: 'Épictète, Manuel' },
-  { text: 'L’âme prend la couleur de ses pensées.', author: 'Marc Aurèle, Pensées' },
+  { text: 'Que la force me soit donnée d’accepter ce qui ne peut être changé, le courage de changer ce qui peut l’être, et surtout la sagesse de distinguer l’un de l’autre.', author: 'Prière de la sérénité, Reinhold Niebuhr' },
   { text: 'Nous souffrons plus souvent en imagination que dans la réalité.', author: 'Sénèque, Lettres à Lucilius' },
 ];
 let quotesOpen = false;
