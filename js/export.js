@@ -78,13 +78,16 @@ export function stepContent(step, data, plan = null) {
     }
   }
   if (step.id === 'strategies') {
-    const tb = (data.boiteOutils || []).filter((it) => it && (it.title || it.url || it.file || (it.photos || []).length || (it.text || '').trim()));
-    const names = { photo: 'photo', video: 'vidéo', audio: 'son', voix: 'message vocal', lien: 'lien', citation: 'citation', album: 'album photo' };
+    const EXN = { 'breathing': 'Respiration en 2 minutes', 'guided-breathing': 'Respiration guidée', 'grounding': 'Ancrage 5-4-3-2-1', 'progressive-muscle-relaxation': 'Relaxation musculaire progressive', 'peaceful-visualization': 'Visualisation apaisante', 'self-compassion': 'Pause d’autocompassion', 'leaves-on-stream': 'Les feuilles sur la rivière', 'sound-therapy': 'Sons apaisants', 'stress-relief-bubbles': 'Bulles anti-stress', 'fidget-spinner': 'Fidget spinner' };
+    const tb = (data.boiteOutils || []).filter((it) => it && (it.title || it.url || it.file || it.ex || (it.photos || []).length || (it.text || '').trim()));
+    const names = { photo: 'photo', video: 'vidéo', audio: 'son', voix: 'message vocal', lien: 'lien', citation: 'citation', album: 'album photo', exercice: 'exercice de Ma boussole bien-être' };
     if (tb.length) {
       out.push({
         label: 'Ma boîte à outils (sur mon téléphone)',
         lines: tb.map((it) => (it.kind === 'citation'
           ? `« ${it.text.trim()} »${it.author ? ' — ' + it.author : ''}`
+          : it.kind === 'exercice'
+            ? `${EXN[it.ex] || 'Exercice'} (exercice de Ma boussole bien-être)`
           : it.kind === 'album'
             ? `${it.title ? it.title + ' ' : ''}(album, ${(it.photos || []).length} photo${(it.photos || []).length > 1 ? 's' : ''})`
             : (it.title ? it.title + ' ' : '') + '(' + names[it.kind] + ')' + (it.kind === 'lien' ? ' : ' + it.url : ''))),

@@ -160,7 +160,7 @@ export const STEPS_ADO = [
       { id: 'moi', label: 'Mes loisirs, ce que je fais moi-même', suggestions: [
         'J’écoute de la musique', 'Je fais du sport ou je vais marcher', 'Je dessine, j’écris ou je joue d’un instrument',
         'Je joue à un jeu que j’aime', 'Je respire calmement quelques minutes', 'Je prends une douche',
-        'Je regarde ma boîte à outils', 'Je me repose, je fais une pause', 'Je passe du temps avec mon animal',
+        'Je regarde ma boîte à outils', 'Je fais un exercice de respiration ou d’ancrage', 'Je me repose, je fais une pause', 'Je passe du temps avec mon animal',
       ] },
       { id: 'entourage', label: 'Mon entourage', suggestions: [
         'J’écris ou j’appelle un·e ami·e', 'Je parle à un adulte de confiance', 'Je demande à quelqu’un de rester avec moi',

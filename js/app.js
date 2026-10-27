@@ -10,6 +10,7 @@ import {
 import { buildPlanPdf } from './planpdf.js';
 import { RESOURCES, CHECKED } from './resources.js';
 import { parseEmbed, fetchTitle } from './embed.js';
+import { EXERCISES, exerciseById, exerciseUrl, offlineStatus, prepareOffline } from './exercises.js';
 import { renderCrisisCard, toJpeg, crisisCardPdf } from './crisiscard.js';
 
 const $ = (sel, root = document) => root.querySelector(sel);
@@ -514,6 +515,7 @@ const KINDS = {
   lien: { icon: '🔗', label: 'Lien' },
   citation: { icon: '❝', label: 'Citation' },
   album: { icon: '🖼', label: 'Album photo' },
+  exercice: { icon: '🧘', label: 'Exercice' },
 };
 const SIZES = [['s', 'Petit'], ['m', 'Moyen'], ['l', 'Grand']];
 const dossiers = () => (plan.data.dossiers ??= []);
@@ -558,6 +560,7 @@ function tbLabel(it) {
     const t = (it.text || '').trim();
     return t ? '« ' + (t.length > 40 ? t.slice(0, 38) + '…' : t) + ' »' : 'Citation';
   }
+  if (it.kind === 'exercice') return exerciseById(it.ex)?.name || 'Exercice';
   if (it.kind === 'album') return it.title || `Album (${(it.photos || []).length} photo${(it.photos || []).length > 1 ? 's' : ''})`;
   return it.title || KINDS[it.kind].label;
 }
@@ -618,6 +621,7 @@ function renderToolbox(fromStep) {
       <div class="tb-add-grid">
         ${['photo', 'video', 'audio'].map((k) => `<label class="btn btn-secondary tb-add-btn"><span aria-hidden="true">${KINDS[k].icon}</span> ${KINDS[k].label}<input type="file" accept="${KINDS[k].accept}" data-act="tb-file" data-kind="${k}" hidden></label>`).join('')}
         <label class="btn btn-secondary tb-add-btn"><span aria-hidden="true">🖼</span> Album photo<input type="file" accept="image/*" multiple data-act="tb-album-new" hidden></label>
+        <button type="button" class="btn btn-secondary tb-add-btn" data-act="tb-exercises"><span aria-hidden="true">🧘</span> Exercice</button>
         ${canRecord() ? `<button type="button" class="btn btn-secondary tb-add-btn" data-act="tb-record"><span aria-hidden="true">🎙</span> M’enregistrer</button>
         <button type="button" class="btn btn-secondary tb-add-btn" data-act="tb-video"><span aria-hidden="true">🎥</span> Me filmer</button>` : ''}
       </div>
@@ -680,6 +684,14 @@ function toolboxViewHTML(it, idx) {
   const title = it.title ? `<p class="tbv-title" data-title-for="${idx}">${esc(it.title)}</p>` : `<p class="tbv-title" data-title-for="${idx}" hidden></p>`;
   if (it.kind === 'citation') {
     return `<blockquote class="tbv tbv-quote"><p>« ${esc(it.text || '')} »</p>${it.author ? `<cite>— ${esc(it.author)}</cite>` : ''}</blockquote>`;
+  }
+  if (it.kind === 'exercice') {
+    const e = exerciseById(it.ex);
+    if (!e) return '';
+    return `<button type="button" class="tbv tbv-exercise" data-act="exercise-open" data-ex="${esc(e.id)}">
+      <span class="tbx-ico" aria-hidden="true">${e.icon}</span>
+      <span class="tbv-col"><span class="tbv-title">${esc(e.name)}</span><span class="tbx-desc">${esc(e.desc)}</span><span class="tbx-dur">⏱ ${esc(e.duration)}</span></span>
+      <span class="tbx-play" aria-hidden="true">▶</span></button>`;
   }
   if (it.kind === 'album') {
     const ph = it.photos || [];
@@ -761,6 +773,18 @@ function toolboxItemHTML(it, idx, n) {
       body = `<a class="btn btn-primary btn-sm tb-open" href="${esc(it.url)}" target="_blank" rel="noopener noreferrer">Ouvrir ${esc(host || 'le lien')} ↗</a>`;
     }
   }
+  if (it.kind === 'exercice') {
+    const e = exerciseById(it.ex);
+    return `<li class="card tb-item">
+    <div class="tb-head"><span class="tb-kind" aria-hidden="true">${e?.icon || '🧘'}</span><span class="tb-kind-label">${esc(e?.name || 'Exercice')}</span></div>
+    ${itemControlsHTML(it, idx)}
+    <div class="tb-tools">
+      <button type="button" class="icon" data-act="tb-up" data-i="${idx}" data-fk="tb-up:${idx}" aria-label="Monter" ${idx === 0 ? 'disabled' : ''}>↑</button>
+      <button type="button" class="icon" data-act="tb-down" data-i="${idx}" data-fk="tb-down:${idx}" aria-label="Descendre" ${idx === n - 1 ? 'disabled' : ''}>↓</button>
+      <button type="button" class="icon icon-del" data-act="tb-del" data-i="${idx}" aria-label="Retirer">✕</button>
+    </div>
+  </li>`;
+  }
   if (it.kind === 'citation') {
     return `<li class="card tb-item tb-citation">
     <div class="tb-head"><span class="tb-kind" aria-hidden="true">${k.icon}</span><span class="tb-kind-label">Citation</span></div>
@@ -828,6 +852,65 @@ async function addToolboxBlob(kind, blob, title = '') {
 }
 
 /* Enregistrement d'un message vocal */
+/* ---------- exercices de Ma boussole bien-être ---------- */
+
+function exercisePicker() {
+  const d = $('#modal');
+  const render = () => {
+    const have = new Set(toolbox().filter((x) => x.kind === 'exercice').map((x) => x.ex));
+    d.innerHTML = `<div class="modal-inner">
+      <h2>🧘 Exercices</h2>
+      <p class="muted small">Des exercices de <strong>Ma boussole bien-être</strong>, à faire sans quitter Mon PCC. Je touche un exercice pour l’ajouter à ma boîte à outils.</p>
+      <ul class="ex-pick">${EXERCISES.map((e) => `<li><button type="button" class="ex-row" data-ex="${e.id}" aria-pressed="${have.has(e.id)}">
+        <span class="tbx-ico" aria-hidden="true">${e.icon}</span>
+        <span class="tbv-col"><span class="tbv-title">${esc(e.name)}</span><span class="tbx-desc">${esc(e.desc)} · ${esc(e.duration)}</span></span>
+        <span class="ex-state">${have.has(e.id) ? '✓' : '+'}</span></button></li>`).join('')}</ul>
+      <p class="muted small">Pour les utiliser sans connexion : Réglages › Exercices hors connexion.</p>
+      <div class="modal-actions"><button type="button" class="btn btn-primary" data-x="close">Terminé</button></div></div>`;
+  };
+  return new Promise((resolve) => {
+    render();
+    d.onclick = (e) => {
+      if (e.target.closest('[data-x="close"]')) { d.close(); return; }
+      const row = e.target.closest('.ex-row');
+      if (!row) return;
+      const arr = toolbox();
+      const at = arr.findIndex((x) => x.kind === 'exercice' && x.ex === row.dataset.ex);
+      if (at >= 0) arr.splice(at, 1);
+      else arr.push({ kind: 'exercice', ex: row.dataset.ex, added: new Date().toISOString() });
+      scheduleSave();
+      const y = d.querySelector('.ex-pick')?.scrollTop;
+      render();
+      if (y) d.querySelector('.ex-pick').scrollTop = y;
+    };
+    d.addEventListener('close', () => { d.onclick = null; resolve(); }, { once: true });
+    d.showModal();
+  });
+}
+
+function openExercise(id) {
+  const e = exerciseById(id);
+  if (!e) return;
+  const el = $('#exercise');
+  el.innerHTML = `<div class="xp-top"><button type="button" class="btn btn-ghost btn-sm xp-back" data-xp="close">✕ Revenir à ma boîte à outils</button>
+      <span class="xp-title">${e.icon} ${esc(e.name)}</span></div>
+    <iframe class="xp-frame" src="${esc(exerciseUrl(e))}" title="${esc(e.name)}" allow="autoplay; fullscreen; screen-wake-lock"></iframe>
+    <p class="xp-off" hidden>Cet exercice n’a pas pu s’ouvrir. Sans connexion, il faut d’abord le préparer dans Réglages › Exercices hors connexion.</p>`;
+  el.hidden = false;
+  document.body.classList.add('no-scroll');
+  const frame = el.querySelector('iframe');
+  if (!navigator.onLine) offlineStatus().then((st) => { if (!st.sw) el.querySelector('.xp-off').hidden = false; });
+  frame.addEventListener('load', () => frame.focus(), { once: true });
+  el.querySelector('[data-xp="close"]').focus();
+}
+function closeExercise() {
+  const el = $('#exercise');
+  el.hidden = true;
+  el.innerHTML = '';
+  document.body.classList.remove('no-scroll');
+}
+document.getElementById('exercise')?.addEventListener('click', (e) => { if (e.target.closest('[data-xp="close"]')) closeExercise(); });
+
 /* ---------- dossiers, albums, visionneuse ---------- */
 
 function promptModal(title, value = '', ok = 'Valider') {
@@ -1502,6 +1585,17 @@ async function shareText() {
 
 /* ---------- réglages ---------- */
 
+async function renderOfflineStatus() {
+  const box = $('#ex-off-status');
+  if (!box) return;
+  const st = await offlineStatus();
+  const btn = app.querySelector('[data-act="ex-offline"]');
+  if (st.sw && st.pages) {
+    box.innerHTML = `✓ <strong>Prêts hors connexion</strong> : ${st.pages} fichiers de pages${st.audios ? ` et ${st.audios} sons` : ''}.`;
+    if (btn) btn.textContent = '↻ Mettre à jour les exercices hors connexion';
+  } else box.textContent = 'Pas encore téléchargés sur ce téléphone.';
+}
+
 function renderSettings() {
   const prot = store.isProtected();
   app.innerHTML = `
@@ -1526,6 +1620,13 @@ function renderSettings() {
             <label class="field"><span>Confirmer le code</span><input type="password" name="c2" minlength="6" required autocomplete="new-password"></label>
             <p class="muted small">Attention : si j’oublie ce code, personne ne pourra récupérer mon plan, pas même les créateurs de l’application.</p>
             <button class="btn btn-primary">Activer la protection</button></form>`}
+    </section>
+    <section class="card" id="exercices-hors-connexion">
+      <h2>Exercices hors connexion</h2>
+      <p>Les exercices de Ma boussole bien-être s’ouvrent dans Mon PCC. Pour pouvoir les faire <strong>sans connexion</strong>, je les télécharge une fois sur ce téléphone (pages et sons, environ 20 Mo).</p>
+      <p class="small" id="ex-off-status">Vérification…</p>
+      <button type="button" class="btn btn-secondary" data-act="ex-offline">⬇ Préparer les exercices hors connexion</button>
+      <p class="muted small">À refaire de temps en temps pour avoir les dernières versions. Rien n’est envoyé : il s’agit seulement de télécharger les exercices.</p>
     </section>
     <section class="card">
       <h2>Sauvegarde</h2>
@@ -1552,6 +1653,7 @@ function renderSettings() {
       <p>Supprime définitivement mon plan de ce téléphone.</p>
       <button class="btn btn-danger" data-act="wipe">Tout effacer</button>
     </section>`;
+  renderOfflineStatus();
 }
 
 /* ---------- pages d'information ---------- */
@@ -1584,6 +1686,7 @@ function renderAbout() {
       <p class="small">La version ado est publiée comme « phase test » sur le site officiel ; sa licence n’y est pas précisée séparément. Elle est reprise ici dans les mêmes conditions que le reste du site (CC BY-NC-SA).</p>
       <p><strong>Modifications apportées</strong> : découpage en étapes, conseils de rédaction, suggestions et exemples ajoutés, numéros d’urgence adaptés à la France, mise en page.</p>
       <p>Mon PCC est un projet indépendant, <strong>non affilié</strong> à la Haute École de la Santé La Source ni aux auteur·es du PCC, qui ne l’ont pas validé.</p>
+      <p>Les exercices de la boîte à outils sont ceux de <a href="../ma-boussole-bien-etre/" target="_blank" rel="noopener">Ma boussole bien-être</a>, un projet distinct (licence GPL-3), affichés dans Mon PCC sans en copier le code.</p>
       <p>Code source libre : <a href="https://github.com/rodtrip2/mon-pcc" target="_blank" rel="noopener noreferrer">dépôt GitHub du projet</a> (fichier LICENSE). Le QR code est généré par la bibliothèque <em>qrcode-generator</em> de Kazuhiko Arase (licence MIT).</p>
     </section>
     <p class="center"><a href="#/confidentialite">Confidentialité</a></p>`;
@@ -1600,6 +1703,7 @@ function renderPrivacy() {
         <li>Aucun cookie, aucune mesure d’audience, aucune publicité, aucune police ou ressource chargée depuis un autre site (sauf les vidéos et musiques que je choisis de lire, voir ci-dessous).</li>
         <li>Quand j’enregistre ou j’envoie mon plan en PDF, je peux le <strong>protéger par un code</strong> (chiffrement AES-256) : sans ce code, le fichier ne peut pas être ouvert. Mon PCC ne conserve pas ce code.</li>
         <li>Si j’ajoute à ma boîte à outils un lien vers une vidéo ou une musique (YouTube, Spotify…), Mon PCC demande son <strong>titre</strong> au site concerné lors de l’ajout. Le contenu n’est lu dans l’application que si je touche « Lire ici », après un avertissement : mon téléphone se connecte alors à ce site, comme si j’ouvrais le lien. Mon plan n’est jamais transmis.</li>
+        <li>Les <strong>exercices</strong> de la boîte à outils viennent de Ma boussole bien-être, hébergée sur le même site que Mon PCC : aucun autre site n’est contacté, et rien de mon plan n’est transmis. Je peux les télécharger pour les utiliser sans connexion (Réglages).</li>
         <li>Les photos, vidéos et sons de ma <strong>boîte à outils</strong> restent sur ce téléphone (chiffrés si j’ai mis un code). Ils ne figurent jamais dans le plan imprimé ou envoyé : seuls leurs titres et les liens y apparaissent.</li>
         <li>Si mon téléphone le permet, je peux <strong>choisir des contacts</strong> dans mon carnet : seuls ceux que je coche sont ajoutés (nom et numéro), le reste de mon carnet n’est jamais lu.</li>
         <li>Je peux <strong>protéger</strong> mon plan par un code (chiffrement AES-256) et <strong>tout effacer</strong> à tout moment dans les Réglages.</li>
@@ -2137,6 +2241,27 @@ document.addEventListener('click', async (e) => {
       scheduleSave(); tbRedraw();
       break;
     }
+    case 'tb-exercises':
+      await exercisePicker();
+      tbRedraw();
+      break;
+    case 'exercise-open': openExercise(btn.dataset.ex); break;
+    case 'ex-offline': {
+      const box = $('#ex-off-status');
+      btn.disabled = true;
+      try {
+        const n = await prepareOffline((p) => {
+          if (!box) return;
+          box.textContent = p.step === 'pages' ? 'Téléchargement des pages…' : `Téléchargement des sons : ${p.done} / ${p.total}`;
+        });
+        toast(`Exercices prêts hors connexion (${n} sons).`);
+      } catch {
+        toast('Préparation impossible : vérifiez la connexion, puis réessayez.');
+      }
+      btn.disabled = false;
+      renderOfflineStatus();
+      break;
+    }
     case 'lightbox':
       lb = { idx: i, k: +btn.dataset.k || 0 };
       showLightbox();
@@ -2367,6 +2492,7 @@ document.addEventListener('toggle', (e) => {
 }, true);
 
 document.addEventListener('keydown', (e) => {
+  if (e.key === 'Escape' && !$('#exercise').hidden) { closeExercise(); return; }
   if (e.key === 'Escape' && !$('#lightbox').hidden) { closeLightbox(); return; }
   if (lb && e.key === 'ArrowRight') { lb.k += 1; showLightbox(); return; }
   if (lb && e.key === 'ArrowLeft') { lb.k -= 1; showLightbox(); return; }

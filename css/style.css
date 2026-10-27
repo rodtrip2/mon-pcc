@@ -340,6 +340,26 @@ img.tb-media { background: transparent; }
 .lb-prev, .lb-next { position: absolute; top: 50%; transform: translateY(-50%); }
 .lb-prev { left: .6rem; } .lb-next { right: .6rem; }
 body.no-scroll { overflow: hidden; }
+.tbv-exercise { display: flex; align-items: center; gap: .75rem; width: 100%; text-align: left; padding: .75rem .85rem; font: inherit; color: var(--ink); cursor: pointer; background: linear-gradient(135deg, var(--card), var(--brand-soft)); }
+.tbx-ico { flex: none; width: 46px; height: 46px; border-radius: 12px; background: var(--card); border: 1px solid var(--line); display: grid; place-items: center; font-size: 1.45rem; }
+.tbx-desc { font-size: .88rem; color: var(--muted); line-height: 1.35; }
+.tbx-dur { font-size: .78rem; color: var(--brand-ink); font-weight: 600; }
+.tbx-play { flex: none; width: 40px; height: 40px; border-radius: 50%; background: var(--brand); color: #fff; display: grid; place-items: center; font-size: .95rem; padding-left: 3px; }
+.tbv-exercise .tbv-title { padding: 0; }
+.size-s .tbv-exercise { flex-direction: column; text-align: center; gap: .4rem; }
+.size-s .tbx-desc, .size-s .tbx-play { display: none; }
+.ex-pick { list-style: none; padding: 0; margin: .5rem 0; max-height: 55vh; overflow-y: auto; display: flex; flex-direction: column; gap: .4rem; }
+.ex-row { display: flex; align-items: center; gap: .7rem; width: 100%; text-align: left; border: 1.5px solid var(--line); background: var(--card); color: var(--ink); border-radius: 12px; padding: .55rem .7rem; font: inherit; cursor: pointer; }
+.ex-row[aria-pressed="true"] { border-color: var(--brand); background: var(--brand-soft); }
+.ex-row .tbv-title { padding: 0; font-weight: 700; }
+.ex-state { flex: none; width: 30px; height: 30px; border-radius: 50%; display: grid; place-items: center; font-weight: 700; background: var(--chip); }
+.ex-row[aria-pressed="true"] .ex-state { background: var(--brand); color: #fff; }
+.exercise-panel { position: fixed; inset: 0; z-index: 85; background: var(--bg); display: flex; flex-direction: column; }
+.xp-top { display: flex; align-items: center; gap: .6rem; padding: calc(.5rem + env(safe-area-inset-top)) .7rem .5rem; border-bottom: 1px solid var(--line); background: var(--card); }
+.xp-title { font-weight: 700; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.xp-back { flex: none; }
+.xp-frame { flex: 1; width: 100%; border: 0; background: #fff; }
+.xp-off { margin: 0; padding: .8rem 1rem; background: var(--warn-bg); }
 .rec-time { font-size: 2rem; font-variant-numeric: tabular-nums; text-align: center; margin: .5rem 0; }
 
 /* Bandeau d'installation */

@@ -156,7 +156,7 @@ const STEPS_ADULTE = [
     groups: [
       { id: 'moi', label: '1. Ce que je fais moi-même', suggestions: [
         'Je respire calmement quelques minutes', 'Je vais marcher', 'J’écoute de la musique qui m’apaise',
-        'Je prends une douche', 'Je me couche à heure régulière', 'J’écris ce que je ressens',
+        'Je prends une douche', 'Je me couche à heure régulière', 'J’écris ce que je ressens', 'Je fais un exercice de ma boîte à outils (respiration, ancrage…)',
         'J’évite l’alcool et les autres produits', 'Je continue mon traitement',
         'Je fais une activité qui m’occupe les mains', 'Je relis mon plan de crise',
       ] },
