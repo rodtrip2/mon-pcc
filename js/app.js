@@ -658,6 +658,42 @@ async function addToolboxBlob(kind, blob, title = '') {
 }
 
 /* Enregistrement d'un message vocal */
+/* ---------- accès caméra / micro : diagnostic et solution de secours ---------- */
+
+/** État de l'autorisation sans déclencher de demande ('granted' | 'denied' | 'prompt' | 'unknown') */
+async function permState(name) {
+  try { return (await navigator.permissions.query({ name })).state; } catch { return 'unknown'; }
+}
+
+/** Bloc d'aide quand le micro ou la caméra ne sont pas accessibles */
+function mediaHelpHTML(kind, errName) {
+  const what = kind === 'video' ? 'à la caméra et au micro' : 'au micro';
+  const site = esc(location.host || 'Mon PCC');
+  let cause;
+  if (errName === 'NotFoundError' || errName === 'OverconstrainedError') cause = kind === 'video' ? 'Aucune caméra n’a été trouvée sur cet appareil.' : 'Aucun micro n’a été trouvé sur cet appareil.';
+  else if (errName === 'NotReadableError' || errName === 'AbortError') cause = 'Le micro ou la caméra est peut-être déjà utilisé par une autre application : je la ferme, puis je réessaie.';
+  else cause = `L’accès ${what} est bloqué pour Mon PCC.`;
+  const blocked = !['NotFoundError', 'OverconstrainedError', 'NotReadableError', 'AbortError'].includes(errName);
+  const fallback = kind === 'video'
+    ? '<label class="btn btn-primary file-btn">🎥 Utiliser l’appareil photo du téléphone<input type="file" accept="video/*" capture="user" data-r-file hidden></label>'
+    : '<label class="btn btn-primary file-btn">🎙 Utiliser l’enregistreur du téléphone<input type="file" accept="audio/*" capture data-r-file hidden></label>';
+  return `<div class="media-help" role="alert">
+    <p><strong>${cause}</strong></p>
+    <p class="small">Solution simple : enregistrer avec l’application du téléphone, puis le fichier s’ajoute à ma boîte à outils.</p>
+    ${fallback}
+    ${blocked ? `<details class="more small"><summary>Autoriser l’accès dans Mon PCC</summary>
+      <p><strong>Sur Android</strong> (Brave, Chrome…), deux réglages comptent :</p>
+      <ol>
+        <li>Réglages du téléphone › Applications › <em>mon navigateur</em> (Brave, Chrome…) › Autorisations › <strong>Micro</strong>${kind === 'video' ? ' et <strong>Caméra</strong>' : ''} : Autoriser.</li>
+        <li>Dans le navigateur lui-même (en l’ouvrant normalement, pas depuis l’icône Mon PCC) : menu ⋮ › Paramètres › Paramètres des sites (ou Autorisations des sites) › <strong>Micro</strong>${kind === 'video' ? ' et <strong>Caméra</strong>' : ''} › ${site} : Autoriser.</li>
+      </ol>
+      <p><strong>Sur iPhone</strong> : Réglages › Safari › Microphone${kind === 'video' ? ' et Caméra' : ''} › Autoriser (ou Demander).</p>
+      <p>Puis je reviens ici et je touche « Réessayer ».</p>
+      <button type="button" class="btn btn-secondary btn-sm" data-r="retry">↻ Réessayer</button>
+    </details>` : '<button type="button" class="btn btn-secondary btn-sm" data-r="retry">↻ Réessayer</button>'}
+  </div>`;
+}
+
 /* Enregistrement d'une vidéo (caméra du téléphone) */
 const VIDEO_MAX_S = 180; // 3 minutes maximum
 
@@ -677,7 +713,7 @@ function recordVideo() {
       <div class="vid-wrap"><video class="vid-live" playsinline muted autoplay></video><video class="vid-play" playsinline controls hidden></video>
         <span class="vid-rec" hidden>● REC</span></div>
       <p class="rec-time" aria-live="polite">0:00</p>
-      <p class="error" role="alert" hidden></p>
+      <div class="media-error" hidden></div>
       <div class="modal-actions">
         <button type="button" class="btn btn-ghost btn-sm" data-r="flip">🔄 Changer de caméra</button>
         <button type="button" class="btn btn-ghost" data-r="cancel">Annuler</button>
@@ -690,20 +726,28 @@ function recordVideo() {
     const play = d.querySelector('.vid-play');
     const recBadge = d.querySelector('.vid-rec');
     const time = d.querySelector('.rec-time');
-    const err = d.querySelector('.error');
+    const err = d.querySelector('.media-error');
     const stopStream = () => { stream?.getTracks().forEach((t) => t.stop()); stream = null; };
+    const showHelp = (name) => {
+      err.innerHTML = mediaHelpHTML('video', name);
+      err.hidden = false;
+      d.querySelector('.vid-wrap').hidden = true; time.hidden = true;
+      $r('start').hidden = true; $r('flip').hidden = true;
+    };
     const fmt = (s) => `${Math.floor(s / 60)}:${String(s % 60).padStart(2, '0')}`;
-    const openCam = async () => {
+    const openCam = async (force = false) => {
       stopStream();
+      // Si l'accès est déjà refusé, on ne redemande pas en boucle : on explique
+      if (!force && ((await permState('camera')) === 'denied' || (await permState('microphone')) === 'denied')) { showHelp('NotAllowedError'); return; }
       try {
         stream = await navigator.mediaDevices.getUserMedia({ video: { facingMode: facing, width: { ideal: 1280 }, height: { ideal: 720 } }, audio: true });
         live.srcObject = stream;
         live.hidden = false; play.hidden = true;
-        $r('start').disabled = false;
+        d.querySelector('.vid-wrap').hidden = false; time.hidden = false;
+        $r('start').disabled = false; $r('start').hidden = false; $r('flip').hidden = false;
         err.hidden = true;
-      } catch {
-        err.textContent = 'Caméra ou micro non autorisés. Je peux les autoriser dans les réglages du navigateur.';
-        err.hidden = false;
+      } catch (e) {
+        showHelp(e?.name);
       }
     };
     const cleanup = () => { clearInterval(timer); stopStream(); if (play.src) URL.revokeObjectURL(play.src); };
@@ -712,6 +756,7 @@ function recordVideo() {
     d.onclick = async (e) => {
       const a = e.target.closest('[data-r]')?.dataset.r;
       if (a === 'cancel') { if (rec?.state === 'recording') rec.stop(); finish(null); }
+      else if (a === 'retry') { await openCam(true); }
       else if (a === 'flip') { if (rec?.state === 'recording') return; facing = facing === 'user' ? 'environment' : 'user'; await openCam(); }
       else if (a === 'start') {
         if (!stream) {
@@ -745,8 +790,9 @@ function recordVideo() {
       else if (a === 'keep' && result) finish(result);
     };
     d.oncancel = (e) => { e.preventDefault(); if (rec?.state === 'recording') rec.stop(); finish(null); };
+    d.onchange = (e) => { if (e.target.matches('[data-r-file]') && e.target.files[0]) finish(e.target.files[0]); };
     d.showModal();
-    openCam();
+    if (!navigator.mediaDevices?.getUserMedia) showHelp('NotFoundError'); else openCam();
   });
 }
 
@@ -759,6 +805,7 @@ function recordVoice() {
       <p class="muted small">Par exemple, un message que je m’adresse quand je vais bien, pour me le faire écouter dans les moments difficiles.</p>
       <p class="rec-time" aria-live="polite">0:00</p>
       <audio class="tb-audio" controls hidden></audio>
+      <div class="media-error" hidden></div>
       <div class="modal-actions">
         <button type="button" class="btn btn-ghost" data-r="cancel">Annuler</button>
         <button type="button" class="btn btn-primary" data-r="start">● Démarrer</button>
@@ -768,13 +815,18 @@ function recordVoice() {
     const $r = (k) => d.querySelector(`[data-r="${k}"]`);
     const time = d.querySelector('.rec-time');
     const player = d.querySelector('audio');
+    const err = d.querySelector('.media-error');
+    const showHelp = (name) => { err.innerHTML = mediaHelpHTML('audio', name); err.hidden = false; $r('start').hidden = true; time.hidden = true; };
     const cleanup = () => { clearInterval(timer); stream?.getTracks().forEach((t) => t.stop()); if (player.src) URL.revokeObjectURL(player.src); };
     const finish = (v) => { cleanup(); d.close(); resolve(v); };
     d.onclick = async (e) => {
       const a = e.target.closest('[data-r]')?.dataset.r;
       if (a === 'cancel') finish(null);
-      else if (a === 'start') {
-        try { stream = await navigator.mediaDevices.getUserMedia({ audio: true }); } catch { toast('Micro non autorisé.'); return; }
+      else if (a === 'retry') {
+        try { stream = await navigator.mediaDevices.getUserMedia({ audio: true }); stream.getTracks().forEach((t) => t.stop()); stream = null; err.hidden = true; $r('start').hidden = false; time.hidden = false; } catch (er) { showHelp(er?.name); }
+      } else if (a === 'start') {
+        if ((await permState('microphone')) === 'denied') { showHelp('NotAllowedError'); return; }
+        try { stream = await navigator.mediaDevices.getUserMedia({ audio: true }); } catch (er) { showHelp(er?.name); return; }
         chunks = []; rec = new MediaRecorder(stream);
         rec.ondataavailable = (ev) => { if (ev.data.size) chunks.push(ev.data); };
         rec.onstop = () => {
@@ -789,6 +841,7 @@ function recordVoice() {
       } else if (a === 'stop') { clearInterval(timer); rec?.stop(); $r('stop').hidden = true; }
       else if (a === 'keep' && result) finish(result);
     };
+    d.onchange = (e) => { if (e.target.matches('[data-r-file]') && e.target.files[0]) finish(e.target.files[0]); };
     d.oncancel = (e) => { e.preventDefault(); if (rec?.state === 'recording') rec.stop(); finish(null); };
     d.showModal();
   });

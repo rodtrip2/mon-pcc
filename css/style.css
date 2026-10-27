@@ -232,6 +232,11 @@ img.tb-media { background: transparent; }
 .tb-quote-author input { flex: 1; }
 .tb-add .sugg .chip { text-align: left; }
 .chip[aria-pressed="true"] .muted { color: inherit; opacity: .85; }
+.media-help { background: var(--warn-bg); border: 1px solid var(--warn-line); border-radius: 12px; padding: .8rem .9rem; margin: .6rem 0; display: flex; flex-direction: column; gap: .5rem; align-items: flex-start; }
+.media-help p { margin: 0; }
+.media-help ol { margin: .3rem 0; padding-left: 1.2rem; }
+.media-help li { margin: .25rem 0; }
+.media-help .file-btn { width: 100%; }
 .rec-time { font-size: 2rem; font-variant-numeric: tabular-nums; text-align: center; margin: .5rem 0; }
 
 /* Bandeau d'installation */
