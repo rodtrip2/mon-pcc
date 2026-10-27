@@ -28,7 +28,7 @@ const editKey = (step, g) => step.id + ':' + g.id;
 function editToggleHTML(key, label = 'Modifier') {
   const on = editing.has(key);
   return on
-    ? `<button type="button" class="btn btn-ghost btn-sm edit-done" data-act="edit-toggle" data-key="${esc(key)}" data-fk="edit:${esc(key)}">✓ Terminé</button>`
+    ? `<span class="editing-tag" data-edit-key="${esc(key)}">✏️ En modification</span>`
     : `<button type="button" class="icon edit-btn" data-act="edit-toggle" data-key="${esc(key)}" data-fk="edit:${esc(key)}" aria-label="${esc(label)}" title="${esc(label)}">✏️</button>`;
 }
 
@@ -83,6 +83,7 @@ function modal({ title, body, ok = 'Continuer', cancel = 'Annuler', danger = fal
         ${cancel ? `<button value="cancel" class="btn btn-ghost">${esc(cancel)}</button>` : ''}
         <button value="ok" class="btn ${danger ? 'btn-danger' : 'btn-primary'}">${esc(ok)}</button>
       </div></form>`;
+    d.returnValue = '';
     d.addEventListener('close', () => resolve(d.returnValue === 'ok'), { once: true });
     d.showModal();
   });
@@ -552,7 +553,6 @@ const QUOTES = [
   { text: 'L’espoir est cette chose à plumes qui se pose dans l’âme.', author: 'Emily Dickinson' },
   { text: 'Laisse tout t’arriver, la beauté comme l’effroi. Avance simplement : aucun sentiment n’est définitif.', author: 'Rainer Maria Rilke, Le Livre d’heures' },
 ];
-let quotesOpen = false;
 
 /** Libellé court d'un élément de la boîte à outils */
 function tbLabel(it) {
@@ -621,29 +621,11 @@ function renderToolbox(fromStep) {
       <div class="tb-add-grid">
         ${['photo', 'video', 'audio'].map((k) => `<label class="btn btn-secondary tb-add-btn"><span aria-hidden="true">${KINDS[k].icon}</span> ${KINDS[k].label}<input type="file" accept="${KINDS[k].accept}" data-act="tb-file" data-kind="${k}" hidden></label>`).join('')}
         <label class="btn btn-secondary tb-add-btn"><span aria-hidden="true">🖼</span> Album photo<input type="file" accept="image/*" multiple data-act="tb-album-new" hidden></label>
+        <button type="button" class="btn btn-secondary tb-add-btn" data-act="tb-link-new"><span aria-hidden="true">🔗</span> Lien</button>
+        <button type="button" class="btn btn-secondary tb-add-btn" data-act="tb-quote-new"><span aria-hidden="true">❝</span> Citation</button>
         <button type="button" class="btn btn-secondary tb-add-btn" data-act="tb-exercises"><span aria-hidden="true">🧘</span> Exercice</button>
         ${canRecord() ? `<button type="button" class="btn btn-secondary tb-add-btn" data-act="tb-record"><span aria-hidden="true">🎙</span> M’enregistrer</button>
         <button type="button" class="btn btn-secondary tb-add-btn" data-act="tb-video"><span aria-hidden="true">🎥</span> Me filmer</button>` : ''}
-      </div>
-      <form class="tb-link" data-act="tb-link">
-        <label class="field"><span>🔗 Ajouter un lien (vidéo, musique, podcast, site…)</span>
-          <input type="text" name="url" inputmode="url" autocapitalize="off" spellcheck="false" placeholder="https://…" autocomplete="off" required></label>
-        <button class="btn btn-secondary btn-sm">Ajouter le lien</button>
-        <p class="muted small">YouTube, Vimeo, Dailymotion, Spotify, Deezer, SoundCloud, Apple Music et Podcasts, TikTok, Instagram : le contenu pourra être lu directement ici, et son titre est demandé au site lors de l’ajout.</p>
-      </form>
-      <form class="tb-link tb-quote" data-act="tb-quote">
-        <label class="field"><span>❝ Ajouter une citation, une phrase qui m’aide</span>
-          <textarea name="text" rows="2" placeholder="Avec mes mots, ou une phrase que j’aime…" required></textarea></label>
-        <label class="field"><span>Auteur (facultatif)</span><input name="author" autocomplete="off" placeholder="Ex. : ma grand-mère, un livre, une chanson…"></label>
-        <button class="btn btn-secondary btn-sm">Ajouter la citation</button>
-      </form>
-      <div class="sugg">
-        <button type="button" class="btn btn-ghost btn-sm ex-btn" data-act="tb-quotes" aria-expanded="${quotesOpen}">${quotesOpen ? 'Masquer les exemples de citations' : 'Exemples de citations'}</button>
-        ${quotesOpen ? `<p class="muted small">Je touche une citation pour l’ajouter à ma boîte, et à nouveau pour la retirer.</p>
-        <div class="chips">${QUOTES.map((q, i) => {
-          const on = items.some((it) => it.kind === 'citation' && it.text === q.text);
-          return `<button type="button" class="chip" aria-pressed="${on}" data-act="tb-quote-chip" data-q="${i}" data-fk="quote:${i}">${on ? '✓ ' : '+ '}« ${esc(q.text)} »${q.author ? ` <span class="muted">— ${esc(q.author)}</span>` : ''}</button>`;
-        }).join('')}</div>` : ''}
       </div>
       <p class="muted small">Tout reste sur ce téléphone${store.isProtected() ? ', chiffré avec mon code' : ''}. Dans le plan imprimé ou envoyé, seuls les titres, les liens et les citations apparaissent, jamais les photos, vidéos ou sons.</p>
     </section>
@@ -947,6 +929,117 @@ async function putFiles(files) {
 }
 
 const tbRedraw = () => rerender(() => renderToolbox(location.hash.endsWith('/etape')));
+
+/** Fenêtre « Ajouter un lien » */
+async function linkDialog() {
+  const p = modal({
+    title: '🔗 Ajouter un lien',
+    body: `<label class="field"><span>Adresse (vidéo, musique, podcast, site…)</span>
+        <input type="text" id="tb-url" inputmode="url" autocapitalize="off" spellcheck="false" placeholder="https://…" autocomplete="off"></label>
+      <p class="muted small">YouTube, Vimeo, Dailymotion, Spotify, Deezer, SoundCloud, Apple Music et Podcasts, TikTok, Instagram : le contenu pourra être lu directement ici, et son titre est demandé au site lors de l’ajout.</p>
+      <p class="error small" id="tb-url-err" hidden>Ce lien ne semble pas valide.</p>`,
+    ok: 'Ajouter le lien',
+  });
+  const d = $('#modal');
+  const input = $('#tb-url');
+  setTimeout(() => input?.focus(), 50);
+  // On vérifie le lien avant de fermer
+  d.querySelector('button[value="ok"]').addEventListener('click', (ev) => {
+    if (!normalizeUrl(input.value)) { ev.preventDefault(); $('#tb-url-err').hidden = false; input.focus(); }
+  });
+  input.addEventListener('keydown', (ev) => {
+    if (ev.key === 'Enter') { ev.preventDefault(); d.querySelector('button[value="ok"]').click(); }
+  });
+  if (!(await p)) return;
+  addLink(normalizeUrl(input.value));
+}
+
+function normalizeUrl(v) {
+  let url = (v || '').trim();
+  if (!url) return null;
+  if (!/^https?:\/\//i.test(url)) url = 'https://' + url;
+  try {
+    const u = new URL(url);
+    if (!/^https?:$/.test(u.protocol) || !u.hostname.includes('.')) return null;
+    return u.href;
+  } catch { return null; }
+}
+
+function addLink(href) {
+  if (!href) return;
+  const item = { kind: 'lien', url: href, title: '', added: new Date().toISOString() };
+  toolbox().push(item);
+  scheduleSave();
+  tbRedraw();
+  toast('Lien ajouté.');
+  const idx = toolbox().length - 1;
+  const input = app.querySelector(`[data-fk="tb:${idx}"]`);
+  if (parseEmbed(href)) {
+    if (input) input.placeholder = 'Recherche du titre…';
+    fetchTitle(href).then((t) => {
+      const el = app.querySelector(`[data-fk="tb:${toolbox().indexOf(item)}"]`);
+      if (el) el.placeholder = 'Lien — donner un titre…';
+      if (t && !item.title) {
+        item.title = t;
+        if (el && !el.value) el.value = t;
+        const v = app.querySelector(`.embed-ph[data-i="${toolbox().indexOf(item)}"] .embed-lbl`);
+        if (v) v.textContent = t;
+        scheduleSave();
+      }
+    });
+  }
+  app.querySelector('.tb-mine')?.scrollIntoView({ behavior: 'smooth', block: 'start' });
+}
+
+/** Fenêtre « Ajouter une citation », avec les exemples à la demande */
+async function quoteDialog() {
+  const p = modal({
+    title: '❝ Ajouter une citation',
+    body: `<label class="field"><span>Une citation, une phrase qui m’aide</span>
+        <textarea id="tb-qtext" rows="3" placeholder="Avec mes mots, ou une phrase que j’aime…"></textarea></label>
+      <label class="field"><span>Auteur (facultatif)</span><input id="tb-qauthor" autocomplete="off" placeholder="Ex. : ma grand-mère, un livre, une chanson…"></label>
+      <p class="error small" id="tb-q-err" hidden>J’écris d’abord la citation, ou j’en choisis une dans les exemples.</p>
+      <div class="sugg">
+        <button type="button" class="btn btn-ghost btn-sm ex-btn" id="tb-qex" aria-expanded="false">Exemples de citations</button>
+        <div id="tb-qchips" hidden>
+          <p class="muted small">Je touche une citation pour la reprendre (je peux ensuite la modifier avant de l’ajouter).</p>
+          <div class="chips">${QUOTES.map((q, i) => `<button type="button" class="chip" data-q="${i}">« ${esc(q.text)} »${q.author ? ` <span class="muted">— ${esc(q.author)}</span>` : ''}</button>`).join('')}</div>
+        </div>
+      </div>`,
+    ok: 'Ajouter la citation',
+  });
+  const d = $('#modal');
+  const text = $('#tb-qtext');
+  const author = $('#tb-qauthor');
+  setTimeout(() => text?.focus(), 50);
+  d.querySelector('button[value="ok"]').addEventListener('click', (ev) => {
+    if (!text.value.trim()) { ev.preventDefault(); $('#tb-q-err').hidden = false; text.focus(); }
+  });
+  $('#tb-qex').addEventListener('click', (ev) => {
+    const box = $('#tb-qchips');
+    box.hidden = !box.hidden;
+    ev.currentTarget.setAttribute('aria-expanded', String(!box.hidden));
+    ev.currentTarget.textContent = box.hidden ? 'Exemples de citations' : 'Masquer les exemples de citations';
+  });
+  $('#tb-qchips').addEventListener('click', (ev) => {
+    const c = ev.target.closest('[data-q]');
+    if (!c) return;
+    const q = QUOTES[+c.dataset.q];
+    text.value = q.text;
+    author.value = q.author || '';
+    $('#tb-q-err').hidden = true;
+    // On replie les exemples pour que le bouton « Ajouter » reste à portée
+    $('#tb-qex').click();
+    d.scrollTo?.({ top: 0, behavior: 'smooth' });
+  });
+  if (!(await p)) return;
+  const t = text.value.trim();
+  if (!t) return;
+  toolbox().push({ kind: 'citation', text: t, author: author.value.trim(), added: new Date().toISOString() });
+  scheduleSave();
+  tbRedraw();
+  toast('Citation ajoutée.');
+}
 
 /* Visionneuse plein écran (photos et albums) */
 let lb = null; // { idx, k }
@@ -1983,43 +2076,6 @@ app.addEventListener('submit', async (e) => {
     scheduleSave();
     rerender(() => renderStep(STEPS.indexOf(step)));
     app.querySelector(`[data-fk="free:${form.dataset.g}"]`)?.focus({ preventScroll: true });
-  } else if (act === 'tb-quote') {
-    const text = form.text.value.trim();
-    if (!text) return;
-    toolbox().push({ kind: 'citation', text, author: form.author.value.trim(), added: new Date().toISOString() });
-    scheduleSave();
-    rerender(() => renderToolbox(location.hash.endsWith('/etape')));
-    toast('Citation ajoutée.');
-  } else if (act === 'tb-link') {
-    let url = form.url.value.trim();
-    if (!/^https?:\/\//i.test(url)) url = 'https://' + url;
-    try {
-      const u = new URL(url);
-      if (!/^https?:$/.test(u.protocol)) throw new Error();
-      const item = { kind: 'lien', url: u.href, title: '', added: new Date().toISOString() };
-      toolbox().push(item);
-      scheduleSave();
-      rerender(() => renderToolbox(location.hash.endsWith('/etape')));
-      const idx = toolbox().length - 1;
-      const input = app.querySelector(`[data-fk="tb:${idx}"]`);
-      input?.focus();
-      if (parseEmbed(u.href)) {
-        if (input) input.placeholder = 'Recherche du titre…';
-        fetchTitle(u.href).then((t) => {
-          const el = app.querySelector(`[data-fk="tb:${toolbox().indexOf(item)}"]`);
-          if (el) el.placeholder = 'Lien — donner un titre…';
-          if (t && !item.title) {
-            item.title = t;
-            if (el && !el.value) el.value = t;
-            const v = app.querySelector(`.embed-ph[data-i="${toolbox().indexOf(item)}"] .embed-lbl`);
-            if (v) v.textContent = t;
-            scheduleSave();
-          }
-        });
-      }
-    } catch {
-      toast('Ce lien ne semble pas valide.');
-    }
   } else if (act === 'unlock') {
     const err = form.querySelector('.error');
     try {
@@ -2170,20 +2226,8 @@ document.addEventListener('click', async (e) => {
       }
       break;
     }
-    case 'tb-quotes':
-      quotesOpen = !quotesOpen;
-      rerender(() => renderToolbox(location.hash.endsWith('/etape')));
-      break;
-    case 'tb-quote-chip': {
-      const q = QUOTES[+btn.dataset.q];
-      const arr = toolbox();
-      const at = arr.findIndex((it) => it.kind === 'citation' && it.text === q.text);
-      if (at >= 0) arr.splice(at, 1);
-      else arr.push({ kind: 'citation', text: q.text, author: q.author || '', added: new Date().toISOString() });
-      scheduleSave();
-      rerender(() => renderToolbox(location.hash.endsWith('/etape')));
-      break;
-    }
+    case 'tb-link-new': await linkDialog(); break;
+    case 'tb-quote-new': await quoteDialog(); break;
     case 'tb-record': {
       const blob = await recordVoice();
       if (blob) await addToolboxBlob('voix', blob, 'Mon message');
@@ -2287,6 +2331,14 @@ document.addEventListener('click', async (e) => {
       }
       scheduleSave();
       rerender(() => renderToolbox(location.hash.endsWith('/etape')));
+      break;
+    }
+    case 'edit-done-all': {
+      app.querySelectorAll('[data-edit-key]').forEach((el) => editing.delete(el.dataset.editKey));
+      if (location.hash.startsWith('#/boite-outils')) rerender(() => renderToolbox(location.hash.endsWith('/etape')));
+      else if (location.hash.startsWith('#/etape/')) rerender(() => renderStep(parseInt(location.hash.split('/')[2], 10) || 0));
+      else route();
+      toast('Modifications terminées.');
       break;
     }
     case 'edit-toggle': {
@@ -2512,6 +2564,19 @@ document.addEventListener('visibilitychange', () => {
 });
 
 // Ajuste la hauteur des lignes de texte après chaque affichage
+/* Bouton flottant « Terminé » : visible tant qu'une liste de la page est en modification */
+const editFloat = document.createElement('button');
+editFloat.type = 'button';
+editFloat.className = 'btn btn-primary edit-float no-print';
+editFloat.dataset.act = 'edit-done-all';
+editFloat.textContent = '✓ Terminé';
+editFloat.hidden = true;
+document.body.appendChild(editFloat);
+new MutationObserver(() => {
+  const on = !!app.querySelector('[data-edit-key]');
+  editFloat.hidden = !on;
+  document.body.classList.toggle('has-edit-float', on);
+}).observe(app, { childList: true });
 new MutationObserver(() => app.querySelectorAll('textarea.item-input, textarea.tb-quote-text').forEach(autosize))
   .observe(app, { childList: true, subtree: true });
 
