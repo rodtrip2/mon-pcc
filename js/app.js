@@ -867,7 +867,8 @@ function pdfDialog(mode) {
         <li>messagerie chiffrée (Signal, WhatsApp…) ;</li>
         <li>dépôt dans Mon Espace Santé ;</li>
         <li>envoi par mon soignant via la messagerie sécurisée de santé (MSSanté).</li></ul>
-        J’évite, si possible, un simple e-mail.</div>` : ''}
+        J’évite, si possible, un simple e-mail.
+        <button value="mes" class="btn btn-secondary btn-sm mes-btn" formnovalidate>🏥 Déposer dans Mon Espace Santé</button></div>` : ''}
       <fieldset class="choice">
         <legend class="sr-only">Protection</legend>
         ${send ? `<label class="radio"><input type="radio" name="mode" value="none" checked> <span><strong>Sans code</strong> (conseillé pour un envoi)<br><span class="muted small">Le destinataire pourra ouvrir mon plan immédiatement, y compris en situation de crise.</span></span></label>` : ''}
@@ -906,6 +907,7 @@ function pdfDialog(mode) {
       }
     });
     d.addEventListener('close', () => {
+      if (d.returnValue === 'mes') { location.hash = '#/mon-espace-sante'; return resolve(null); }
       if (d.returnValue !== 'ok') return resolve(null);
       resolve({ password: f.mode.value === 'code' ? f.code.value.trim() : '' });
     }, { once: true });

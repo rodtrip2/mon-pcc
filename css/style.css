@@ -259,6 +259,7 @@ img.tb-media { background: transparent; }
 .more { margin-top: .8rem; }
 .safe-ways { background: var(--brand-soft); border-radius: 10px; padding: .6rem .8rem; margin: .5rem 0; }
 .safe-ways ul { margin: .3rem 0; padding-left: 1.2rem; }
+.mes-btn { display: flex; width: 100%; margin-top: .6rem; }
 .code-box .warn { margin: .2rem 0 0; }
 .code-box .warn ul { margin: .3rem 0 0; padding-left: 1.2rem; }
 .more summary { cursor: pointer; color: var(--brand-ink); font-weight: 600; min-height: 36px; display: flex; align-items: center; }
