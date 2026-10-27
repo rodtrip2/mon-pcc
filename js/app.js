@@ -1,5 +1,5 @@
 /* Mon PCC — application (sans dépendance, sans serveur, sans traceur) */
-import { STEPS, PROCESS, SOURCE } from './data.js';
+import { STEPS, PROCESS, SOURCE, VERSION, VERSIONS, setVersion, hiddenSteps } from './data.js';
 import * as store from './storage.js';
 import * as media from './media.js';
 import { appUrl, displayUrl, makeQr, qrSvg, renderCard, canvasToJpeg, buildSheetPdf } from './share.js';
@@ -81,6 +81,13 @@ function rerender(fn) {
   }
 }
 
+/** Applique la version du plan (adulte / ado) à toute l'application */
+function applyVersion() {
+  setVersion(plan?.data?.version || 'adulte');
+}
+const isAdo = () => VERSION === 'ado';
+const versionLabel = (v = VERSION) => (v === 'ado' ? 'version ado' : 'version adulte');
+
 const hasData = () => plan && STEPS.some((s) => stepIsFilled(s, plan.data));
 
 /* ---------- accès aux données d'une étape ---------- */
@@ -118,7 +125,7 @@ function route() {
     case 'demarche': renderProcess(); break;
     case 'etape': renderStep(Math.max(0, Math.min(STEPS.length - 1, parseInt(arg, 10) || 0))); break;
     case 'plan': renderPlan(); break;
-    case 'reglages': renderSettings(); break;
+    case 'reglages': renderSettings(); if (arg === 'version') setTimeout(() => $('#version')?.scrollIntoView({ block: 'start' }), 0); break;
     case 'partager': renderShare(); break;
     case 'mon-espace-sante': renderMES(); break;
     case 'ressources': renderResources(); break;
@@ -150,11 +157,15 @@ function renderHome() {
         <div class="hero-logo" aria-hidden="true">${logoSVG()}</div>
         <h1>Mon PCC</h1>
         <p class="lead">Préparer mon <strong>plan de crise conjoint</strong>, pas à pas, avec mes propres mots.</p>
-        <a class="btn btn-primary btn-lg" href="#/demarche">Commencer</a>
+        <div class="start-choice">
+          <button type="button" class="btn btn-primary btn-lg" data-act="start" data-v="adulte">Commencer — version adulte</button>
+          <button type="button" class="btn btn-secondary btn-lg" data-act="start" data-v="ado">Commencer — version ado</button>
+        </div>
+        <p class="muted small">La version ado est adaptée aux adolescent·es. Je pourrai changer de version à tout moment, sans perdre mes réponses.</p>
       </section>
       <section class="card">
         <h2>Le plan de crise conjoint, c’est quoi ?</h2>
-        <p>Un document que je construis <strong>avec un·e professionnel·le</strong> qui m’accompagne, et avec mes proches si je le souhaite. Il décrit ce qui peut me mettre en crise, comment le repérer, ce qui m’aide, et les soins que je souhaite recevoir ou éviter.</p>
+        <p>Un document que je construis <strong>avec un·e professionnel·le</strong> qui m’accompagne, et avec mes proches si je le souhaite. Il décrit ce qui peut me mettre en crise, comment le repérer, ce qui m’aide et qui prévenir. Dans la version adulte, il précise aussi les soins que je souhaite recevoir ou éviter.</p>
         <p>Il sert à prévenir les crises et, si elles arrivent, à ce que mes choix soient connus et respectés.</p>
       </section>
       <section class="card card-soft">
@@ -181,6 +192,7 @@ function renderHome() {
       <h2>Mon plan de crise conjoint</h2>
       <div class="bar" role="progressbar" aria-valuemin="0" aria-valuemax="${p.total}" aria-valuenow="${p.done}" aria-label="Étapes complétées"><span style="width:${(p.done / p.total) * 100}%"></span></div>
       <p class="muted">${p.done} étape${p.done > 1 ? 's' : ''} sur ${p.total} complétée${p.done > 1 ? 's' : ''} · modifié le ${fmtDate(lastUpdate(plan))}</p>
+      <p class="version-line small">${isAdo() ? '🧑‍🎓' : '🧑'} ${esc(versionLabel())[0].toUpperCase() + esc(versionLabel()).slice(1)} · <a href="#/reglages/version">changer</a></p>
       ${review}
       <div class="stack">
         ${next >= 0 ? `<a class="btn btn-primary" href="#/etape/${next}">Continuer : ${esc(STEPS[next].short)}</a>` : ''}
@@ -209,6 +221,7 @@ function renderProcess() {
   app.innerHTML = `
     <h1>Comment se déroule la démarche</h1>
     <p class="lead">Le plan de crise conjoint est une démarche <strong>volontaire</strong>, qui se construit en plusieurs temps.</p>
+    <p class="version-line small">${isAdo() ? '🧑‍🎓' : '🧑'} Je remplis la <strong>${versionLabel()}</strong>${isAdo() ? ' (en phase de test sur le site officiel)' : ''} · <a href="#/reglages/version">changer de version</a></p>
     <ol class="process">${PROCESS.map((s) => `<li><h2>${esc(s.t)}</h2><p>${esc(s.d)}</p></li>`).join('')}</ol>
     <section class="card card-soft">
       <h2>Comment utiliser Mon PCC</h2>
@@ -722,8 +735,15 @@ let cardPreviewUrl = '';
 /** Données de la carte, préremplies depuis le plan au premier affichage */
 function carte() {
   if (!plan.data.carte) {
-    const proche = (plan.data.aide?.proches || []).find((r) => r.nom || r.tel) || {};
-    const pro = (plan.data.aide?.pros || []).find((r) => r.nom || r.tel) || {};
+    let proche = (plan.data.aide?.proches || []).find((r) => r.nom || r.tel) || {};
+    let pro = (plan.data.aide?.pros || []).find((r) => r.nom || r.tel) || {};
+    if (isAdo()) {
+      const info = (plan.data.information || []).find((r) => r.qui) || {};
+      const tel = (info.comment || '').match(/(\+?\d[\d .-]{7,}\d)/);
+      proche = { nom: info.qui || '', lien: '', tel: tel ? tel[1] : '' };
+      const p2 = (plan.data.partenaires || []).find((r) => /infirm|psych|médecin|medecin|éduc|educ|référent|referent|CMP/i.test(r.role || '')) || {};
+      pro = { nom: p2.nom || '', lien: p2.role || '', tel: '' };
+    }
     const id = plan.data.coordonnees || {};
     plan.data.carte = {
       nom: [id.prenom, id.nom].filter(Boolean).join(' '),
@@ -751,6 +771,7 @@ function renderMES() {
     <h1>🏥 Ajouter à Mon Espace Santé</h1>
     <p class="lead">Déposer mon plan dans Mon Espace Santé permet aux soignant·es que j’autorise de le consulter, y compris en cas d’hospitalisation ou d’urgence. Ma carte de crise signale qu’il existe.</p>
 
+    ${isAdo() ? `<div class="note small" role="note"><strong>Si j’ai moins de 18 ans :</strong> mon espace Mon Espace Santé est géré par mon ou mes représentant·es légaux (selon ma situation : parents, tuteur·rice, service de l’aide sociale à l’enfance…). Je ne peux pas y déposer mon plan seul·e : je le fais <strong>avec mon ou ma représentant·e légal·e</strong>, ou je demande à un·e <strong>professionnel·le qui me suit</strong> de l’y déposer. À mes 18 ans, j’accède moi-même à mon espace et j’y retrouve mes documents.</div>` : ''}
     <section class="card">
       <h2>1. Télécharger mon plan en PDF</h2>
       <p class="muted small">Sans code : Mon Espace Santé est déjà un espace sécurisé, et un code empêcherait les soignant·es de lire le document.</p>
@@ -802,17 +823,47 @@ function renderMES() {
   refreshCardPreview();
 }
 
+/* ---------- changement de version ---------- */
+
+async function changeVersion(v) {
+  if (v === VERSION) return;
+  const masked = hiddenSteps(v).filter((st) => stepIsFilled(st, plan.data));
+  const signed = (plan.data.signature?.signataires || []).some((r) => r.sig);
+  const ok = !hasData() || await modal({
+    title: v === 'ado' ? 'Passer à la version ado ?' : 'Passer à la version adulte ?',
+    body: `<p>Mes réponses communes aux deux versions sont gardées.</p>
+      ${masked.length ? `<p>Ces rubriques seront <strong>masquées</strong> (gardées sur ce téléphone, elles réapparaîtront si je reviens à l’autre version) :</p><ul>${masked.map((st) => `<li>${esc(st.title)}</li>`).join('')}</ul>` : ''}
+      ${signed ? '<p class="small"><strong>Le plan change de contenu</strong> : les signatures déjà faites ne figureront plus sur l’impression ni sur le PDF. Il faudra signer à nouveau.</p>' : ''}`,
+    ok: 'Changer de version',
+  });
+  if (!ok) { rerender(renderSettings); return; }
+  plan.data.version = v;
+  applyVersion();
+  scheduleSave();
+  toast(v === 'ado' ? 'Version ado activée.' : 'Version adulte activée.');
+  rerender(() => route());
+}
+
 /* ---------- ressources ---------- */
 
 const telHref = (t) => 'tel:' + t.replace(/[^\d+]/g, '');
 
+function resourcesOrdered() {
+  if (!isAdo()) return RESOURCES;
+  const first = RESOURCES.filter((c) => c.id === 'urgence' || c.id === 'jeunes');
+  return [...first, ...RESOURCES.filter((c) => !first.includes(c))];
+}
+
 function renderResources() {
-  const inPlan = (it) => (plan?.data.aide?.garde || []).some((r) => r.tel && r.tel.replace(/\D/g, '') === it.tel.replace(/\D/g, ''));
+  const digits = (t) => String(t || '').replace(/\D/g, '');
+  const inPlan = (it) => (isAdo()
+    ? (plan?.data.strategies?.pros || []).some((t) => digits(t).includes(digits(it.tel)))
+    : (plan?.data.aide?.garde || []).some((r) => r.tel && digits(r.tel) === digits(it.tel)));
   app.innerHTML = `
     <h1>📞 Ressources</h1>
-    <p class="lead">Des lignes d’écoute et des sites fiables, en France. Je peux ajouter un numéro à mon plan, dans « À qui demander de l’aide ».</p>
-    <nav class="res-jump" aria-label="Catégories">${RESOURCES.map((c) => `<a class="chip" href="#res-${c.id}" data-act="res-jump" data-id="${c.id}">${c.icon} ${esc(c.title)}</a>`).join('')}</nav>
-    ${RESOURCES.map((c) => `
+    <p class="lead">Des lignes d’écoute et des sites fiables, en France. Je peux ajouter un numéro à mon plan, dans « ${isAdo() ? 'Ce qui me fait du bien › L’aide de professionnel·les' : 'À qui demander de l’aide'} ».</p>
+    <nav class="res-jump" aria-label="Catégories">${resourcesOrdered().map((c) => `<a class="chip" href="#res-${c.id}" data-act="res-jump" data-id="${c.id}">${c.icon} ${esc(c.title)}</a>`).join('')}</nav>
+    ${resourcesOrdered().map((c) => `
       <section class="card res-cat" id="res-${c.id}">
         <h2>${c.icon} ${esc(c.title)}</h2>
         ${c.intro ? `<p class="muted small">${esc(c.intro)}</p>` : ''}
@@ -836,7 +887,7 @@ function renderResources() {
 /* ---------- plan complet et partage ---------- */
 
 function renderPlan() {
-  const refused = (plan.data.soinsEvites || []).some((r) => r.soin && r.soin.trim());
+  const refused = STEPS.some((s) => s.id === 'alternatives') && (plan.data.soinsEvites || []).some((r) => r.soin && r.soin.trim());
   const alt = (plan.data.alternatives || []).some((x) => x.trim());
   const canShare = !!navigator.share;
   app.innerHTML = `
@@ -1068,6 +1119,16 @@ function renderSettings() {
   const prot = store.isProtected();
   app.innerHTML = `
     <h1>Réglages</h1>
+    <section class="card" id="version">
+      <h2>Version du plan</h2>
+      <p class="muted small">Je peux changer de version à tout moment. Les réponses communes sont gardées ; les rubriques propres à l’autre version sont conservées mais masquées.</p>
+      <div class="choice">
+        ${Object.entries(VERSIONS).map(([v, c]) => `<label class="radio"><input type="radio" name="version" value="${v}" data-act="version" ${VERSION === v ? 'checked' : ''}>
+          <span><strong>${v === 'ado' ? 'Version ado' : 'Version adulte'}</strong> (${c.steps.length} étapes)<br><span class="muted small">${v === 'ado'
+            ? 'Questions adaptées aux adolescent·es. Version en phase de test sur le site officiel du PCC.'
+            : 'La version de référence, avec les soins souhaités, à éviter et les démarches à déléguer.'}</span></span></label>`).join('')}
+      </div>
+    </section>
     <section class="card">
       <h2>Protéger par un code</h2>
       <p>${prot ? 'Mon plan est <strong>chiffré</strong> sur ce téléphone. Le code est demandé à chaque ouverture.' : 'Je peux chiffrer mon plan avec un code personnel. Il sera demandé à chaque ouverture de l’application.'}</p>
@@ -1129,8 +1190,11 @@ function renderAbout() {
     </section>
     <section class="card">
       <h2>Sources et droits d’auteur</h2>
-      <p>Les questions de Mon PCC reprennent le support officiel :<br><em>${esc(SOURCE.citation)}</em> <a href="${SOURCE.url}" target="_blank" rel="noopener">${SOURCE.url}</a> — © ${esc(SOURCE.holder)}.</p>
+      <p>Les questions de Mon PCC reprennent les supports officiels :</p>
+      <ul class="small">${Object.values(VERSIONS).map((c) => `<li><em>${esc(c.source.citation)}</em> (${c.label.toLowerCase()})</li>`).join('')}</ul>
+      <p><a href="${SOURCE.url}" target="_blank" rel="noopener">${SOURCE.url}</a> — © ${esc(SOURCE.holder)}.</p>
       <p>Ce support est diffusé sous licence <a href="${SOURCE.licenseUrl}" target="_blank" rel="noopener">Creative Commons BY-NC-SA</a> (attribution, pas d’utilisation commerciale, partage dans les mêmes conditions). Mon PCC respecte ces conditions : il cite la source, reste gratuit et non commercial, et ses contenus sont partagés sous la même licence.</p>
+      <p class="small">La version ado est publiée comme « phase test » sur le site officiel ; sa licence n’y est pas précisée séparément. Elle est reprise ici dans les mêmes conditions que le reste du site (CC BY-NC-SA).</p>
       <p><strong>Modifications apportées</strong> : découpage en étapes, conseils de rédaction, suggestions et exemples ajoutés, numéros d’urgence adaptés à la France, mise en page.</p>
       <p>Mon PCC est un projet indépendant, <strong>non affilié</strong> à la Haute École de la Santé La Source ni aux auteur·es du PCC, qui ne l’ont pas validé.</p>
       <p>Code source libre : <a href="https://github.com/rodtrip2/mon-pcc" target="_blank" rel="noopener noreferrer">dépôt GitHub du projet</a> (fichier LICENSE). Le QR code est généré par la bibliothèque <em>qrcode-generator</em> de Kazuhiko Arase (licence MIT).</p>
@@ -1439,6 +1503,7 @@ app.addEventListener('submit', async (e) => {
     try {
       plan = await store.unlock(form.code.value);
       locked = false;
+      applyVersion();
       media.prune(usedMediaIds()).catch(() => {});
       route();
     } catch {
@@ -1470,6 +1535,7 @@ app.addEventListener('change', async (e) => {
     if (!obj || obj.app !== 'mon-pcc' || typeof obj.plan?.data !== 'object') throw new Error();
     if (hasData() && !(await modal({ title: 'Remplacer mon plan ?', body: '<p>Le plan actuellement enregistré sur ce téléphone sera remplacé par la sauvegarde.</p>', ok: 'Remplacer', danger: true }))) return;
     plan = obj.plan;
+    applyVersion();
     await media.clear();
     forgetMediaURLs();
     for (const m of obj.media || []) await media.put(media.dataURLToBlob(m.data), m.id);
@@ -1598,7 +1664,7 @@ document.addEventListener('click', async (e) => {
       break;
     case 'me': {
       const id = plan.data.coordonnees || {};
-      getArr(step).push({ nom: [id.prenom, id.nom].filter(Boolean).join(' ') || 'Moi-même', role: 'Usager·ère' });
+      getArr(step).push({ nom: [id.prenom, id.nom].filter(Boolean).join(' ') || 'Moi-même', role: isAdo() ? 'Moi' : 'Usager·ère' });
       redraw();
       break;
     }
@@ -1612,6 +1678,12 @@ document.addEventListener('click', async (e) => {
     }
     case 'print': window.print(); break;
     case 'pdf-save': pdfSave(); break;
+    case 'start':
+      plan.data.version = btn.dataset.v === 'ado' ? 'ado' : 'adulte';
+      applyVersion();
+      scheduleSave(false);
+      location.hash = '#/demarche';
+      break;
     case 'res-jump': {
       e.preventDefault();
       document.getElementById('res-' + btn.dataset.id)?.scrollIntoView({ behavior: 'smooth', block: 'start' });
@@ -1620,12 +1692,18 @@ document.addEventListener('click', async (e) => {
     case 'res-add': {
       const cat = RESOURCES.find((c) => c.id === btn.dataset.c);
       const it = cat.items[+btn.dataset.k];
-      plan.data.aide ??= {};
-      plan.data.aide.garde ??= [];
-      plan.data.aide.garde.push({ nom: it.name, lien: [cat.title, it.hours].filter(Boolean).join(' · '), tel: it.tel });
+      if (isAdo()) {
+        plan.data.strategies ??= {};
+        plan.data.strategies.pros ??= [];
+        plan.data.strategies.pros.push(`J’appelle ${it.name} (${it.tel})`);
+      } else {
+        plan.data.aide ??= {};
+        plan.data.aide.garde ??= [];
+        plan.data.aide.garde.push({ nom: it.name, lien: [cat.title, it.hours].filter(Boolean).join(' · '), tel: it.tel });
+      }
       scheduleSave();
       rerender(renderResources);
-      toast('Ajouté à mon plan (étape 8, services et institutions de garde).');
+      toast(isAdo() ? 'Ajouté à mon plan (ce qui me fait du bien, aide de professionnel·les).' : 'Ajouté à mon plan (étape 8, services et institutions de garde).');
       break;
     }
     case 'mes-pdf':
@@ -1658,6 +1736,7 @@ document.addEventListener('click', async (e) => {
         await media.clear();
         forgetMediaURLs();
         plan = store.emptyPlan();
+        applyVersion();
         toast('Données effacées.');
         location.hash = '#/';
         route();
@@ -1684,6 +1763,7 @@ document.addEventListener('click', async (e) => {
         store.wipe();
         await media.clear();
         plan = store.emptyPlan();
+        applyVersion();
         locked = false;
         location.hash = '#/';
         route();
@@ -1726,7 +1806,11 @@ document.addEventListener('click', async (e) => {
   }
 });
 
-document.addEventListener('change', (e) => {
+document.addEventListener('change', async (e) => {
+  if (e.target.dataset?.act === 'version') {
+    await changeVersion(e.target.value);
+    return;
+  }
   if (e.target.dataset?.act === 'ib-toggle') {
     setInstallPref(e.target.checked ? null : 'never');
     toast(e.target.checked ? 'Le bandeau d’installation sera proposé.' : 'Le bandeau ne sera plus proposé.');
@@ -1764,6 +1848,7 @@ function start() {
   if (st === 'locked') locked = true;
   else plan = store.loadPlain() || store.emptyPlan();
   if (plan && !plan.data) plan.data = {};
+  applyVersion();
   saveState.textContent = st === 'none' ? '' : 'Enregistré sur ce téléphone';
   store.requestPersistence();
   if (plan) media.prune(usedMediaIds()).catch(() => {});

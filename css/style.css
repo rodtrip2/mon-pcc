@@ -292,6 +292,11 @@ img.tb-media { background: transparent; }
 .res-added { font-size: .9rem; font-weight: 600; color: var(--brand-ink); }
 .res-link { display: block; margin-top: .4rem; font-weight: 700; }
 
+.start-choice { display: flex; flex-direction: column; gap: .6rem; align-items: center; margin: .4rem 0 .6rem; }
+.start-choice .btn { width: min(100%, 340px); }
+#version { scroll-margin-top: 5rem; }
+.version-line { margin: .3rem 0; color: var(--brand-ink); }
+
 /* Exemples */
 .sugg { margin-top: .6rem; }
 .ex-btn { margin-bottom: .5rem; }

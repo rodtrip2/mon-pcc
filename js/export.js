@@ -71,6 +71,7 @@ export function stepContent(step, data, plan = null) {
       if (!recs.length) continue;
       const lines = recs.map((r) => {
         if (step.id === 'soinsEvites') return [r.soin, filled(r.raison) ? 'parce que : ' + r.raison : ''].filter(filled).join(' — ');
+        if (step.labelled) return step.fields.filter((f) => filled(r[f.key])).map((f) => `${f.label} ${r[f.key]}`).join(' — ');
         return step.fields.map((f) => r[f.key]).filter(filled).join(' — ');
       });
       out.push({ label: g.label, lines, ordered: step.ordered });

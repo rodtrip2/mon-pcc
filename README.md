@@ -10,6 +10,7 @@ un·e professionnel·le qui l’accompagne et, si elle le souhaite, ses proches.
 ## Fonctionnalités
 
 - **Trame officielle** : les 14 étapes suivent, dans l’ordre, les questions du support PCC version adulte (V6, 2026).
+- **Deux versions** : adulte (support PCC V6, 14 étapes) et **ado** (support PCC Ado V1 « phase test », 10 étapes : questions reformulées, rubrique « Qui informer ? Par qui ? Comment ? », sans les rubriques de soins). Choix au démarrage, changement possible à tout moment dans les Réglages : les réponses communes sont gardées, les rubriques propres à l’autre version masquées mais conservées. Exemples adaptés aux ados et à toutes les situations de vie (parents, famille d’accueil, foyer, ASE…).
 - **Rédaction guidée sans induire les réponses** : pour chaque question, un conseil de rédaction et une saisie libre « avec mes mots » en premier. Des **exemples à cocher** n’apparaissent qu’en touchant le bouton « Exemples ».
 - **Priorités** : stratégies et personnes ressources se classent par ordre de priorité (moi-même → entourage → professionnel·les → services de garde), comme le demande le PCC.
 - **Cohérence** : rappel si des soins à éviter sont indiqués sans alternative (champ indispensable selon le PCC).
@@ -53,7 +54,8 @@ Aucune compilation : HTML, CSS et JavaScript natifs. Pour tester en local : `pyt
 ```
 index.html              page unique
 css/style.css           styles (clair/sombre, impression)
-js/data.js              trame PCC, conseils et suggestions  ← contenu à relire
+js/data.js              trame PCC adulte, conseils, exemples ; choix de version  ← contenu à relire
+js/data-ado.js          trame PCC ado, conseils, exemples  ← contenu à relire
 js/app.js               interface et navigation
 js/storage.js           stockage local et chiffrement
 js/pdf.js               écriture PDF et chiffrement AES-256

@@ -1,3 +1,4 @@
+import { STEPS_ADO, PROCESS_ADO, SOURCE_ADO, PRINT_TITLE_ADO, PRINT_SUBTITLE_ADO } from './data-ado.js';
 /*
  * Mon PCC — trame et suggestions
  *
@@ -10,7 +11,7 @@
  * Ce fichier est diffusé sous la même licence (CC BY-NC-SA 4.0).
  */
 
-export const SOURCE = {
+const SOURCE_ADULTE = {
   citation:
     'Ferrari, P., Suter, C., Martino, P. (2026). Support Plan de Crise Conjoint uniformisé et validé.',
   url: 'https://plandecriseconjoint.ch/',
@@ -20,7 +21,7 @@ export const SOURCE = {
 };
 
 /* Les six temps de la démarche, d'après le guide et la FAQ du PCC */
-export const PROCESS = [
+const PROCESS_ADULTE = [
   { t: 'Je choisis un moment calme', d: 'Idéalement à distance d’une crise, dans un moment d’apaisement. Je peux faire des pauses et avancer à mon rythme.' },
   { t: 'Je remplis d’abord seul·e', d: 'À la première personne (« je »), avec mes propres mots. Des exemples sont disponibles si je manque d’idées, mais ils ne parlent pas à ma place.' },
   { t: 'J’en discute avec un·e professionnel·le', d: 'Au minimum avec un·e professionnel·le qui m’accompagne, et avec mes proches si je le souhaite. Ensemble, nous complétons ou modifions le plan : c’est une décision partagée.' },
@@ -38,7 +39,7 @@ export const PROCESS = [
  * Une étape list/records peut avoir des groupes (groups).
  * ordered : l'ordre compte (priorité), on affiche les flèches.
  */
-export const STEPS = [
+const STEPS_ADULTE = [
   {
     id: 'coordonnees',
     type: 'identity',
@@ -309,5 +310,38 @@ export const STEPS = [
   },
 ];
 
-export const PRINT_TITLE = 'PLAN DE CRISE CONJOINT';
-export const PRINT_SUBTITLE = 'Un partenariat entre moi et mon réseau de soutien — version adulte';
+const PRINT_TITLE_ADULTE = 'PLAN DE CRISE CONJOINT';
+const PRINT_SUBTITLE_ADULTE = 'Un partenariat entre moi et mon réseau de soutien — version adulte';
+
+/* ---------- choix de la version (adulte / ado) ----------
+ * Les exports ci-dessous sont des liaisons vivantes : après setVersion(),
+ * tous les modules qui les importent voient la trame de la version choisie.
+ */
+export const VERSIONS = {
+  adulte: { label: 'Adulte', steps: STEPS_ADULTE, process: PROCESS_ADULTE, source: SOURCE_ADULTE, title: PRINT_TITLE_ADULTE, subtitle: PRINT_SUBTITLE_ADULTE },
+  ado: { label: 'Ado', steps: STEPS_ADO, process: PROCESS_ADO, source: SOURCE_ADO, title: PRINT_TITLE_ADO, subtitle: PRINT_SUBTITLE_ADO },
+};
+
+export let VERSION = 'adulte';
+export let STEPS = STEPS_ADULTE;
+export let PROCESS = PROCESS_ADULTE;
+export let SOURCE = SOURCE_ADULTE;
+export let PRINT_TITLE = PRINT_TITLE_ADULTE;
+export let PRINT_SUBTITLE = PRINT_SUBTITLE_ADULTE;
+
+export function setVersion(v) {
+  const c = VERSIONS[v] || VERSIONS.adulte;
+  VERSION = VERSIONS[v] ? v : 'adulte';
+  STEPS = c.steps;
+  PROCESS = c.process;
+  SOURCE = c.source;
+  PRINT_TITLE = c.title;
+  PRINT_SUBTITLE = c.subtitle;
+}
+
+/** Étapes de l'autre version absentes de la version donnée (réponses gardées mais masquées) */
+export function hiddenSteps(v) {
+  const mine = new Set(VERSIONS[v].steps.map((s) => s.id));
+  const other = v === 'ado' ? VERSIONS.adulte.steps : VERSIONS.ado.steps;
+  return other.filter((s) => !mine.has(s.id));
+}
