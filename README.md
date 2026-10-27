@@ -16,6 +16,7 @@ un·e professionnel·le qui l’accompagne et, si elle le souhaite, ses proches.
 - **Cohérence** : rappel si des soins à éviter sont indiqués sans alternative (champ indispensable selon le PCC).
 - **Démarche respectée** : remplir d’abord seul·e à la première personne, puis décision partagée, signature, diffusion, relecture au moins tous les 6 mois (rappel de date).
 - **Boîte à outils** (étape 7, partie 1, et menu) : photos, vidéos, sons, messages vocaux et vidéos enregistrés dans l’application (caméra avant ou arrière, 3 minutes maximum), citations (avec 25 exemples sur demande : phrases-repères rédigées pour Mon PCC et auteurs du domaine public, traductions reformulées) et liens qui aident à aller mieux. Fichiers stockés sur l’appareil (IndexedDB), chiffrés avec le code si le plan est protégé ; seuls les titres et liens figurent dans le plan imprimé ou envoyé.
+- **Lecteurs intégrés** (boîte à outils) : les liens YouTube, Vimeo, Dailymotion, Spotify, Deezer, SoundCloud, Apple Music / Podcasts, TikTok, Instagram et les fichiers audio/vidéo directs se lisent dans l’application. Rien n’est chargé avant que la personne touche « Lire ici » (avertissement, option « ne plus me demander ») ; versions sans cookies / dnt quand elles existent. Titre prérempli via oEmbed à l’ajout du lien. Domaines limités par la CSP (`js/embed.js`).
 - **Contacts du téléphone** (Android/Chrome) : aux étapes Partenaires, À qui demander de l’aide et Démarches, bouton « Choisir dans mes contacts » après information et accord. Seuls les contacts cochés sont transmis (API Contact Picker) ; le bouton n’apparaît pas sur les appareils non compatibles (iPhone, ordinateur) ni dans Brave, qui expose l’API sans la faire fonctionner ([brave-browser#18908](https://github.com/brave/brave-browser/issues/18908)) ; un message invite alors à utiliser Chrome.
 - **Signature sur l’écran** : la personne et chaque partenaire peuvent signer au doigt sur le smartphone (ou à la main sur la version imprimée). Alerte si le plan est modifié après les signatures.
 - **Imprimer, enregistrer, envoyer** : impression séparée de l’export ; **PDF généré sur l’appareil** (enregistré ou envoyé via le menu de partage du téléphone), **protégeable par un code** (chiffrement PDF standard AES-256, ISO 32000-2, demandé à l’ouverture par tous les lecteurs PDF récents). Code recommandé à l’enregistrement ; pour l’envoi, PDF sans code par défaut avec conseils de canaux sûrs, code en option accompagné d’un rappel des risques (illisible en crise sans le code, non intégrable au dossier). Envoi en texte possible, signalé comme non protégé.
@@ -29,7 +30,7 @@ un·e professionnel·le qui l’accompagne et, si elle le souhaite, ses proches.
 
 ## Confidentialité (RGPD)
 
-- Aucune donnée collectée : pas de compte, de serveur, de base de données, de cookie, de mesure d’audience ni de ressource externe (polices et icônes embarquées).
+- Aucune donnée collectée : pas de compte, de serveur, de base de données, de cookie, de mesure d’audience ni de ressource externe (polices et icônes embarquées). Seule exception, choisie par la personne : les vidéos et musiques qu’elle décide de lire dans la boîte à outils, et la demande de leur titre à l’ajout du lien.
 - Le plan est enregistré **uniquement dans le navigateur de l’appareil** (`localStorage`).
 - **Chiffrement facultatif** par code personnel (PBKDF2-SHA-256 250 000 itérations + AES-GCM 256 bits, via Web Crypto), verrouillage automatique après 5 minutes en arrière-plan.
 - Effacement complet et sauvegarde/restauration depuis les Réglages.
@@ -62,6 +63,7 @@ js/pdf.js               écriture PDF et chiffrement AES-256
 js/planpdf.js           mise en page du plan en PDF
 js/crisiscard.js        carte de crise (image et PDF)
 js/resources.js         ressources d’aide (numéros, horaires, sites)
+js/embed.js             lecteurs intégrés et titres des liens (oEmbed)
 js/share.js             carte, QR code, planche PDF
 js/early.js             capture de l’invitation à installer
 js/vendor/qrcode.js     générateur de QR code (MIT)

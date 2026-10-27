@@ -237,6 +237,13 @@ img.tb-media { background: transparent; }
 .media-help ol { margin: .3rem 0; padding-left: 1.2rem; }
 .media-help li { margin: .25rem 0; }
 .media-help .file-btn { width: 100%; }
+.embed-ph { width: 100%; border: 0; border-radius: 12px; background: linear-gradient(135deg, #24524e, #2f6f6a); color: #fff; display: flex; flex-direction: column; align-items: center; justify-content: center; gap: .25rem; min-height: 150px; cursor: pointer; font: inherit; padding: 1rem; }
+.embed-play { width: 56px; height: 56px; border-radius: 50%; background: rgba(255,255,255,.95); color: #24524e; display: grid; place-items: center; font-size: 1.4rem; padding-left: 4px; }
+.embed-lbl { font-weight: 700; font-size: 1.05rem; }
+.embed-sub { font-size: .8rem; opacity: .85; }
+.embed-box { width: 100%; border-radius: 12px; overflow: hidden; background: #000; }
+.embed-box iframe, .embed-box video { width: 100%; height: 100%; border: 0; display: block; }
+.tb-open-small { display: inline-block; margin-top: .4rem; }
 .rec-time { font-size: 2rem; font-variant-numeric: tabular-nums; text-align: center; margin: .5rem 0; }
 
 /* Bandeau d'installation */

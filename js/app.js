@@ -9,6 +9,7 @@ import {
 } from './export.js';
 import { buildPlanPdf } from './planpdf.js';
 import { RESOURCES, CHECKED } from './resources.js';
+import { parseEmbed, fetchTitle } from './embed.js';
 import { renderCrisisCard, toJpeg, crisisCardPdf } from './crisiscard.js';
 
 const $ = (sel, root = document) => root.querySelector(sel);
@@ -525,6 +526,32 @@ function tbLabel(it) {
   return it.title || KINDS[it.kind].label;
 }
 const mediaURLs = new Map(); // id -> URL d'affichage (session)
+const embedLoaded = new Set(); // liens dont le lecteur intégré a été ouvert (session)
+const EMBED_OK = 'monpcc.embedOk';
+
+function embedPlayerHTML(e, title) {
+  const box = e.ratio ? `style="aspect-ratio:${e.ratio.toFixed(4)}"` : `style="height:${e.height}px"`;
+  if (e.media === 'video') return `<div class="embed-box" ${box}><video src="${esc(e.src)}" controls playsinline preload="metadata"></video></div>`;
+  if (e.media === 'audio') return `<audio class="tb-audio" src="${esc(e.src)}" controls preload="metadata"></audio>`;
+  return `<div class="embed-box" ${box}><iframe src="${esc(e.src)}" title="${esc(title || e.provider)}" loading="lazy"
+    allow="autoplay; encrypted-media; picture-in-picture; fullscreen; clipboard-write" allowfullscreen
+    referrerpolicy="${e.referrer || 'strict-origin-when-cross-origin'}"></iframe></div>`;
+}
+
+async function confirmEmbed(provider) {
+  try { if (localStorage.getItem(EMBED_OK)) return true; } catch { /* stockage indisponible */ }
+  let remember = false;
+  const ok = await modal({
+    title: `Lire ici depuis ${provider} ?`,
+    body: `<p>Pour lire ce contenu dans Mon PCC, mon téléphone va se connecter à <strong>${esc(provider)}</strong>. Ce site recevra mon adresse IP et saura ce que je regarde ou j’écoute, comme si j’ouvrais le lien.</p>
+      <p class="small muted">Mon plan, lui, n’est jamais transmis.</p>
+      <label class="check"><input type="checkbox" id="embed-remember"> Ne plus me demander sur cet appareil</label>`,
+    ok: 'Lire ici',
+  });
+  remember = !!document.getElementById('embed-remember')?.checked;
+  if (ok && remember) { try { localStorage.setItem(EMBED_OK, '1'); } catch { /* ignoré */ } }
+  return ok;
+}
 const canRecord = () => !!(navigator.mediaDevices?.getUserMedia && window.MediaRecorder);
 const toolbox = () => (plan.data.boiteOutils ??= []);
 
@@ -557,9 +584,10 @@ function renderToolbox(fromStep) {
         <button type="button" class="btn btn-secondary tb-add-btn" data-act="tb-video"><span aria-hidden="true">🎥</span> Me filmer</button>` : ''}
       </div>
       <form class="tb-link" data-act="tb-link">
-        <label class="field"><span>🔗 Ajouter un lien (playlist, vidéo, site…)</span>
+        <label class="field"><span>🔗 Ajouter un lien (vidéo, musique, podcast, site…)</span>
           <input type="text" name="url" inputmode="url" autocapitalize="off" spellcheck="false" placeholder="https://…" autocomplete="off" required></label>
         <button class="btn btn-secondary btn-sm">Ajouter le lien</button>
+        <p class="muted small">YouTube, Vimeo, Dailymotion, Spotify, Deezer, SoundCloud, Apple Music et Podcasts, TikTok, Instagram : le contenu pourra être lu directement ici, et son titre est demandé au site lors de l’ajout.</p>
       </form>
       <form class="tb-link tb-quote" data-act="tb-quote">
         <label class="field"><span>❝ Ajouter une citation, une phrase qui m’aide</span>
@@ -592,7 +620,19 @@ function toolboxItemHTML(it, idx, n) {
   else if (it.kind === 'lien') {
     let host = '';
     try { host = new URL(it.url).hostname.replace(/^www\./, ''); } catch { /* lien invalide */ }
-    body = `<a class="btn btn-primary btn-sm tb-open" href="${esc(it.url)}" target="_blank" rel="noopener noreferrer">Ouvrir ${esc(host || 'le lien')} ↗</a>`;
+    const e = parseEmbed(it.url);
+    if (e && embedLoaded.has(it.url)) {
+      body = `${embedPlayerHTML(e, it.title)}<a class="small tb-open-small" href="${esc(it.url)}" target="_blank" rel="noopener noreferrer">Ouvrir sur ${esc(e.provider)} ↗</a>`;
+    } else if (e) {
+      body = `<button type="button" class="embed-ph" data-act="tb-embed" data-i="${idx}" ${e.ratio ? `style="aspect-ratio:${Math.max(e.ratio, 1.4).toFixed(4)}"` : ''}>
+          <span class="embed-play" aria-hidden="true">▶</span>
+          <span class="embed-lbl">Lire ici</span>
+          <span class="embed-sub">${esc(e.provider)} · se connecte à ce site</span>
+        </button>
+        <a class="small tb-open-small" href="${esc(it.url)}" target="_blank" rel="noopener noreferrer">Ouvrir sur ${esc(e.provider)} ↗</a>`;
+    } else {
+      body = `<a class="btn btn-primary btn-sm tb-open" href="${esc(it.url)}" target="_blank" rel="noopener noreferrer">Ouvrir ${esc(host || 'le lien')} ↗</a>`;
+    }
   }
   if (it.kind === 'citation') {
     return `<li class="card tb-item tb-citation">
@@ -1333,8 +1373,9 @@ function renderPrivacy() {
       <ul>
         <li><strong>Aucune donnée n’est collectée</strong> par Mon PCC : pas de compte, pas de serveur, pas de base de données.</li>
         <li>Mes réponses sont enregistrées <strong>uniquement dans le navigateur de ce téléphone</strong>.</li>
-        <li>Aucun cookie, aucune mesure d’audience, aucune publicité, aucune police ou ressource chargée depuis un autre site.</li>
+        <li>Aucun cookie, aucune mesure d’audience, aucune publicité, aucune police ou ressource chargée depuis un autre site (sauf les vidéos et musiques que je choisis de lire, voir ci-dessous).</li>
         <li>Quand j’enregistre ou j’envoie mon plan en PDF, je peux le <strong>protéger par un code</strong> (chiffrement AES-256) : sans ce code, le fichier ne peut pas être ouvert. Mon PCC ne conserve pas ce code.</li>
+        <li>Si j’ajoute à ma boîte à outils un lien vers une vidéo ou une musique (YouTube, Spotify…), Mon PCC demande son <strong>titre</strong> au site concerné lors de l’ajout. Le contenu n’est lu dans l’application que si je touche « Lire ici », après un avertissement : mon téléphone se connecte alors à ce site, comme si j’ouvrais le lien. Mon plan n’est jamais transmis.</li>
         <li>Les photos, vidéos et sons de ma <strong>boîte à outils</strong> restent sur ce téléphone (chiffrés si j’ai mis un code). Ils ne figurent jamais dans le plan imprimé ou envoyé : seuls leurs titres et les liens y apparaissent.</li>
         <li>Si mon téléphone le permet, je peux <strong>choisir des contacts</strong> dans mon carnet : seuls ceux que je coche sont ajoutés (nom et numéro), le reste de mon carnet n’est jamais lu.</li>
         <li>Je peux <strong>protéger</strong> mon plan par un code (chiffrement AES-256) et <strong>tout effacer</strong> à tout moment dans les Réglages.</li>
@@ -1627,10 +1668,25 @@ app.addEventListener('submit', async (e) => {
     try {
       const u = new URL(url);
       if (!/^https?:$/.test(u.protocol)) throw new Error();
-      toolbox().push({ kind: 'lien', url: u.href, title: '', added: new Date().toISOString() });
+      const item = { kind: 'lien', url: u.href, title: '', added: new Date().toISOString() };
+      toolbox().push(item);
       scheduleSave();
       rerender(() => renderToolbox(location.hash.endsWith('/etape')));
-      app.querySelector(`[data-fk="tb:${toolbox().length - 1}"]`)?.focus();
+      const idx = toolbox().length - 1;
+      const input = app.querySelector(`[data-fk="tb:${idx}"]`);
+      input?.focus();
+      if (parseEmbed(u.href)) {
+        if (input) input.placeholder = 'Recherche du titre…';
+        fetchTitle(u.href).then((t) => {
+          const el = app.querySelector(`[data-fk="tb:${toolbox().indexOf(item)}"]`);
+          if (el) el.placeholder = 'Lien — donner un titre…';
+          if (t && !item.title) {
+            item.title = t;
+            if (el && !el.value) el.value = t;
+            scheduleSave();
+          }
+        });
+      }
     } catch {
       toast('Ce lien ne semble pas valide.');
     }
@@ -1740,6 +1796,16 @@ document.addEventListener('click', async (e) => {
     case 'tb-video': {
       const blob = await recordVideo();
       if (blob) await addToolboxBlob('video', blob, 'Ma vidéo');
+      break;
+    }
+    case 'tb-embed': {
+      const it = toolbox()[i];
+      const e = parseEmbed(it?.url || '');
+      if (!e || !(await confirmEmbed(e.provider))) break;
+      embedLoaded.add(it.url);
+      // On remplace seulement ce cadre : les autres lecteurs ouverts continuent
+      const body = btn.closest('.tb-body');
+      if (body) body.innerHTML = `${embedPlayerHTML(e, it.title)}<a class="small tb-open-small" href="${esc(it.url)}" target="_blank" rel="noopener noreferrer">Ouvrir sur ${esc(e.provider)} ↗</a>`;
       break;
     }
     case 'tb-quotes':
