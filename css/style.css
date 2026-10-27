@@ -257,6 +257,10 @@ img.tb-media { background: transparent; }
 .code-box[hidden] { display: none; }
 .code-box input { font-family: ui-monospace, Menlo, Consolas, monospace; letter-spacing: .08em; font-size: 1.1rem; }
 .more { margin-top: .8rem; }
+.safe-ways { background: var(--brand-soft); border-radius: 10px; padding: .6rem .8rem; margin: .5rem 0; }
+.safe-ways ul { margin: .3rem 0; padding-left: 1.2rem; }
+.code-box .warn { margin: .2rem 0 0; }
+.code-box .warn ul { margin: .3rem 0 0; padding-left: 1.2rem; }
 .more summary { cursor: pointer; color: var(--brand-ink); font-weight: 600; min-height: 36px; display: flex; align-items: center; }
 
 .mes-steps { padding-left: 1.3rem; margin: .3rem 0 .8rem; }
@@ -302,7 +306,7 @@ img.tb-media { background: transparent; }
 .footer { font-size: .78rem; color: var(--muted); text-align: center; padding: 1rem 1rem calc(1.2rem + env(safe-area-inset-bottom)); border-top: 1px solid var(--line); }
 .footer p { margin: .2rem auto; max-width: 60ch; }
 .toast { position: fixed; left: 50%; bottom: calc(5.5rem + env(safe-area-inset-bottom)); transform: translateX(-50%); background: var(--ink); color: var(--bg); padding: .7rem 1.1rem; border-radius: 12px; max-width: 90vw; z-index: 60; box-shadow: var(--shadow); font-size: .95rem; }
-.modal { border: 0; border-radius: var(--radius); padding: 0; width: min(480px, 92vw); background: var(--card); color: var(--ink); }
+.modal { max-height: 92vh; overflow-y: auto; overscroll-behavior: contain; border: 0; border-radius: var(--radius); padding: 0; width: min(480px, 92vw); background: var(--card); color: var(--ink); }
 .modal::backdrop { background: rgba(10, 20, 20, .5); }
 .modal-inner { padding: 1.2rem; }
 .modal-actions { display: flex; gap: .6rem; justify-content: flex-end; margin-top: 1rem; flex-wrap: wrap; }

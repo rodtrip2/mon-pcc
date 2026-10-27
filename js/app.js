@@ -759,7 +759,7 @@ function renderPlan() {
         <button class="btn btn-primary" data-act="pdf-send">📤 Envoyer le PDF</button>
         <a class="btn btn-secondary" href="#/mon-espace-sante">🏥 Ajouter à Mon Espace Santé</a>
       </div>
-      <p class="muted small">Pour l’enregistrement comme pour l’envoi, je peux <strong>protéger le PDF par un code</strong> : il sera demandé à l’ouverture du fichier.</p>
+      <p class="muted small">À l’enregistrement, je peux <strong>protéger le PDF par un code</strong>. Pour un envoi, je privilégie un moyen sûr et un PDF sans code, que le destinataire pourra ouvrir en cas de crise.</p>
       <details class="more">
         <summary>Autre option : envoyer en texte</summary>
         <p class="muted small">Le texte se colle dans un message. Il <strong>ne peut pas être protégé</strong> par un code : préférez le PDF protégé pour un envoi.</p>
@@ -861,19 +861,29 @@ function pdfDialog(mode) {
     const send = mode === 'send';
     d.innerHTML = `<form method="dialog" class="modal-inner pdf-dlg">
       <h2>${send ? '📤 Envoyer mon plan en PDF' : '📄 Enregistrer mon plan en PDF'}</h2>
-      ${send ? `<p class="small">Mon plan contient des <strong>informations de santé</strong>. Une fois envoyé, il quitte ce téléphone : je l’envoie seulement à des personnes de confiance ou aux professionnel·les qui m’accompagnent, et je vérifie le destinataire.</p>` : ''}
+      ${send ? `<p class="small">Mon plan contient des <strong>informations de santé</strong>. Une fois envoyé, il quitte ce téléphone : je l’envoie seulement à des personnes de confiance ou aux professionnel·les qui m’accompagnent, et je vérifie le destinataire.</p>
+      <div class="safe-ways small"><strong>Je choisis un moyen d’envoi sûr :</strong>
+        <ul><li>remise en main propre ou version imprimée ;</li>
+        <li>messagerie chiffrée (Signal, WhatsApp…) ;</li>
+        <li>dépôt dans Mon Espace Santé ;</li>
+        <li>envoi par mon soignant via la messagerie sécurisée de santé (MSSanté).</li></ul>
+        J’évite, si possible, un simple e-mail.</div>` : ''}
       <fieldset class="choice">
         <legend class="sr-only">Protection</legend>
-        <label class="radio"><input type="radio" name="mode" value="code" checked> <span><strong>Protéger par un code</strong> (recommandé)<br><span class="muted small">Le code sera demandé pour ouvrir le PDF.</span></span></label>
+        ${send ? `<label class="radio"><input type="radio" name="mode" value="none" checked> <span><strong>Sans code</strong> (conseillé pour un envoi)<br><span class="muted small">Le destinataire pourra ouvrir mon plan immédiatement, y compris en situation de crise.</span></span></label>` : ''}
+        <label class="radio"><input type="radio" name="mode" value="code" ${send ? '' : 'checked'}> <span><strong>Protéger par un code</strong> ${send ? '<br><span class="muted small">Seulement si le destinataire peut recevoir le code par un autre moyen.</span>' : '(recommandé)<br><span class="muted small">Le code sera demandé pour ouvrir le PDF.</span>'}</span></label>
         <div class="code-box">
           <label class="field"><span>Code (6 caractères minimum)</span>
             <input name="code" autocomplete="off" autocapitalize="characters" spellcheck="false"></label>
           <button type="button" class="btn btn-ghost btn-sm" data-gen>Générer un code</button>
-          <p class="muted small">${send
-            ? 'Je communique ce code au destinataire <strong>par un autre moyen</strong> (de vive voix, par SMS séparé…), jamais dans le même message que le fichier.'
-            : 'Je note ce code : sans lui, le fichier ne pourra pas être ouvert. Mon PCC ne le garde pas.'}</p>
+          ${send
+            ? `<div class="warn small" role="note"><strong>⚠ Attention aux risques d’un envoi avec code :</strong>
+                <ul><li>sans le code, le destinataire <strong>ne pourra pas lire mon plan</strong>, y compris en situation de crise, quand il est le plus utile ;</li>
+                <li>un fichier protégé <strong>ne peut pas être intégré</strong> à mon dossier à l’hôpital ni à Mon Espace Santé sans le code ;</li>
+                <li>je transmets le code <strong>par un autre moyen</strong> (de vive voix, par SMS séparé…), jamais dans le même message que le fichier.</li></ul></div>`
+            : '<p class="muted small">Je note ce code : sans lui, le fichier ne pourra pas être ouvert. Mon PCC ne le garde pas.</p>'}
         </div>
-        <label class="radio"><input type="radio" name="mode" value="none"> <span>Sans code</span></label>
+        ${send ? '' : '<label class="radio"><input type="radio" name="mode" value="none"> <span>Sans code</span></label>'}
       </fieldset>
       <p class="error" role="alert" hidden></p>
       <div class="modal-actions">
