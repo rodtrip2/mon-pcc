@@ -33,6 +33,7 @@ Mon PCC est une application web installable (PWA), gratuite et sans serveur, qui
 - **Signatures** : elles ne figurent sur l'export que si elles sont postérieures à la dernière modification du contenu (`contentUpdated`). Signer appelle `scheduleSave(false)`, ce qui n'invalide pas les signatures. Modifier la carte de crise ne les invalide pas non plus.
 - L'export affiche toujours la date de dernière mise à jour.
 - **Seule l'adresse de l'application est partagée** (QR, carte), jamais le plan.
+- **Tout message masquable doit pouvoir être réaffiché.** Il faut l'ajouter à `hiddenWarnings()` et `resetWarnings()` dans `app.js`, qui alimentent Réglages › Messages et avertissements.
 
 ## 4. Choix techniques
 

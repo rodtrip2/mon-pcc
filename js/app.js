@@ -1709,6 +1709,26 @@ async function renderOfflineStatus() {
   } else box.textContent = 'Pas encore téléchargés sur ce téléphone.';
 }
 
+/** Avertissements que la personne a masqués (libellés lisibles) */
+function hiddenWarnings() {
+  const h = [];
+  const ls = (k) => { try { return localStorage.getItem(k); } catch { return null; } };
+  const ss = (k) => { try { return sessionStorage.getItem(k); } catch { return null; } };
+  if (ls(EMBED_OK)) h.push('Avertissement avant de lire une vidéo ou une musique d’un autre site');
+  if (plan?.data?.masquerNoteMineur) h.push('Message « Si j’ai moins de 18 ans » (Mon Espace Santé)');
+  if (installPref() && !isStandalone()) h.push('Bandeau proposant d’installer l’application');
+  if (ss('monpcc.contactsOk')) h.push('Information avant d’ouvrir mes contacts');
+  if (ss('monpcc.shareOk')) h.push('Avertissement avant d’envoyer mon plan');
+  return h;
+}
+
+function resetWarnings() {
+  try { localStorage.removeItem(EMBED_OK); } catch { /* ignoré */ }
+  try { sessionStorage.removeItem('monpcc.contactsOk'); sessionStorage.removeItem('monpcc.shareOk'); } catch { /* ignoré */ }
+  if (plan?.data?.masquerNoteMineur) { delete plan.data.masquerNoteMineur; scheduleSave(false); }
+  setInstallPref(null);
+}
+
 function renderSettings() {
   const prot = store.isProtected();
   app.innerHTML = `
@@ -1740,6 +1760,14 @@ function renderSettings() {
       <p class="small" id="ex-off-status">Vérification…</p>
       <button type="button" class="btn btn-secondary" data-act="ex-offline">⬇ Préparer les exercices hors connexion</button>
       <p class="muted small">À refaire de temps en temps pour avoir les dernières versions. Rien n’est envoyé : il s’agit seulement de télécharger les exercices.</p>
+    </section>
+    <section class="card" id="avertissements">
+      <h2>Messages et avertissements</h2>
+      ${(() => { const h = hiddenWarnings(); return h.length
+        ? `<p>Messages que j’ai masqués ou choisi de ne plus voir :</p><ul class="small">${h.map((x) => `<li>${esc(x)}</li>`).join('')}</ul>`
+        : '<p class="muted">Aucun message masqué pour l’instant.</p>'; })()}
+      <button class="btn btn-secondary" data-act="warnings-reset">Réafficher tous les avertissements</button>
+      <p class="muted small">Les demandes d’accord (contacts, partage du plan, lecture de vidéos ou de musique) seront de nouveau posées, et les messages d’information masqués réapparaîtront.</p>
     </section>
     <section class="card">
       <h2>Sauvegarde</h2>
@@ -2445,6 +2473,11 @@ document.addEventListener('click', async (e) => {
       toast(isAdo() ? 'Ajouté à mon plan (ce qui me fait du bien, aide de professionnel·les).' : 'Ajouté à mon plan (étape 8, services et institutions de garde).');
       break;
     }
+    case 'warnings-reset':
+      resetWarnings();
+      rerender(renderSettings);
+      toast('Tous les avertissements sont réactivés.');
+      break;
     case 'mes-minor-hide':
       plan.data.masquerNoteMineur = true;
       scheduleSave(false);
