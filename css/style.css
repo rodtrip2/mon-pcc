@@ -275,6 +275,71 @@ img.tb-media { background: transparent; }
 .tbv-embed .embed-box { border-radius: 0; }
 .embed-ph.compact { border-radius: 0; min-height: 120px; }
 .embed-ph.compact .embed-lbl { text-align: center; max-width: 90%; }
+.tbv-grid { display: grid; grid-template-columns: 1fr 1fr; gap: .6rem; margin-bottom: .8rem; align-items: start; }
+.tbv-cell { min-width: 0; }
+.tbv-cell.size-m, .tbv-cell.size-l { grid-column: 1 / -1; }
+.tbv-cell .tbv { height: 100%; }
+.size-s .tbv-photo img { aspect-ratio: 1; object-fit: cover; max-height: none; }
+.size-m .tbv-photo img { aspect-ratio: 4 / 3; object-fit: cover; max-height: none; }
+.size-l .tbv-photo img { max-height: 80vh; object-fit: contain; background: #000; }
+.size-l .tbv-video video { max-height: 80vh; }
+.size-s .tbv-quote p { font-size: .95rem; }
+.size-l .tbv-quote p { font-size: 1.35rem; }
+.size-s .tbv-audio { flex-direction: column; align-items: stretch; }
+.size-s .tbv-audio .tbv-ico { display: none; }
+.size-s .tbv-title, .size-s figcaption { font-size: .85rem; padding: .35rem .6rem; }
+.size-s .embed-ph.compact { min-height: 110px; }
+.size-s .embed-sub { display: none; }
+.size-s .tbv-link .muted { display: none; }
+.size-l .embed-ph.compact { min-height: 220px; }
+.photo-open { display: block; width: 100%; padding: 0; border: 0; background: none; cursor: zoom-in; }
+.photo-open img { display: block; width: 100%; }
+.tbv-album .tbv-title { padding: .5rem .7rem; }
+.album-grid { display: grid; grid-template-columns: repeat(3, 1fr); gap: 2px; }
+.album-grid.n1 { grid-template-columns: 1fr; }
+.album-grid.n2, .album-grid.n4 { grid-template-columns: 1fr 1fr; }
+.size-s .album-grid { grid-template-columns: 1fr 1fr; }
+.album-th { position: relative; padding: 0; border: 0; background: #000; cursor: zoom-in; aspect-ratio: 1; overflow: hidden; }
+.album-th img { width: 100%; height: 100%; object-fit: cover; display: block; }
+.album-more { position: absolute; inset: 0; background: rgba(0,0,0,.55); color: #fff; display: grid; place-items: center; font-size: 1.4rem; font-weight: 700; }
+.tb-folder { background: var(--card); border: 1px solid var(--line); border-radius: 14px; margin-bottom: .7rem; box-shadow: var(--shadow); }
+.tb-folder > summary { list-style: none; display: flex; align-items: center; gap: .6rem; padding: .75rem .9rem; cursor: pointer; font-weight: 700; min-height: 52px; }
+.tb-folder > summary::-webkit-details-marker { display: none; }
+.tb-folder > summary::after { content: '▸'; margin-left: auto; color: var(--muted); transition: transform .2s; }
+.tb-folder[open] > summary::after { transform: rotate(90deg); }
+.tbf-ico { font-size: 1.3rem; }
+.tbf-count { font-size: .8rem; font-weight: 700; background: var(--brand-soft); color: var(--brand-ink); border-radius: 99px; padding: .05rem .5rem; }
+.tb-folder > .tbv-grid, .tb-folder > .empty { padding: 0 .7rem .2rem; }
+.tb-folders-bar { background: var(--brand-soft); border-radius: 12px; padding: .6rem .8rem .2rem; margin-bottom: .8rem; }
+.folder-chip { display: inline-flex; align-items: center; gap: .2rem; padding-right: .3rem; }
+.chip-x { border: 0; background: rgba(0,0,0,.07); border-radius: 99px; width: 28px; height: 28px; cursor: pointer; font-size: .85rem; color: var(--ink); }
+.chip-x.danger { color: var(--danger); }
+.tb-ctrl { display: flex; flex-wrap: wrap; gap: .5rem; align-items: center; }
+.seg { display: inline-flex; border: 1.5px solid var(--line); border-radius: 10px; overflow: hidden; }
+.seg-btn { border: 0; background: var(--card); color: var(--ink); font: inherit; font-size: .88rem; padding: .45rem .7rem; min-height: 40px; cursor: pointer; }
+.seg-btn + .seg-btn { border-left: 1.5px solid var(--line); }
+.seg-btn[aria-pressed="true"] { background: var(--brand); color: #fff; }
+.tb-folder-sel select { font: inherit; font-size: .9rem; min-height: 40px; border-radius: 10px; border: 1.5px solid var(--line); background: var(--card); color: var(--ink); padding: .3rem .5rem; max-width: 100%; }
+.album-edit { display: grid; grid-template-columns: repeat(3, 1fr); gap: .4rem; margin-bottom: .5rem; }
+.album-ed-th { position: relative; aspect-ratio: 1; border-radius: 8px; overflow: hidden; background: #000; }
+.album-ed-th img { width: 100%; height: 100%; object-fit: cover; display: block; }
+.album-ed-th .chip-x { position: absolute; top: 4px; width: 30px; height: 30px; background: rgba(255,255,255,.92); }
+.album-ed-th .chip-x:first-of-type { left: 4px; }
+.album-ed-th .chip-x.danger { right: 4px; }
+.album-pick { display: flex; gap: .4rem; flex-wrap: wrap; margin-top: .3rem; }
+.album-pick-th { position: relative; width: 64px; height: 64px; padding: 0; border: 2px dashed var(--brand); border-radius: 8px; overflow: hidden; cursor: pointer; background: #000; }
+.album-pick-th img { width: 100%; height: 100%; object-fit: cover; opacity: .75; }
+.album-pick-th span { position: absolute; inset: 0; display: grid; place-items: center; color: #fff; font-size: 1.4rem; font-weight: 700; text-shadow: 0 1px 3px #000; }
+.lightbox { position: fixed; inset: 0; z-index: 90; background: #050a0a; color: #fff; display: flex; flex-direction: column; touch-action: pan-y; }
+.lb-top { display: flex; align-items: center; gap: .6rem; padding: calc(.6rem + env(safe-area-inset-top)) .8rem .6rem; }
+.lb-title { flex: 1; font-weight: 600; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.lb-count { font-size: .9rem; opacity: .8; min-width: 3.5rem; }
+.lb-stage { flex: 1; display: grid; place-items: center; min-height: 0; padding: .5rem; }
+.lb-stage img { max-width: 100%; max-height: 100%; object-fit: contain; user-select: none; -webkit-user-drag: none; }
+.lb-btn { border: 0; background: rgba(255,255,255,.14); color: #fff; width: 48px; height: 48px; border-radius: 50%; font-size: 1.5rem; cursor: pointer; }
+.lb-prev, .lb-next { position: absolute; top: 50%; transform: translateY(-50%); }
+.lb-prev { left: .6rem; } .lb-next { right: .6rem; }
+body.no-scroll { overflow: hidden; }
 .rec-time { font-size: 2rem; font-variant-numeric: tabular-nums; text-align: center; margin: .5rem 0; }
 
 /* Bandeau d'installation */

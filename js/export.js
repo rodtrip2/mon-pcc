@@ -78,14 +78,16 @@ export function stepContent(step, data, plan = null) {
     }
   }
   if (step.id === 'strategies') {
-    const tb = (data.boiteOutils || []).filter((it) => it && (it.title || it.url || it.file || (it.text || '').trim()));
-    const names = { photo: 'photo', video: 'vidéo', audio: 'son', voix: 'message vocal', lien: 'lien', citation: 'citation' };
+    const tb = (data.boiteOutils || []).filter((it) => it && (it.title || it.url || it.file || (it.photos || []).length || (it.text || '').trim()));
+    const names = { photo: 'photo', video: 'vidéo', audio: 'son', voix: 'message vocal', lien: 'lien', citation: 'citation', album: 'album photo' };
     if (tb.length) {
       out.push({
         label: 'Ma boîte à outils (sur mon téléphone)',
         lines: tb.map((it) => (it.kind === 'citation'
           ? `« ${it.text.trim()} »${it.author ? ' — ' + it.author : ''}`
-          : (it.title ? it.title + ' ' : '') + '(' + names[it.kind] + ')' + (it.kind === 'lien' ? ' : ' + it.url : ''))),
+          : it.kind === 'album'
+            ? `${it.title ? it.title + ' ' : ''}(album, ${(it.photos || []).length} photo${(it.photos || []).length > 1 ? 's' : ''})`
+            : (it.title ? it.title + ' ' : '') + '(' + names[it.kind] + ')' + (it.kind === 'lien' ? ' : ' + it.url : ''))),
       });
     }
   }

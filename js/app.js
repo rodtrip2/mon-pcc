@@ -513,7 +513,11 @@ const KINDS = {
   voix: { icon: '🎙', label: 'Message vocal' },
   lien: { icon: '🔗', label: 'Lien' },
   citation: { icon: '❝', label: 'Citation' },
+  album: { icon: '🖼', label: 'Album photo' },
 };
+const SIZES = [['s', 'Petit'], ['m', 'Moyen'], ['l', 'Grand']];
+const dossiers = () => (plan.data.dossiers ??= []);
+const openFolders = new Set(); // dossiers dépliés (session)
 
 /* Exemples de citations (affichés seulement sur demande) :
    phrases-repères rédigées pour Mon PCC et extraits d'auteurs
@@ -554,6 +558,7 @@ function tbLabel(it) {
     const t = (it.text || '').trim();
     return t ? '« ' + (t.length > 40 ? t.slice(0, 38) + '…' : t) + ' »' : 'Citation';
   }
+  if (it.kind === 'album') return it.title || `Album (${(it.photos || []).length} photo${(it.photos || []).length > 1 ? 's' : ''})`;
   return it.title || KINDS[it.kind].label;
 }
 const mediaURLs = new Map(); // id -> URL d'affichage (session)
@@ -607,13 +612,12 @@ function renderToolbox(fromStep) {
     <h1>🧰 Ma boîte à outils</h1>
     <p class="lead">Ce qui m’aide quand ça ne va pas : une photo qui m’apaise, une musique, une vidéo, un message vocal que je me suis enregistré quand j’allais bien, une citation, un lien utile…</p>
     ${items.length ? `<div class="kept-head"><h2 class="tb-mine">Mes éléments</h2>${editToggleHTML('toolbox', 'Modifier mes éléments')}</div>
-      ${editing.has('toolbox')
-        ? `<ol class="tb-list">${items.map((it, idx) => toolboxItemHTML(it, idx, items.length)).join('')}</ol>`
-        : `<div class="tbv-list">${items.map((it, idx) => toolboxViewHTML(it, idx)).join('')}</div>`}` : '<p class="muted empty center">Ma boîte à outils est vide pour l’instant.</p>'}
+      ${editing.has('toolbox') ? `${foldersBarHTML()}<ol class="tb-list">${items.map((it, idx) => toolboxItemHTML(it, idx, items.length)).join('')}</ol>` : toolboxGridHTML(items)}` : '<p class="muted empty center">Ma boîte à outils est vide pour l’instant.</p>'}
     <section class="card tb-add">
       <h2>Ajouter</h2>
       <div class="tb-add-grid">
         ${['photo', 'video', 'audio'].map((k) => `<label class="btn btn-secondary tb-add-btn"><span aria-hidden="true">${KINDS[k].icon}</span> ${KINDS[k].label}<input type="file" accept="${KINDS[k].accept}" data-act="tb-file" data-kind="${k}" hidden></label>`).join('')}
+        <label class="btn btn-secondary tb-add-btn"><span aria-hidden="true">🖼</span> Album photo<input type="file" accept="image/*" multiple data-act="tb-album-new" hidden></label>
         ${canRecord() ? `<button type="button" class="btn btn-secondary tb-add-btn" data-act="tb-record"><span aria-hidden="true">🎙</span> M’enregistrer</button>
         <button type="button" class="btn btn-secondary tb-add-btn" data-act="tb-video"><span aria-hidden="true">🎥</span> Me filmer</button>` : ''}
       </div>
@@ -645,14 +649,49 @@ function renderToolbox(fromStep) {
   fillMedia();
 }
 
+/** Grille d'affichage : éléments hors dossier, puis un bloc repliable par dossier */
+function toolboxGridHTML(items) {
+  const cell = (it) => `<div class="tbv-cell size-${it.size || 'm'}">${toolboxViewHTML(it, items.indexOf(it))}</div>`;
+  const loose = items.filter((it) => !it.folder || !dossiers().some((d) => d.id === it.folder));
+  let h = loose.length ? `<div class="tbv-grid">${loose.map(cell).join('')}</div>` : '';
+  for (const d of dossiers()) {
+    const inside = items.filter((it) => it.folder === d.id);
+    h += `<details class="tb-folder" data-folder="${esc(d.id)}" ${openFolders.has(d.id) ? 'open' : ''}>
+      <summary><span class="tbf-ico" aria-hidden="true">📁</span><span class="tbf-name">${esc(d.name)}</span><span class="tbf-count">${inside.length}</span></summary>
+      ${inside.length ? `<div class="tbv-grid">${inside.map(cell).join('')}</div>` : '<p class="muted small empty">Dossier vide. Je range des éléments ici avec ✏️.</p>'}
+    </details>`;
+  }
+  return h;
+}
+
+/** Barre de gestion des dossiers (mode modification) */
+function foldersBarHTML() {
+  return `<div class="tb-folders-bar">
+    <p class="kept-label">📁 Mes dossiers</p>
+    <div class="chips">${dossiers().map((d) => `<span class="chip folder-chip">${esc(d.name)}
+      <button type="button" class="chip-x" data-act="folder-rename" data-id="${esc(d.id)}" aria-label="Renommer ${esc(d.name)}">✎</button>
+      <button type="button" class="chip-x" data-act="folder-del" data-id="${esc(d.id)}" aria-label="Supprimer ${esc(d.name)}">✕</button></span>`).join('')}
+      <button type="button" class="chip" data-act="folder-new" data-fk="folder-new">＋ Nouveau dossier</button></div>
+  </div>`;
+}
+
 /** Affichage compact d'un élément (hors mode modification) */
 function toolboxViewHTML(it, idx) {
   const title = it.title ? `<p class="tbv-title" data-title-for="${idx}">${esc(it.title)}</p>` : `<p class="tbv-title" data-title-for="${idx}" hidden></p>`;
   if (it.kind === 'citation') {
     return `<blockquote class="tbv tbv-quote"><p>« ${esc(it.text || '')} »</p>${it.author ? `<cite>— ${esc(it.author)}</cite>` : ''}</blockquote>`;
   }
+  if (it.kind === 'album') {
+    const ph = it.photos || [];
+    const max = it.size === 's' ? 4 : 6;
+    return `<div class="tbv tbv-album">
+      <p class="tbv-title">🖼 ${esc(tbLabel(it))}</p>
+      <div class="album-grid n${Math.min(ph.length, max)}">${ph.slice(0, max).map((p, k) => `<button type="button" class="album-th" data-act="lightbox" data-i="${idx}" data-k="${k}" aria-label="Voir la photo ${k + 1} sur ${ph.length}">
+        <img data-media="${esc(p.file)}" alt="">${k === max - 1 && ph.length > max ? `<span class="album-more">+${ph.length - max}</span>` : ''}</button>`).join('')}</div>
+    </div>`;
+  }
   if (it.kind === 'photo') {
-    return `<figure class="tbv tbv-photo"><img data-media="${esc(it.file)}" alt="${esc(it.title || 'Photo')}">${it.title ? `<figcaption>${esc(it.title)}</figcaption>` : ''}</figure>`;
+    return `<figure class="tbv tbv-photo"><button type="button" class="photo-open" data-act="lightbox" data-i="${idx}" data-k="0" aria-label="Agrandir la photo"><img data-media="${esc(it.file)}" alt="${esc(it.title || 'Photo')}"></button>${it.title ? `<figcaption>${esc(it.title)}</figcaption>` : ''}</figure>`;
   }
   if (it.kind === 'video') {
     return `<figure class="tbv tbv-video"><video data-media="${esc(it.file)}" controls playsinline preload="metadata"></video>${it.title ? `<figcaption>${esc(it.title)}</figcaption>` : ''}</figure>`;
@@ -678,10 +717,31 @@ function toolboxViewHTML(it, idx) {
   return '';
 }
 
+/** Réglages communs en mode modification : taille et dossier */
+function itemControlsHTML(it, idx) {
+  return `<div class="tb-ctrl">
+    <div class="seg" role="group" aria-label="Taille d’affichage">${SIZES.map(([v, l]) => `<button type="button" class="seg-btn" data-act="tb-size" data-i="${idx}" data-s="${v}" aria-pressed="${(it.size || 'm') === v}">${l}</button>`).join('')}</div>
+    <label class="tb-folder-sel"><span class="sr-only">Dossier</span><select data-act="tb-folder" data-i="${idx}">
+      <option value="">📂 Hors dossier</option>
+      ${dossiers().map((d) => `<option value="${esc(d.id)}" ${it.folder === d.id ? 'selected' : ''}>📁 ${esc(d.name)}</option>`).join('')}
+      <option value="__new">＋ Nouveau dossier…</option>
+    </select></label>
+  </div>`;
+}
+
 function toolboxItemHTML(it, idx, n) {
   const k = KINDS[it.kind];
   let body = '';
-  if (it.kind === 'photo') body = `<img class="tb-media" data-media="${esc(it.file)}" alt="${esc(it.title || 'Photo')}">`;
+  if (it.kind === 'album') {
+    const others = toolbox().map((x, j) => [x, j]).filter(([x]) => x.kind === 'photo');
+    body = `<div class="album-edit">${(it.photos || []).map((p, j) => `<div class="album-ed-th"><img data-media="${esc(p.file)}" alt="">
+        <button type="button" class="chip-x" data-act="album-out" data-i="${idx}" data-k="${j}" aria-label="Sortir cette photo de l’album">⤴</button>
+        <button type="button" class="chip-x danger" data-act="album-del" data-i="${idx}" data-k="${j}" aria-label="Supprimer cette photo">✕</button></div>`).join('')}</div>
+      <label class="btn btn-secondary btn-sm file-btn">＋ Ajouter des photos<input type="file" accept="image/*" multiple data-act="album-add" data-i="${idx}" hidden></label>
+      ${others.length ? `<p class="muted small">Ou y ranger une photo déjà dans ma boîte :</p><div class="album-pick">${others.map(([x, j]) => `<button type="button" class="album-pick-th" data-act="album-take" data-i="${idx}" data-j="${j}" aria-label="Ajouter ${esc(x.title || 'cette photo')} à l’album"><img data-media="${esc(x.file)}" alt=""><span>＋</span></button>`).join('')}</div>` : ''}`;
+  }
+  if (it.kind === 'photo') body = `<img class="tb-media" data-media="${esc(it.file)}" alt="${esc(it.title || 'Photo')}">
+    <button type="button" class="btn btn-ghost btn-sm" data-act="album-from" data-i="${idx}">🖼 Créer un album avec cette photo</button>`;
   else if (it.kind === 'video') body = `<video class="tb-media" data-media="${esc(it.file)}" controls playsinline preload="metadata"></video>`;
   else if (it.kind === 'audio' || it.kind === 'voix') body = `<audio class="tb-audio" data-media="${esc(it.file)}" controls preload="metadata"></audio>`;
   else if (it.kind === 'lien') {
@@ -707,6 +767,7 @@ function toolboxItemHTML(it, idx, n) {
     <label class="sr-only" for="tb-q-${idx}">Texte de la citation</label>
     <textarea id="tb-q-${idx}" class="tb-quote-text" rows="2" data-tbf="text" data-i="${idx}" data-fk="tbq:${idx}">${esc(it.text || '')}</textarea>
     <label class="field tb-quote-author"><span>— Auteur</span><input data-tbf="author" data-i="${idx}" data-fk="tba:${idx}" value="${esc(it.author || '')}" placeholder="facultatif"></label>
+    ${itemControlsHTML(it, idx)}
     <div class="tb-tools">
       <button type="button" class="icon" data-act="tb-up" data-i="${idx}" data-fk="tb-up:${idx}" aria-label="Monter" ${idx === 0 ? 'disabled' : ''}>↑</button>
       <button type="button" class="icon" data-act="tb-down" data-i="${idx}" data-fk="tb-down:${idx}" aria-label="Descendre" ${idx === n - 1 ? 'disabled' : ''}>↓</button>
@@ -721,6 +782,7 @@ function toolboxItemHTML(it, idx, n) {
       <input id="tb-t-${idx}" class="tb-title" data-tb="${idx}" data-fk="tb:${idx}" value="${esc(it.title || '')}" placeholder="${esc(k.label)} — donner un titre…">
     </div>
     <div class="tb-body">${body}</div>
+    ${itemControlsHTML(it, idx)}
     <div class="tb-tools">
       <button type="button" class="icon" data-act="tb-up" data-i="${idx}" data-fk="tb-up:${idx}" aria-label="Monter" ${idx === 0 ? 'disabled' : ''}>↑</button>
       <button type="button" class="icon" data-act="tb-down" data-i="${idx}" data-fk="tb-down:${idx}" aria-label="Descendre" ${idx === n - 1 ? 'disabled' : ''}>↓</button>
@@ -766,6 +828,92 @@ async function addToolboxBlob(kind, blob, title = '') {
 }
 
 /* Enregistrement d'un message vocal */
+/* ---------- dossiers, albums, visionneuse ---------- */
+
+function promptModal(title, value = '', ok = 'Valider') {
+  return new Promise((resolve) => {
+    const d = $('#modal');
+    d.innerHTML = `<form method="dialog" class="modal-inner"><h2>${esc(title)}</h2>
+      <label class="field"><span>Nom</span><input name="v" value="${esc(value)}" maxlength="40" autocomplete="off" required></label>
+      <div class="modal-actions"><button value="cancel" class="btn btn-ghost" formnovalidate>Annuler</button><button value="ok" class="btn btn-primary">${esc(ok)}</button></div></form>`;
+    const f = d.querySelector('form');
+    d.addEventListener('close', () => resolve(d.returnValue === 'ok' ? f.v.value.trim() : null), { once: true });
+    d.returnValue = '';
+    d.showModal();
+    f.v.focus(); f.v.select();
+  });
+}
+
+async function newFolder() {
+  const name = await promptModal('Nouveau dossier', '', 'Créer');
+  if (!name) return null;
+  const d = { id: media.newId(), name };
+  dossiers().push(d);
+  openFolders.add(d.id);
+  scheduleSave();
+  return d;
+}
+
+async function putFiles(files) {
+  const out = [];
+  for (const f of files) {
+    if (f.size > media.MAX_BYTES) { toast('Une photo est trop volumineuse (150 Mo maximum).'); continue; }
+    out.push({ file: await media.put(f) });
+  }
+  return out;
+}
+
+const tbRedraw = () => rerender(() => renderToolbox(location.hash.endsWith('/etape')));
+
+/* Visionneuse plein écran (photos et albums) */
+let lb = null; // { idx, k }
+function lbPhotos() {
+  const it = toolbox()[lb.idx];
+  return it.kind === 'album' ? (it.photos || []) : [{ file: it.file }];
+}
+async function showLightbox() {
+  const el = $('#lightbox');
+  const it = toolbox()[lb.idx];
+  const ph = lbPhotos();
+  lb.k = (lb.k + ph.length) % ph.length;
+  el.innerHTML = `<div class="lb-top"><span class="lb-count">${ph.length > 1 ? `${lb.k + 1} / ${ph.length}` : ''}</span><span class="lb-title">${esc(it.title || '')}</span>
+    <button type="button" class="lb-btn" data-lb="close" aria-label="Fermer">✕</button></div>
+    <div class="lb-stage"><img alt="${esc(it.title || 'Photo')}" data-media="${esc(ph[lb.k].file)}"></div>
+    ${ph.length > 1 ? '<button type="button" class="lb-btn lb-prev" data-lb="prev" aria-label="Photo précédente">‹</button><button type="button" class="lb-btn lb-next" data-lb="next" aria-label="Photo suivante">›</button>' : ''}`;
+  el.hidden = false;
+  document.body.classList.add('no-scroll');
+  const img = el.querySelector('img');
+  const id = img.dataset.media;
+  try {
+    if (!mediaURLs.has(id)) { const b = await media.get(id); if (b) mediaURLs.set(id, URL.createObjectURL(b)); }
+    img.src = mediaURLs.get(id) || '';
+  } catch { /* fichier illisible */ }
+  el.querySelector('[data-lb="close"]').focus({ preventScroll: true });
+}
+function closeLightbox() {
+  $('#lightbox').hidden = true;
+  document.body.classList.remove('no-scroll');
+  lb = null;
+}
+(() => {
+  const el = document.getElementById('lightbox');
+  if (!el) return;
+  el.addEventListener('click', (e) => {
+    const a = e.target.closest('[data-lb]')?.dataset.lb;
+    if (a === 'close') closeLightbox();
+    else if (a === 'prev') { lb.k -= 1; showLightbox(); }
+    else if (a === 'next') { lb.k += 1; showLightbox(); }
+    else if (e.target.classList.contains('lb-stage')) closeLightbox();
+  });
+  let x0 = null;
+  el.addEventListener('pointerdown', (e) => { x0 = e.clientX; });
+  el.addEventListener('pointerup', (e) => {
+    if (x0 === null || !lb) return;
+    const dx = e.clientX - x0; x0 = null;
+    if (Math.abs(dx) > 50 && lbPhotos().length > 1) { lb.k += dx < 0 ? 1 : -1; showLightbox(); }
+  });
+})();
+
 /* ---------- accès caméra / micro : diagnostic et solution de secours ---------- */
 
 /** État de l'autorisation sans déclencher de demande ('granted' | 'denied' | 'prompt' | 'unknown') */
@@ -955,7 +1103,7 @@ function recordVoice() {
   });
 }
 
-const usedMediaIds = () => (plan?.data.boiteOutils || []).map((it) => it.file).filter(Boolean);
+const usedMediaIds = () => (plan?.data.boiteOutils || []).flatMap((it) => [it.file, ...(it.photos || []).map((p) => p.file)]).filter(Boolean);
 
 /* ---------- Mon Espace Santé + carte de crise ---------- */
 
@@ -1793,6 +1941,32 @@ app.addEventListener('submit', async (e) => {
 
 app.addEventListener('change', async (e) => {
   const el = e.target;
+  if (el.dataset.act === 'tb-album-new' && el.files.length) {
+    const files = [...el.files]; el.value = '';
+    const photos = await putFiles(files);
+    if (!photos.length) return;
+    toolbox().push(photos.length === 1 ? { kind: 'photo', file: photos[0].file, title: '', added: new Date().toISOString() } : { kind: 'album', photos, title: '', added: new Date().toISOString() });
+    editing.add('toolbox');
+    scheduleSave(); tbRedraw();
+    toast(photos.length > 1 ? `Album créé avec ${photos.length} photos. Je peux lui donner un titre.` : 'Photo ajoutée.');
+    return;
+  }
+  if (el.dataset.act === 'album-add' && el.files.length) {
+    const files = [...el.files]; el.value = '';
+    const it = toolbox()[+el.dataset.i];
+    (it.photos ??= []).push(...await putFiles(files));
+    scheduleSave(); tbRedraw();
+    return;
+  }
+  if (el.dataset.act === 'tb-folder') {
+    const it = toolbox()[+el.dataset.i];
+    if (el.value === '__new') {
+      const d = await newFolder();
+      if (d) it.folder = d.id;
+    } else it.folder = el.value || undefined;
+    scheduleSave(); tbRedraw();
+    return;
+  }
   if (el.dataset.act === 'tb-file' && el.files[0]) {
     const f = el.files[0];
     el.value = '';
@@ -1911,13 +2085,71 @@ document.addEventListener('click', async (e) => {
       if (blob) await addToolboxBlob('voix', blob, 'Mon message');
       break;
     }
+    case 'tb-size':
+      toolbox()[i].size = btn.dataset.s;
+      scheduleSave(); tbRedraw();
+      break;
+    case 'folder-new': { if (await newFolder()) tbRedraw(); break; }
+    case 'folder-rename': {
+      const d = dossiers().find((x) => x.id === btn.dataset.id);
+      const name = d && await promptModal('Renommer le dossier', d.name, 'Renommer');
+      if (name) { d.name = name; scheduleSave(); tbRedraw(); }
+      break;
+    }
+    case 'folder-del': {
+      const d = dossiers().find((x) => x.id === btn.dataset.id);
+      if (!d || !(await modal({ title: 'Supprimer ce dossier ?', body: `<p>Le dossier « ${esc(d.name)} » sera supprimé. Son contenu n’est pas effacé : il revient hors dossier.</p>`, ok: 'Supprimer le dossier', danger: true }))) break;
+      toolbox().forEach((it) => { if (it.folder === d.id) delete it.folder; });
+      plan.data.dossiers = dossiers().filter((x) => x.id !== d.id);
+      scheduleSave(); tbRedraw();
+      break;
+    }
+    case 'album-from': {
+      const it = toolbox()[i];
+      toolbox()[i] = { kind: 'album', title: it.title || '', photos: [{ file: it.file }], size: it.size, folder: it.folder, added: it.added };
+      scheduleSave(); tbRedraw();
+      toast('Album créé : j’y ajoute d’autres photos.');
+      break;
+    }
+    case 'album-take': {
+      const album = toolbox()[i];
+      const j = +btn.dataset.j;
+      const photo = toolbox()[j];
+      (album.photos ??= []).push({ file: photo.file });
+      toolbox().splice(j, 1);
+      scheduleSave(); tbRedraw();
+      break;
+    }
+    case 'album-out': {
+      const album = toolbox()[i];
+      const [p] = album.photos.splice(+btn.dataset.k, 1);
+      toolbox().splice(i + 1, 0, { kind: 'photo', file: p.file, title: '', folder: album.folder, added: new Date().toISOString() });
+      if (!album.photos.length) toolbox().splice(i, 1);
+      scheduleSave(); tbRedraw();
+      break;
+    }
+    case 'album-del': {
+      const album = toolbox()[i];
+      if (!(await modal({ title: 'Supprimer cette photo ?', body: '<p>Elle sera effacée de ce téléphone.</p>', ok: 'Supprimer', danger: true }))) break;
+      const [p] = album.photos.splice(+btn.dataset.k, 1);
+      await media.remove(p.file).catch(() => {});
+      if (!album.photos.length) toolbox().splice(i, 1);
+      scheduleSave(); tbRedraw();
+      break;
+    }
+    case 'lightbox':
+      lb = { idx: i, k: +btn.dataset.k || 0 };
+      showLightbox();
+      break;
     case 'tb-up': case 'tb-down': {
       const arr = toolbox();
-      const j = act === 'tb-up' ? i - 1 : i + 1;
+      const same = (x) => (x.folder || '') === (arr[i].folder || '');
+      let j = i;
+      do { j += act === 'tb-up' ? -1 : 1; } while (j >= 0 && j < arr.length && !same(arr[j]));
       if (j < 0 || j >= arr.length) return;
       [arr[i], arr[j]] = [arr[j], arr[i]];
       scheduleSave();
-      rerender(() => renderToolbox(location.hash.endsWith('/etape')));
+      tbRedraw();
       (app.querySelector(`[data-fk="${act}:${j}"]`) || app.querySelector(`[data-fk="tb:${j}"]`))?.focus({ preventScroll: true });
       break;
     }
@@ -1925,7 +2157,9 @@ document.addEventListener('click', async (e) => {
       const it = toolbox()[i];
       if (!(await modal({ title: 'Retirer de ma boîte à outils ?', body: `<p>${esc(tbLabel(it))} sera supprimé de ce téléphone.</p>`, ok: 'Supprimer', danger: true }))) return;
       toolbox().splice(i, 1);
-      if (it.file) { await media.remove(it.file).catch(() => {}); const u = mediaURLs.get(it.file); if (u) URL.revokeObjectURL(u); mediaURLs.delete(it.file); }
+      for (const f of [it.file, ...(it.photos || []).map((p) => p.file)].filter(Boolean)) {
+        await media.remove(f).catch(() => {}); const u = mediaURLs.get(f); if (u) URL.revokeObjectURL(u); mediaURLs.delete(f);
+      }
       scheduleSave();
       rerender(() => renderToolbox(location.hash.endsWith('/etape')));
       break;
@@ -2125,7 +2359,17 @@ document.addEventListener('change', async (e) => {
   }
 });
 
+// Mémorise les dossiers dépliés de la boîte à outils
+document.addEventListener('toggle', (e) => {
+  const d = e.target;
+  if (!d.classList?.contains('tb-folder')) return;
+  if (d.open) openFolders.add(d.dataset.folder); else openFolders.delete(d.dataset.folder);
+}, true);
+
 document.addEventListener('keydown', (e) => {
+  if (e.key === 'Escape' && !$('#lightbox').hidden) { closeLightbox(); return; }
+  if (lb && e.key === 'ArrowRight') { lb.k += 1; showLightbox(); return; }
+  if (lb && e.key === 'ArrowLeft') { lb.k -= 1; showLightbox(); return; }
   if (e.key === 'Escape' && !$('#qr-full').hidden) { closeQrFull(); return; }
   if (e.key === 'Escape' && !$('#menu').hidden) closeMenu();
 });
