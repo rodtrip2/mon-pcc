@@ -960,6 +960,19 @@ const usedMediaIds = () => (plan?.data.boiteOutils || []).map((it) => it.file).f
 /* ---------- Mon Espace Santé + carte de crise ---------- */
 
 const MES_URL = 'https://www.monespacesante.fr/';
+const MES_ANDROID = 'fr.assurancemaladie.monespacesante';
+const MES_PLAY = `https://play.google.com/store/apps/details?id=${MES_ANDROID}`;
+const MES_APPSTORE = 'https://apps.apple.com/fr/app/id1589255019';
+const isAndroid = () => /Android/i.test(navigator.userAgent);
+const isIOS = () => /iPad|iPhone|iPod/.test(navigator.userAgent) || (/Macintosh/.test(navigator.userAgent) && navigator.maxTouchPoints > 1);
+
+/** Lien qui ouvre l'application Mon Espace Santé si elle est installée (Android), sinon le site */
+function mesLaunchHref() {
+  if (isAndroid()) {
+    return `intent://www.monespacesante.fr/#Intent;scheme=https;package=${MES_ANDROID};S.browser_fallback_url=${encodeURIComponent(MES_URL)};end`;
+  }
+  return MES_URL; // iPhone : l'application s'ouvre d'elle-même si elle gère ce lien
+}
 let cardTimer = null;
 let cardPreviewUrl = '';
 
@@ -1020,7 +1033,8 @@ function renderMES() {
         <li>Dans les <strong>paramètres de confidentialité</strong>, je peux autoriser l’<strong>accès en cas d’urgence</strong> (médecin du SAMU-Centre 15, soignant·es face à un risque immédiat pour ma santé). C’est ce qui rend mon plan utile en situation de crise.</li>
         <li>À chaque mise à jour de mon plan, je dépose la nouvelle version et je supprime l’ancienne.</li>
       </ol>
-      <a class="btn btn-secondary" href="${MES_URL}" target="_blank" rel="noopener noreferrer">Ouvrir Mon Espace Santé ↗</a>
+      <a class="btn btn-secondary" href="${mesLaunchHref()}" ${isAndroid() ? '' : 'target="_blank"'} rel="noopener noreferrer">Ouvrir Mon Espace Santé ↗</a>
+      <p class="muted small">Si l’application Mon Espace Santé est installée, elle s’ouvre ; sinon, c’est le site. Pas encore l’application ? ${isIOS() ? `<a href="${MES_APPSTORE}" target="_blank" rel="noopener noreferrer">App Store</a>` : isAndroid() ? `<a href="${MES_PLAY}" target="_blank" rel="noopener noreferrer">Google Play</a>` : `<a href="${MES_PLAY}" target="_blank" rel="noopener noreferrer">Google Play</a> · <a href="${MES_APPSTORE}" target="_blank" rel="noopener noreferrer">App Store</a>`}</p>
       <details class="more">
         <summary>Si je suis hospitalisé·e</summary>
         <ul class="small">
