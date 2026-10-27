@@ -21,7 +21,7 @@ Mon PCC est une application web installable (PWA), gratuite et sans serveur, qui
 
 - Les deux versions sont dans `js/data.js` (adulte, 14 étapes) et `js/data-ado.js` (ado, 10 étapes). `setVersion()` met à jour les exports utilisés par toute l'application.
 - **On peut changer de version à tout moment** dans Réglages › Version. Les réponses communes sont conservées. Les rubriques propres à l'autre version sont masquées, jamais effacées.
-- Toute nouvelle fonctionnalité doit marcher dans les deux versions. Exemples : pour l'ado, les ressources sont ajoutées à `strategies.pros` ; pour l'adulte, à `aide.garde`. La page Mon Espace Santé ajoute une note pour les mineur·es.
+- Toute nouvelle fonctionnalité doit marcher dans les deux versions. Exemples : pour l'ado, les ressources sont ajoutées à `strategies.pros` ; pour l'adulte, à `aide.garde`. Sur la page Mon Espace Santé, une note s'adresse aux mineur·es. Elle s'affiche si la date de naissance indique moins de 18 ans, ou en version ado quand cette date n'est pas renseignée. Elle ne s'affiche jamais pour une personne majeure, et on peut la masquer (✕).
 
 ## 3. Confidentialité et sécurité (RGPD)
 

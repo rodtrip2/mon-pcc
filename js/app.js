@@ -1325,6 +1325,26 @@ async function refreshCardPreview() {
   box.innerHTML = `<img src="${cardPreviewUrl}" alt="Aperçu de ma carte de crise">`;
 }
 
+/** Âge d'après la date de naissance de l'étape 1 (null si inconnue) */
+function ageFromBirth() {
+  const d = plan.data.coordonnees?.naissance;
+  const m = /^(\d{4})-(\d{2})-(\d{2})$/.exec(d || '');
+  if (!m) return null;
+  const now = new Date();
+  let age = now.getFullYear() - +m[1];
+  if (now.getMonth() + 1 < +m[2] || (now.getMonth() + 1 === +m[2] && now.getDate() < +m[3])) age--;
+  return age;
+}
+
+/** Message « moins de 18 ans » : jamais si la personne est majeure ou l'a masqué ;
+    affiché si elle est mineure, ou en version ado quand la date de naissance n'est pas renseignée */
+function showMinorNote() {
+  if (plan.data.masquerNoteMineur) return false;
+  const age = ageFromBirth();
+  if (age !== null) return age < 18;
+  return isAdo();
+}
+
 function renderMES() {
   const c = carte();
   const f = (k, label, ph, type = 'text') => `<label class="field"><span>${label}</span><input ${type === 'tel' ? 'inputmode="tel"' : ''} data-card="${k}" data-fk="card:${k}" value="${esc(c[k] || '')}" placeholder="${esc(ph)}"></label>`;
@@ -1332,7 +1352,7 @@ function renderMES() {
     <h1>🏥 Ajouter à Mon Espace Santé</h1>
     <p class="lead">Déposer mon plan dans Mon Espace Santé permet aux soignant·es que j’autorise de le consulter, y compris en cas d’hospitalisation ou d’urgence. Ma carte de crise signale qu’il existe.</p>
 
-    ${isAdo() ? `<div class="note small" role="note"><strong>Si j’ai moins de 18 ans :</strong> mon espace Mon Espace Santé est géré par mon ou mes représentant·es légaux (selon ma situation : parents, tuteur·rice, service de l’aide sociale à l’enfance…). Je ne peux pas y déposer mon plan seul·e : je le fais <strong>avec mon ou ma représentant·e légal·e</strong>, ou je demande à un·e <strong>professionnel·le qui me suit</strong> de l’y déposer. À mes 18 ans, j’accède moi-même à mon espace et j’y retrouve mes documents.</div>` : ''}
+    ${showMinorNote() ? `<div class="note small note-x" role="note"><button type="button" class="icon note-close" data-act="mes-minor-hide" aria-label="Masquer ce message" title="Masquer ce message">✕</button><strong>Si j’ai moins de 18 ans :</strong> mon espace Mon Espace Santé est géré par mon ou mes représentant·es légaux (selon ma situation : parents, tuteur·rice, service de l’aide sociale à l’enfance…). Je ne peux pas y déposer mon plan seul·e : je le fais <strong>avec mon ou ma représentant·e légal·e</strong>, ou je demande à un·e <strong>professionnel·le qui me suit</strong> de l’y déposer. À mes 18 ans, j’accède moi-même à mon espace et j’y retrouve mes documents.</div>` : ''}
     <section class="card">
       <h2>1. Télécharger mon plan en PDF</h2>
       <p class="muted small">Sans code : Mon Espace Santé est déjà un espace sécurisé, et un code empêcherait les soignant·es de lire le document.</p>
@@ -2425,6 +2445,12 @@ document.addEventListener('click', async (e) => {
       toast(isAdo() ? 'Ajouté à mon plan (ce qui me fait du bien, aide de professionnel·les).' : 'Ajouté à mon plan (étape 8, services et institutions de garde).');
       break;
     }
+    case 'mes-minor-hide':
+      plan.data.masquerNoteMineur = true;
+      scheduleSave(false);
+      btn.closest('.note')?.remove();
+      toast('Message masqué.');
+      break;
     case 'mes-pdf':
       try {
         const file = await makePlanPdf('');

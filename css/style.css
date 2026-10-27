@@ -495,3 +495,6 @@ body.no-scroll { overflow: hidden; }
 }
 
 @media (prefers-reduced-motion: reduce) { * { transition: none !important; scroll-behavior: auto !important; } }
+
+.note-x { position: relative; padding-right: 2.6rem; }
+.note-close { position: absolute; top: .3rem; right: .3rem; width: 36px; height: 36px; font-size: .9rem; }
