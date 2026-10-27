@@ -1117,6 +1117,12 @@ function renderAbout() {
       <p>Il ne remplace ni l’accompagnement par un·e professionnel·le, ni un avis médical. Le plan de crise conjoint se construit <em>avec</em> son réseau de soutien : Mon PCC aide à préparer et mettre en forme ce travail.</p>
     </section>
     <section class="card">
+      <h2>Crédits</h2>
+      <p>Conception et réalisation : <strong>Roddy Ricart</strong>.</p>
+      <p>Mon PCC est un projet libre : son code source est consultable, et chacun·e peut proposer une amélioration ou signaler un problème.</p>
+      <a class="btn btn-secondary" href="https://github.com/rodtrip2/mon-pcc" target="_blank" rel="noopener noreferrer">Voir le projet sur GitHub ↗</a>
+    </section>
+    <section class="card">
       <h2>Le plan de crise conjoint</h2>
       <p>Le PCC est une forme de déclaration anticipée en santé mentale. Il résulte d’une décision partagée entre la personne concernée, un·e professionnel·le et, si elle le souhaite, ses proches. Ses bénéfices ont été étudiés : meilleure alliance thérapeutique, moins d’hospitalisations sous contrainte, meilleure qualité de vie.</p>
       <p>Pour en savoir plus, se former gratuitement (e-learning) ou télécharger le formulaire officiel : <a href="${SOURCE.url}" target="_blank" rel="noopener">plandecriseconjoint.ch</a>.</p>
@@ -1127,7 +1133,7 @@ function renderAbout() {
       <p>Ce support est diffusé sous licence <a href="${SOURCE.licenseUrl}" target="_blank" rel="noopener">Creative Commons BY-NC-SA</a> (attribution, pas d’utilisation commerciale, partage dans les mêmes conditions). Mon PCC respecte ces conditions : il cite la source, reste gratuit et non commercial, et ses contenus sont partagés sous la même licence.</p>
       <p><strong>Modifications apportées</strong> : découpage en étapes, conseils de rédaction, suggestions et exemples ajoutés, numéros d’urgence adaptés à la France, mise en page.</p>
       <p>Mon PCC est un projet indépendant, <strong>non affilié</strong> à la Haute École de la Santé La Source ni aux auteur·es du PCC, qui ne l’ont pas validé.</p>
-      <p>Code source libre : voir le dépôt GitHub du projet (fichiers LICENSE). Le QR code est généré par la bibliothèque <em>qrcode-generator</em> de Kazuhiko Arase (licence MIT).</p>
+      <p>Code source libre : <a href="https://github.com/rodtrip2/mon-pcc" target="_blank" rel="noopener noreferrer">dépôt GitHub du projet</a> (fichier LICENSE). Le QR code est généré par la bibliothèque <em>qrcode-generator</em> de Kazuhiko Arase (licence MIT).</p>
     </section>
     <p class="center"><a href="#/confidentialite">Confidentialité</a></p>`;
 }
@@ -1160,7 +1166,7 @@ function renderPrivacy() {
     <section class="card">
       <h2>Mes droits</h2>
       <p>Mes données sont sous mon seul contrôle : je peux les consulter, les modifier, les exporter (Réglages › Sauvegarde) et les effacer (Réglages › Tout effacer). Désinstaller l’application ou effacer les données du site dans mon navigateur les supprime aussi.</p>
-      <p>Pour toute question sur Mon PCC : ouvrir un ticket sur le dépôt GitHub du projet. Je peux aussi m’adresser à la <a href="https://www.cnil.fr" target="_blank" rel="noopener">CNIL</a>.</p>
+      <p>Pour toute question sur Mon PCC : <a href="https://github.com/rodtrip2/mon-pcc/issues" target="_blank" rel="noopener noreferrer">ouvrir un ticket sur le dépôt GitHub du projet</a>. Je peux aussi m’adresser à la <a href="https://www.cnil.fr" target="_blank" rel="noopener">CNIL</a>.</p>
     </section>`;
 }
 

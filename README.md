@@ -42,7 +42,7 @@ L’éditeur n’ayant jamais accès aux données, il n’est pas responsable de
 1. Créer un dépôt public `mon-pcc` sur GitHub.
 2. Y déposer le contenu de ce dossier (à la racine du dépôt).
 3. *Settings › Pages* : source « Deploy from a branch », branche `main`, dossier `/ (root)`.
-4. L’application est disponible à `https://<utilisateur>.github.io/mon-pcc/`.
+4. L’application est disponible à `https://rodtrip2.github.io/mon-pcc/`.
 
 Aucune compilation : HTML, CSS et JavaScript natifs. Pour tester en local : `python3 -m http.server` puis http://localhost:8000.
 
@@ -81,6 +81,11 @@ Les étapes de la démarche s’appuient sur la FAQ du site et sur le *Guide pou
 **Modifications apportées** : découpage en étapes, conseils de rédaction, suggestions et exemples rédigés pour Mon PCC, numéros d’urgence adaptés à la France, mise en page numérique.
 
 Mon PCC est un projet **indépendant, gratuit et non commercial**, non affilié à la Haute École de la Santé La Source ni aux auteur·es du PCC, qui ne l’ont pas validé.
+
+## Crédits
+
+Conception et réalisation : **Roddy Ricart**.
+Code source : https://github.com/rodtrip2/mon-pcc — suggestions et signalements via les [tickets GitHub](https://github.com/rodtrip2/mon-pcc/issues).
 
 ## Licence
 
