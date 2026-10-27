@@ -548,6 +548,7 @@ function renderToolbox(fromStep) {
   app.innerHTML = `
     <h1>🧰 Ma boîte à outils</h1>
     <p class="lead">Ce qui m’aide quand ça ne va pas : une photo qui m’apaise, une musique, une vidéo, un message vocal que je me suis enregistré quand j’allais bien, une citation, un lien utile…</p>
+    ${items.length ? `<ol class="tb-list">${items.map((it, idx) => toolboxItemHTML(it, idx, items.length)).join('')}</ol>` : '<p class="muted empty center">Ma boîte à outils est vide pour l’instant.</p>'}
     <section class="card tb-add">
       <h2>Ajouter</h2>
       <div class="tb-add-grid">
@@ -576,7 +577,6 @@ function renderToolbox(fromStep) {
       </div>
       <p class="muted small">Tout reste sur ce téléphone${store.isProtected() ? ', chiffré avec mon code' : ''}. Dans le plan imprimé ou envoyé, seuls les titres, les liens et les citations apparaissent, jamais les photos, vidéos ou sons.</p>
     </section>
-    ${items.length ? `<ol class="tb-list">${items.map((it, idx) => toolboxItemHTML(it, idx, items.length)).join('')}</ol>` : '<p class="muted empty center">Ma boîte à outils est vide pour l’instant.</p>'}
     <div class="nav-bottom">
       ${fromStep ? `<a class="btn btn-ghost" href="#/etape/${stepIdx}">← Retour à l’étape 7</a>` : '<a class="btn btn-ghost" href="#/">← Accueil</a>'}
     </div>`;
