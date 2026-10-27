@@ -21,6 +21,31 @@ let locked = false;
 let saveTimer = null;
 let hiddenAt = 0;
 const openExamples = new Set(); // groupes dont les exemples sont affichés
+const editing = new Set(); // listes en mode modification (sinon affichage compact)
+const editKey = (step, g) => step.id + ':' + g.id;
+
+function editToggleHTML(key, label = 'Modifier') {
+  const on = editing.has(key);
+  return on
+    ? `<button type="button" class="btn btn-ghost btn-sm edit-done" data-act="edit-toggle" data-key="${esc(key)}" data-fk="edit:${esc(key)}">✓ Terminé</button>`
+    : `<button type="button" class="icon edit-btn" data-act="edit-toggle" data-key="${esc(key)}" data-fk="edit:${esc(key)}" aria-label="${esc(label)}" title="${esc(label)}">✏️</button>`;
+}
+
+const telLink = (t) => (t && /^[\d +().-]{2,}$/.test(t) ? `<a class="call" href="tel:${esc(t.replace(/[^\d+]/g, ''))}">☎ ${esc(t)}</a>` : esc(t || ''));
+
+/** Résumé lisible d'une fiche (mode affichage) */
+function recordSummaryHTML(step, r) {
+  if (step.id === 'soinsEvites') {
+    return `<span class="rv-main">${esc(r.soin || '')}</span>${r.raison ? `<span class="rv-sub">parce que : ${esc(r.raison)}</span>` : ''}`;
+  }
+  if (step.labelled) {
+    return step.fields.filter((f) => (r[f.key] || '').trim()).map((f) => `<span class="rv-sub"><strong>${esc(f.label)}</strong> ${esc(r[f.key])}</span>`).join('');
+  }
+  const [first, ...rest] = step.fields;
+  const main = (r[first.key] || '').trim();
+  const others = rest.filter((f) => (r[f.key] || '').trim()).map((f) => (f.type === 'tel' ? telLink(r[f.key]) : esc(r[f.key])));
+  return `<span class="rv-main">${esc(main) || '<span class="muted">à compléter</span>'}</span>${others.length ? `<span class="rv-sub">${others.join(' · ')}</span>` : ''}`;
+}
 const AUTO_LOCK_MS = 5 * 60 * 1000;
 
 /* ---------- utilitaires ---------- */
@@ -321,7 +346,10 @@ function listGroupHTML(step, g) {
     </li>`).join('');
   return `<section class="group card">
     ${g.label ? `<h2>${esc(g.label)}</h2>` : ''}
-    ${arr.length ? `<p class="kept-label">Ce que je retiens${step.ordered ? ' <span class="muted">(par ordre de priorité)</span>' : ''}</p><ol class="items ${step.ordered ? 'ordered' : ''}">${items}</ol>` : ''}
+    ${arr.length ? `<div class="kept-head"><p class="kept-label">Ce que je retiens${step.ordered ? ' <span class="muted">(par ordre de priorité)</span>' : ''}</p>${editToggleHTML(editKey(step, g))}</div>
+      ${editing.has(editKey(step, g))
+        ? `<ol class="items ${step.ordered ? 'ordered' : ''}">${items}</ol>`
+        : `<${step.ordered ? 'ol' : 'ul'} class="view-list ${step.ordered ? 'ordered' : ''}">${arr.map((t) => `<li>${esc(t)}</li>`).join('')}</${step.ordered ? 'ol' : 'ul'}>`}` : ''}
     <form class="free" data-act="free" data-g="${g.id}">
       <label class="sr-only" for="free-${g.id}">Écrire avec mes mots</label>
       <input id="free-${g.id}" data-fk="free:${g.id}" placeholder="Écrire avec mes mots…" autocomplete="off">
@@ -357,7 +385,10 @@ function recordsGroupHTML(step, g) {
     </li>`).join('');
   return `<section class="group card">
     ${g.label ? `<h2>${esc(g.label)}</h2>` : ''}
-    ${arr.length ? `<ol class="records">${cards}</ol>` : ''}
+    ${arr.length ? `<div class="kept-head"><p class="kept-label">${step.ordered ? 'Par ordre de priorité' : 'Ce que je retiens'}</p>${editToggleHTML(editKey(step, g))}</div>
+      ${editing.has(editKey(step, g))
+        ? `<ol class="records">${cards}</ol>`
+        : `<${step.ordered ? 'ol' : 'ul'} class="view-list view-records ${step.ordered ? 'ordered' : ''}">${arr.map((r) => `<li>${recordSummaryHTML(step, r)}</li>`).join('')}</${step.ordered ? 'ol' : 'ul'}>`}` : ''}
     <div class="row-btns">
       <button type="button" class="btn btn-secondary btn-sm" data-act="empty" data-g="${g.id}" data-fk="empty:${g.id}">+ Ajouter une ligne</button>
       ${contactsEnabled(step, g) ? `<button type="button" class="btn btn-secondary btn-sm" data-act="contacts" data-g="${g.id}" data-fk="contacts:${g.id}">👤 Choisir dans mes contacts</button>` : ''}
@@ -575,7 +606,10 @@ function renderToolbox(fromStep) {
   app.innerHTML = `
     <h1>🧰 Ma boîte à outils</h1>
     <p class="lead">Ce qui m’aide quand ça ne va pas : une photo qui m’apaise, une musique, une vidéo, un message vocal que je me suis enregistré quand j’allais bien, une citation, un lien utile…</p>
-    ${items.length ? `<ol class="tb-list">${items.map((it, idx) => toolboxItemHTML(it, idx, items.length)).join('')}</ol>` : '<p class="muted empty center">Ma boîte à outils est vide pour l’instant.</p>'}
+    ${items.length ? `<div class="kept-head"><h2 class="tb-mine">Mes éléments</h2>${editToggleHTML('toolbox', 'Modifier mes éléments')}</div>
+      ${editing.has('toolbox')
+        ? `<ol class="tb-list">${items.map((it, idx) => toolboxItemHTML(it, idx, items.length)).join('')}</ol>`
+        : `<div class="tbv-list">${items.map((it, idx) => toolboxViewHTML(it, idx)).join('')}</div>`}` : '<p class="muted empty center">Ma boîte à outils est vide pour l’instant.</p>'}
     <section class="card tb-add">
       <h2>Ajouter</h2>
       <div class="tb-add-grid">
@@ -609,6 +643,39 @@ function renderToolbox(fromStep) {
       ${fromStep ? `<a class="btn btn-ghost" href="#/etape/${stepIdx}">← Retour à l’étape 7</a>` : '<a class="btn btn-ghost" href="#/">← Accueil</a>'}
     </div>`;
   fillMedia();
+}
+
+/** Affichage compact d'un élément (hors mode modification) */
+function toolboxViewHTML(it, idx) {
+  const title = it.title ? `<p class="tbv-title" data-title-for="${idx}">${esc(it.title)}</p>` : `<p class="tbv-title" data-title-for="${idx}" hidden></p>`;
+  if (it.kind === 'citation') {
+    return `<blockquote class="tbv tbv-quote"><p>« ${esc(it.text || '')} »</p>${it.author ? `<cite>— ${esc(it.author)}</cite>` : ''}</blockquote>`;
+  }
+  if (it.kind === 'photo') {
+    return `<figure class="tbv tbv-photo"><img data-media="${esc(it.file)}" alt="${esc(it.title || 'Photo')}">${it.title ? `<figcaption>${esc(it.title)}</figcaption>` : ''}</figure>`;
+  }
+  if (it.kind === 'video') {
+    return `<figure class="tbv tbv-video"><video data-media="${esc(it.file)}" controls playsinline preload="metadata"></video>${it.title ? `<figcaption>${esc(it.title)}</figcaption>` : ''}</figure>`;
+  }
+  if (it.kind === 'audio' || it.kind === 'voix') {
+    return `<div class="tbv tbv-audio"><span class="tbv-ico" aria-hidden="true">${KINDS[it.kind].icon}</span><div class="tbv-col">
+      <p class="tbv-title">${esc(it.title || KINDS[it.kind].label)}</p><audio data-media="${esc(it.file)}" controls preload="metadata"></audio></div></div>`;
+  }
+  if (it.kind === 'lien') {
+    let host = '';
+    try { host = new URL(it.url).hostname.replace(/^www\./, ''); } catch { /* lien invalide */ }
+    const e = parseEmbed(it.url);
+    if (!e) {
+      return `<a class="tbv tbv-link" href="${esc(it.url)}" target="_blank" rel="noopener noreferrer"><span class="tbv-ico" aria-hidden="true">🔗</span>
+        <span class="tbv-col"><span class="tbv-title">${esc(it.title || host || 'Lien')}</span><span class="muted small">${esc(host)} ↗</span></span></a>`;
+    }
+    const inner = embedLoaded.has(it.url)
+      ? embedPlayerHTML(e, it.title)
+      : `<button type="button" class="embed-ph compact" data-act="tb-embed" data-i="${idx}"><span class="embed-play" aria-hidden="true">▶</span>
+          <span class="embed-lbl">${esc(it.title || 'Lire ici')}</span><span class="embed-sub">${esc(e.provider)} · se connecte à ce site</span></button>`;
+    return `<div class="tbv tbv-embed">${it.title && embedLoaded.has(it.url) ? title : ''}<div class="tb-body">${inner}</div></div>`;
+  }
+  return '';
 }
 
 function toolboxItemHTML(it, idx, n) {
@@ -688,6 +755,7 @@ async function addToolboxBlob(kind, blob, title = '') {
   try {
     const file = await media.put(blob);
     toolbox().push({ kind, file, title, added: new Date().toISOString() });
+    if (!title) editing.add('toolbox'); // pour lui donner un titre
     scheduleSave();
     rerender(() => renderToolbox(location.hash.endsWith('/etape')));
     app.querySelector(`[data-fk="tb:${toolbox().length - 1}"]`)?.focus();
@@ -1683,6 +1751,8 @@ app.addEventListener('submit', async (e) => {
           if (t && !item.title) {
             item.title = t;
             if (el && !el.value) el.value = t;
+            const v = app.querySelector(`.embed-ph[data-i="${toolbox().indexOf(item)}"] .embed-lbl`);
+            if (v) v.textContent = t;
             scheduleSave();
           }
         });
@@ -1767,7 +1837,10 @@ document.addEventListener('click', async (e) => {
           ? arr.findIndex((r) => r[sf] === s)
           : arr.findIndex((r) => r.nom === s.nom && r.tel === s.tel);
         if (at >= 0) arr.splice(at, 1);
-        else arr.push(typeof s === 'string' ? { [sf]: s } : { ...s });
+        else {
+          arr.push(typeof s === 'string' ? { [sf]: s } : { ...s });
+          if (typeof s === 'string') editing.add(step.id + ':' + g); // le nom reste à compléter
+        }
       }
       redraw();
       break;
@@ -1805,7 +1878,10 @@ document.addEventListener('click', async (e) => {
       embedLoaded.add(it.url);
       // On remplace seulement ce cadre : les autres lecteurs ouverts continuent
       const body = btn.closest('.tb-body');
-      if (body) body.innerHTML = `${embedPlayerHTML(e, it.title)}<a class="small tb-open-small" href="${esc(it.url)}" target="_blank" rel="noopener noreferrer">Ouvrir sur ${esc(e.provider)} ↗</a>`;
+      if (body) {
+        const inView = !!body.closest('.tbv-embed');
+        body.innerHTML = `${inView && it.title ? `<p class="tbv-title">${esc(it.title)}</p>` : ''}${embedPlayerHTML(e, it.title)}${inView ? '' : `<a class="small tb-open-small" href="${esc(it.url)}" target="_blank" rel="noopener noreferrer">Ouvrir sur ${esc(e.provider)} ↗</a>`}`;
+      }
       break;
     }
     case 'tb-quotes':
@@ -1846,7 +1922,15 @@ document.addEventListener('click', async (e) => {
       rerender(() => renderToolbox(location.hash.endsWith('/etape')));
       break;
     }
+    case 'edit-toggle': {
+      const key = btn.dataset.key;
+      if (editing.has(key)) editing.delete(key); else editing.add(key);
+      if (key === 'toolbox') rerender(() => renderToolbox(location.hash.endsWith('/etape')));
+      else rerender(() => renderStep(STEPS.indexOf(step)));
+      break;
+    }
     case 'empty': {
+      editing.add(step.id + ':' + g);
       getArr(step, g).push({});
       redraw();
       const arr = getArr(step, g);
