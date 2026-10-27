@@ -225,6 +225,13 @@ img.tb-media { background: transparent; }
 .vid-rec { position: absolute; top: .5rem; left: .6rem; color: #fff; background: #c62828; font-size: .75rem; font-weight: 700; padding: .1rem .45rem; border-radius: 6px; animation: blink 1s steps(2) infinite; }
 .vid-rec[hidden] { display: none; }
 @keyframes blink { 50% { opacity: .4; } }
+.tb-quote { margin-top: .9rem; }
+.tb-kind-label { font-weight: 700; color: var(--muted); font-size: .9rem; }
+.tb-quote-text { font-family: Georgia, "Times New Roman", serif; font-style: italic; font-size: 1.15rem; line-height: 1.45; resize: none; overflow: hidden; border-left: 4px solid var(--brand); }
+.tb-quote-author { flex-direction: row; align-items: center; gap: .5rem; font-weight: 400; color: var(--muted); }
+.tb-quote-author input { flex: 1; }
+.tb-add .sugg .chip { text-align: left; }
+.chip[aria-pressed="true"] .muted { color: inherit; opacity: .85; }
 .rec-time { font-size: 2rem; font-variant-numeric: tabular-nums; text-align: center; margin: .5rem 0; }
 
 /* Bandeau d'installation */

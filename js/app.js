@@ -480,7 +480,37 @@ const KINDS = {
   audio: { icon: '🎵', label: 'Son ou musique', accept: 'audio/*' },
   voix: { icon: '🎙', label: 'Message vocal' },
   lien: { icon: '🔗', label: 'Lien' },
+  citation: { icon: '❝', label: 'Citation' },
 };
+
+/* Exemples de citations (affichés seulement sur demande) :
+   phrases-repères rédigées pour Mon PCC, proverbes, et extraits d'auteurs
+   du domaine public (traductions reformulées). */
+const QUOTES = [
+  { text: 'Cette vague passera, comme les autres sont passées.' },
+  { text: 'J’ai déjà traversé des moments difficiles. Je peux traverser celui-ci.' },
+  { text: 'Je n’ai pas à tout régler aujourd’hui. Juste le prochain pas.' },
+  { text: 'Ce que je ressens est réel, et ça ne durera pas toujours.' },
+  { text: 'Demander de l’aide, c’est prendre soin de moi.' },
+  { text: 'Je suis plus que ce moment difficile.' },
+  { text: 'Une respiration à la fois.' },
+  { text: 'Après la pluie, le beau temps.', author: 'Proverbe' },
+  { text: 'Petit à petit, l’oiseau fait son nid.', author: 'Proverbe' },
+  { text: 'Parmi les choses, les unes dépendent de nous, les autres n’en dépendent pas.', author: 'Épictète, Manuel' },
+  { text: 'Ce ne sont pas les choses qui nous troublent, mais les jugements que nous portons sur elles.', author: 'Épictète, Manuel' },
+  { text: 'L’âme prend la couleur de ses pensées.', author: 'Marc Aurèle, Pensées' },
+  { text: 'Nous souffrons plus souvent en imagination que dans la réalité.', author: 'Sénèque, Lettres à Lucilius' },
+];
+let quotesOpen = false;
+
+/** Libellé court d'un élément de la boîte à outils */
+function tbLabel(it) {
+  if (it.kind === 'citation') {
+    const t = (it.text || '').trim();
+    return t ? '« ' + (t.length > 40 ? t.slice(0, 38) + '…' : t) + ' »' : 'Citation';
+  }
+  return it.title || KINDS[it.kind].label;
+}
 const mediaURLs = new Map(); // id -> URL d'affichage (session)
 const canRecord = () => !!(navigator.mediaDevices?.getUserMedia && window.MediaRecorder);
 const toolbox = () => (plan.data.boiteOutils ??= []);
@@ -493,8 +523,8 @@ function toolboxTeaserHTML(href = '#/boite-outils/etape') {
   const items = plan.data.boiteOutils || [];
   return `<div class="tb-teaser">
     <h3>🧰 Ma boîte à outils</h3>
-    <p class="muted small">J’y range ce qui m’aide à aller mieux : une photo qui m’apaise, une musique, une vidéo, un message que je me suis enregistré, un lien…</p>
-    ${items.length ? `<p class="small"><strong>${items.length} élément${items.length > 1 ? 's' : ''}</strong> : ${items.slice(0, 4).map((it) => esc(KINDS[it.kind].icon + ' ' + (it.title || KINDS[it.kind].label))).join(' · ')}${items.length > 4 ? '…' : ''}</p>` : ''}
+    <p class="muted small">J’y range ce qui m’aide à aller mieux : une photo qui m’apaise, une musique, une vidéo, un message que je me suis enregistré, une citation, un lien…</p>
+    ${items.length ? `<p class="small"><strong>${items.length} élément${items.length > 1 ? 's' : ''}</strong> : ${items.slice(0, 4).map((it) => esc(KINDS[it.kind].icon + ' ' + tbLabel(it))).join(' · ')}${items.length > 4 ? '…' : ''}</p>` : ''}
     <a class="btn btn-secondary btn-sm" href="${href}">${items.length ? 'Ouvrir ma boîte à outils' : 'Créer ma boîte à outils'}</a>
   </div>`;
 }
@@ -504,7 +534,7 @@ function renderToolbox(fromStep) {
   const stepIdx = STEPS.findIndex((x) => x.id === 'strategies');
   app.innerHTML = `
     <h1>🧰 Ma boîte à outils</h1>
-    <p class="lead">Ce qui m’aide quand ça ne va pas : une photo qui m’apaise, une musique, une vidéo, un message vocal que je me suis enregistré quand j’allais bien, un lien utile…</p>
+    <p class="lead">Ce qui m’aide quand ça ne va pas : une photo qui m’apaise, une musique, une vidéo, un message vocal que je me suis enregistré quand j’allais bien, une citation, un lien utile…</p>
     <section class="card tb-add">
       <h2>Ajouter</h2>
       <div class="tb-add-grid">
@@ -517,7 +547,21 @@ function renderToolbox(fromStep) {
           <input type="text" name="url" inputmode="url" autocapitalize="off" spellcheck="false" placeholder="https://…" autocomplete="off" required></label>
         <button class="btn btn-secondary btn-sm">Ajouter le lien</button>
       </form>
-      <p class="muted small">Tout reste sur ce téléphone${store.isProtected() ? ', chiffré avec mon code' : ''}. Dans le plan imprimé ou envoyé, seuls les titres et les liens apparaissent, jamais les photos, vidéos ou sons.</p>
+      <form class="tb-link tb-quote" data-act="tb-quote">
+        <label class="field"><span>❝ Ajouter une citation, une phrase qui m’aide</span>
+          <textarea name="text" rows="2" placeholder="Avec mes mots, ou une phrase que j’aime…" required></textarea></label>
+        <label class="field"><span>Auteur (facultatif)</span><input name="author" autocomplete="off" placeholder="Ex. : ma grand-mère, un livre, une chanson…"></label>
+        <button class="btn btn-secondary btn-sm">Ajouter la citation</button>
+      </form>
+      <div class="sugg">
+        <button type="button" class="btn btn-ghost btn-sm ex-btn" data-act="tb-quotes" aria-expanded="${quotesOpen}">${quotesOpen ? 'Masquer les exemples de citations' : 'Exemples de citations'}</button>
+        ${quotesOpen ? `<p class="muted small">Je touche une citation pour l’ajouter à ma boîte, et à nouveau pour la retirer.</p>
+        <div class="chips">${QUOTES.map((q, i) => {
+          const on = items.some((it) => it.kind === 'citation' && it.text === q.text);
+          return `<button type="button" class="chip" aria-pressed="${on}" data-act="tb-quote-chip" data-q="${i}" data-fk="quote:${i}">${on ? '✓ ' : '+ '}« ${esc(q.text)} »${q.author ? ` <span class="muted">— ${esc(q.author)}</span>` : ''}</button>`;
+        }).join('')}</div>` : ''}
+      </div>
+      <p class="muted small">Tout reste sur ce téléphone${store.isProtected() ? ', chiffré avec mon code' : ''}. Dans le plan imprimé ou envoyé, seuls les titres, les liens et les citations apparaissent, jamais les photos, vidéos ou sons.</p>
     </section>
     ${items.length ? `<ol class="tb-list">${items.map((it, idx) => toolboxItemHTML(it, idx, items.length)).join('')}</ol>` : '<p class="muted empty center">Ma boîte à outils est vide pour l’instant.</p>'}
     <div class="nav-bottom">
@@ -536,6 +580,19 @@ function toolboxItemHTML(it, idx, n) {
     let host = '';
     try { host = new URL(it.url).hostname.replace(/^www\./, ''); } catch { /* lien invalide */ }
     body = `<a class="btn btn-primary btn-sm tb-open" href="${esc(it.url)}" target="_blank" rel="noopener noreferrer">Ouvrir ${esc(host || 'le lien')} ↗</a>`;
+  }
+  if (it.kind === 'citation') {
+    return `<li class="card tb-item tb-citation">
+    <div class="tb-head"><span class="tb-kind" aria-hidden="true">${k.icon}</span><span class="tb-kind-label">Citation</span></div>
+    <label class="sr-only" for="tb-q-${idx}">Texte de la citation</label>
+    <textarea id="tb-q-${idx}" class="tb-quote-text" rows="2" data-tbf="text" data-i="${idx}" data-fk="tbq:${idx}">${esc(it.text || '')}</textarea>
+    <label class="field tb-quote-author"><span>— Auteur</span><input data-tbf="author" data-i="${idx}" data-fk="tba:${idx}" value="${esc(it.author || '')}" placeholder="facultatif"></label>
+    <div class="tb-tools">
+      <button type="button" class="icon" data-act="tb-up" data-i="${idx}" data-fk="tb-up:${idx}" aria-label="Monter" ${idx === 0 ? 'disabled' : ''}>↑</button>
+      <button type="button" class="icon" data-act="tb-down" data-i="${idx}" data-fk="tb-down:${idx}" aria-label="Descendre" ${idx === n - 1 ? 'disabled' : ''}>↓</button>
+      <button type="button" class="icon icon-del" data-act="tb-del" data-i="${idx}" aria-label="Supprimer">✕</button>
+    </div>
+  </li>`;
   }
   return `<li class="card tb-item">
     <div class="tb-head">
@@ -1444,6 +1501,12 @@ app.addEventListener('input', (e) => {
     cardTimer = setTimeout(refreshCardPreview, 400);
     return;
   }
+  if (el.dataset.tbf) {
+    toolbox()[+el.dataset.i][el.dataset.tbf] = el.value;
+    if (el.tagName === 'TEXTAREA') autosize(el);
+    scheduleSave();
+    return;
+  }
   if (el.dataset.tb !== undefined) {
     toolbox()[+el.dataset.tb].title = el.value;
     scheduleSave();
@@ -1485,6 +1548,13 @@ app.addEventListener('submit', async (e) => {
     scheduleSave();
     rerender(() => renderStep(STEPS.indexOf(step)));
     app.querySelector(`[data-fk="free:${form.dataset.g}"]`)?.focus({ preventScroll: true });
+  } else if (act === 'tb-quote') {
+    const text = form.text.value.trim();
+    if (!text) return;
+    toolbox().push({ kind: 'citation', text, author: form.author.value.trim(), added: new Date().toISOString() });
+    scheduleSave();
+    rerender(() => renderToolbox(location.hash.endsWith('/etape')));
+    toast('Citation ajoutée.');
   } else if (act === 'tb-link') {
     let url = form.url.value.trim();
     if (!/^https?:\/\//i.test(url)) url = 'https://' + url;
@@ -1606,6 +1676,20 @@ document.addEventListener('click', async (e) => {
       if (blob) await addToolboxBlob('video', blob, 'Ma vidéo');
       break;
     }
+    case 'tb-quotes':
+      quotesOpen = !quotesOpen;
+      rerender(() => renderToolbox(location.hash.endsWith('/etape')));
+      break;
+    case 'tb-quote-chip': {
+      const q = QUOTES[+btn.dataset.q];
+      const arr = toolbox();
+      const at = arr.findIndex((it) => it.kind === 'citation' && it.text === q.text);
+      if (at >= 0) arr.splice(at, 1);
+      else arr.push({ kind: 'citation', text: q.text, author: q.author || '', added: new Date().toISOString() });
+      scheduleSave();
+      rerender(() => renderToolbox(location.hash.endsWith('/etape')));
+      break;
+    }
     case 'tb-record': {
       const blob = await recordVoice();
       if (blob) await addToolboxBlob('voix', blob, 'Mon message');
@@ -1623,7 +1707,7 @@ document.addEventListener('click', async (e) => {
     }
     case 'tb-del': {
       const it = toolbox()[i];
-      if (!(await modal({ title: 'Retirer de ma boîte à outils ?', body: `<p>« ${esc(it.title || KINDS[it.kind].label)} » sera supprimé de ce téléphone.</p>`, ok: 'Supprimer', danger: true }))) return;
+      if (!(await modal({ title: 'Retirer de ma boîte à outils ?', body: `<p>${esc(tbLabel(it))} sera supprimé de ce téléphone.</p>`, ok: 'Supprimer', danger: true }))) return;
       toolbox().splice(i, 1);
       if (it.file) { await media.remove(it.file).catch(() => {}); const u = mediaURLs.get(it.file); if (u) URL.revokeObjectURL(u); mediaURLs.delete(it.file); }
       scheduleSave();
@@ -1834,7 +1918,7 @@ document.addEventListener('visibilitychange', () => {
 });
 
 // Ajuste la hauteur des lignes de texte après chaque affichage
-new MutationObserver(() => app.querySelectorAll('textarea.item-input').forEach(autosize))
+new MutationObserver(() => app.querySelectorAll('textarea.item-input, textarea.tb-quote-text').forEach(autosize))
   .observe(app, { childList: true, subtree: true });
 
 /* ---------- démarrage ---------- */

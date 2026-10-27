@@ -78,12 +78,14 @@ export function stepContent(step, data, plan = null) {
     }
   }
   if (step.id === 'strategies') {
-    const tb = (data.boiteOutils || []).filter((it) => it && (it.title || it.url || it.file));
-    const names = { photo: 'photo', video: 'vidéo', audio: 'son', voix: 'message vocal', lien: 'lien' };
+    const tb = (data.boiteOutils || []).filter((it) => it && (it.title || it.url || it.file || (it.text || '').trim()));
+    const names = { photo: 'photo', video: 'vidéo', audio: 'son', voix: 'message vocal', lien: 'lien', citation: 'citation' };
     if (tb.length) {
       out.push({
         label: 'Ma boîte à outils (sur mon téléphone)',
-        lines: tb.map((it) => (it.title ? it.title + ' ' : '') + '(' + names[it.kind] + ')' + (it.kind === 'lien' ? ' : ' + it.url : '')),
+        lines: tb.map((it) => (it.kind === 'citation'
+          ? `« ${it.text.trim()} »${it.author ? ' — ' + it.author : ''}`
+          : (it.title ? it.title + ' ' : '') + '(' + names[it.kind] + ')' + (it.kind === 'lien' ? ' : ' + it.url : ''))),
       });
     }
   }
