@@ -496,7 +496,8 @@ function renderToolbox(fromStep) {
       <h2>Ajouter</h2>
       <div class="tb-add-grid">
         ${['photo', 'video', 'audio'].map((k) => `<label class="btn btn-secondary tb-add-btn"><span aria-hidden="true">${KINDS[k].icon}</span> ${KINDS[k].label}<input type="file" accept="${KINDS[k].accept}" data-act="tb-file" data-kind="${k}" hidden></label>`).join('')}
-        ${canRecord() ? `<button type="button" class="btn btn-secondary tb-add-btn" data-act="tb-record"><span aria-hidden="true">🎙</span> M’enregistrer</button>` : ''}
+        ${canRecord() ? `<button type="button" class="btn btn-secondary tb-add-btn" data-act="tb-record"><span aria-hidden="true">🎙</span> M’enregistrer</button>
+        <button type="button" class="btn btn-secondary tb-add-btn" data-act="tb-video"><span aria-hidden="true">🎥</span> Me filmer</button>` : ''}
       </div>
       <form class="tb-link" data-act="tb-link">
         <label class="field"><span>🔗 Ajouter un lien (playlist, vidéo, site…)</span>
@@ -574,6 +575,98 @@ async function addToolboxBlob(kind, blob, title = '') {
 }
 
 /* Enregistrement d'un message vocal */
+/* Enregistrement d'une vidéo (caméra du téléphone) */
+const VIDEO_MAX_S = 180; // 3 minutes maximum
+
+function pickVideoMime() {
+  const types = ['video/mp4;codecs=avc1,mp4a', 'video/webm;codecs=vp9,opus', 'video/webm;codecs=vp8,opus', 'video/webm', 'video/mp4'];
+  return types.find((t) => window.MediaRecorder?.isTypeSupported?.(t)) || '';
+}
+
+function recordVideo() {
+  return new Promise((resolve) => {
+    const d = $('#modal');
+    let stream = null; let rec = null; let chunks = []; let timer = null; let t0 = 0; let result = null;
+    let facing = 'user';
+    d.innerHTML = `<div class="modal-inner">
+      <h2>🎥 Me filmer</h2>
+      <p class="muted small">Par exemple, un message que je m’adresse quand je vais bien, pour me le repasser dans les moments difficiles. 3 minutes maximum.</p>
+      <div class="vid-wrap"><video class="vid-live" playsinline muted autoplay></video><video class="vid-play" playsinline controls hidden></video>
+        <span class="vid-rec" hidden>● REC</span></div>
+      <p class="rec-time" aria-live="polite">0:00</p>
+      <p class="error" role="alert" hidden></p>
+      <div class="modal-actions">
+        <button type="button" class="btn btn-ghost btn-sm" data-r="flip">🔄 Changer de caméra</button>
+        <button type="button" class="btn btn-ghost" data-r="cancel">Annuler</button>
+        <button type="button" class="btn btn-primary" data-r="start" disabled>● Démarrer</button>
+        <button type="button" class="btn btn-danger" data-r="stop" hidden>■ Arrêter</button>
+        <button type="button" class="btn btn-primary" data-r="keep" hidden>Garder</button>
+      </div></div>`;
+    const $r = (k) => d.querySelector(`[data-r="${k}"]`);
+    const live = d.querySelector('.vid-live');
+    const play = d.querySelector('.vid-play');
+    const recBadge = d.querySelector('.vid-rec');
+    const time = d.querySelector('.rec-time');
+    const err = d.querySelector('.error');
+    const stopStream = () => { stream?.getTracks().forEach((t) => t.stop()); stream = null; };
+    const fmt = (s) => `${Math.floor(s / 60)}:${String(s % 60).padStart(2, '0')}`;
+    const openCam = async () => {
+      stopStream();
+      try {
+        stream = await navigator.mediaDevices.getUserMedia({ video: { facingMode: facing, width: { ideal: 1280 }, height: { ideal: 720 } }, audio: true });
+        live.srcObject = stream;
+        live.hidden = false; play.hidden = true;
+        $r('start').disabled = false;
+        err.hidden = true;
+      } catch {
+        err.textContent = 'Caméra ou micro non autorisés. Je peux les autoriser dans les réglages du navigateur.';
+        err.hidden = false;
+      }
+    };
+    const cleanup = () => { clearInterval(timer); stopStream(); if (play.src) URL.revokeObjectURL(play.src); };
+    const finish = (v) => { cleanup(); d.close(); resolve(v); };
+    const stopRec = () => { clearInterval(timer); if (rec?.state === 'recording') rec.stop(); $r('stop').hidden = true; recBadge.hidden = true; };
+    d.onclick = async (e) => {
+      const a = e.target.closest('[data-r]')?.dataset.r;
+      if (a === 'cancel') { if (rec?.state === 'recording') rec.stop(); finish(null); }
+      else if (a === 'flip') { if (rec?.state === 'recording') return; facing = facing === 'user' ? 'environment' : 'user'; await openCam(); }
+      else if (a === 'start') {
+        if (!stream) {
+          // « Recommencer » : rouvrir la caméra, puis démarrer au prochain appui
+          await openCam();
+          $r('start').textContent = '● Démarrer';
+          $r('keep').hidden = true;
+          time.textContent = '0:00';
+          return;
+        }
+        chunks = [];
+        const mimeType = pickVideoMime();
+        rec = new MediaRecorder(stream, { ...(mimeType ? { mimeType } : {}), videoBitsPerSecond: 1_200_000, audioBitsPerSecond: 64_000 });
+        rec.ondataavailable = (ev) => { if (ev.data.size) chunks.push(ev.data); };
+        rec.onstop = () => {
+          result = new Blob(chunks, { type: (rec.mimeType || mimeType || 'video/webm').split(';')[0] });
+          stopStream();
+          if (play.src) URL.revokeObjectURL(play.src);
+          play.src = URL.createObjectURL(result);
+          live.hidden = true; play.hidden = false;
+          $r('keep').hidden = false; $r('start').hidden = false; $r('start').textContent = '● Recommencer'; $r('flip').hidden = false;
+        };
+        rec.start(1000); t0 = Date.now();
+        timer = setInterval(() => {
+          const sec = Math.floor((Date.now() - t0) / 1000);
+          time.textContent = `${fmt(sec)} / ${fmt(VIDEO_MAX_S)}`;
+          if (sec >= VIDEO_MAX_S) stopRec();
+        }, 250);
+        $r('start').hidden = true; $r('keep').hidden = true; $r('flip').hidden = true; $r('stop').hidden = false; recBadge.hidden = false;
+      } else if (a === 'stop') stopRec();
+      else if (a === 'keep' && result) finish(result);
+    };
+    d.oncancel = (e) => { e.preventDefault(); if (rec?.state === 'recording') rec.stop(); finish(null); };
+    d.showModal();
+    openCam();
+  });
+}
+
 function recordVoice() {
   return new Promise((resolve) => {
     const d = $('#modal');
@@ -1436,6 +1529,11 @@ document.addEventListener('click', async (e) => {
       break;
     }
     case 'contacts': await pickContacts(step, g); break;
+    case 'tb-video': {
+      const blob = await recordVideo();
+      if (blob) await addToolboxBlob('video', blob, 'Ma vidéo');
+      break;
+    }
     case 'tb-record': {
       const blob = await recordVoice();
       if (blob) await addToolboxBlob('voix', blob, 'Mon message');
