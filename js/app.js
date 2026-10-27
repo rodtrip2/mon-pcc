@@ -320,12 +320,12 @@ function listGroupHTML(step, g) {
     </li>`).join('');
   return `<section class="group card">
     ${g.label ? `<h2>${esc(g.label)}</h2>` : ''}
+    ${arr.length ? `<p class="kept-label">Ce que je retiens${step.ordered ? ' <span class="muted">(par ordre de priorité)</span>' : ''}</p><ol class="items ${step.ordered ? 'ordered' : ''}">${items}</ol>` : ''}
     <form class="free" data-act="free" data-g="${g.id}">
       <label class="sr-only" for="free-${g.id}">Écrire avec mes mots</label>
       <input id="free-${g.id}" data-fk="free:${g.id}" placeholder="Écrire avec mes mots…" autocomplete="off">
       <button class="btn btn-secondary btn-sm">Ajouter</button>
     </form>
-    ${arr.length ? `<p class="kept-label">Ce que je retiens${step.ordered ? ' <span class="muted">(par ordre de priorité)</span>' : ''}</p><ol class="items ${step.ordered ? 'ordered' : ''}">${items}</ol>` : ''}
     ${suggestionsHTML(step, g, (s) => arr.includes(s))}
     ${step.id === 'strategies' && g.id === 'moi' ? toolboxTeaserHTML() : ''}
   </section>`;

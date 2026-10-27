@@ -155,7 +155,7 @@ main { flex: 1; width: 100%; max-width: 720px; margin: 0 auto; padding: 1rem 1re
 .chip[aria-pressed="true"] { background: var(--chip-on); border-color: var(--chip-on); color: #fff; }
 @media (prefers-color-scheme: dark) { .chip[aria-pressed="true"] { color: #0e1a19; } }
 
-.free { display: flex; gap: .5rem; margin: .2rem 0 .8rem; }
+.free { display: flex; gap: .5rem; margin: .6rem 0 .8rem; }
 .free input { flex: 1; min-width: 0; }
 
 input, textarea, select {
