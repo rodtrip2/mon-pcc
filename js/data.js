@@ -45,6 +45,7 @@ const PROCESS_ADULTE = [
 const STEPS_ADULTE = [
   {
     id: 'coordonnees',
+    easy: { q: 'Qui suis-je ? J’écris mon nom, mon prénom, ma date de naissance, mon téléphone et mon adresse.', tip: 'Ces informations servent à savoir que ce plan est le mien. Elles restent sur mon téléphone.' },
     type: 'identity',
     short: 'Coordonnées',
     title: 'Mes coordonnées',
@@ -53,6 +54,7 @@ const STEPS_ADULTE = [
   },
   {
     id: 'partenaires',
+    easy: { q: 'Avec qui je fais mon plan ? J’écris le nom des personnes et leur rôle.', tip: 'Il faut au moins un professionnel qui me soigne. Je peux aussi choisir un proche. C’est moi qui décide.' },
     type: 'records',
     short: 'Partenaires',
     title: 'Avec qui je l’élabore',
@@ -73,6 +75,7 @@ const STEPS_ADULTE = [
   },
   {
     id: 'difficultes',
+    easy: { q: 'Pourquoi je suis suivi·e ? J’écris mes difficultés.', tip: 'J’utilise mes mots. Je n’écris que ce que je veux dire.' },
     type: 'list',
     short: 'Mes difficultés',
     title: 'Ce qui a motivé mon suivi',
@@ -93,6 +96,7 @@ const STEPS_ADULTE = [
   },
   {
     id: 'declencheurs',
+    easy: { q: 'Qu’est-ce qui peut me faire aller très mal ?', tip: 'Je pense aux dernières fois où j’ai été mal. Qu’est-ce qui s’est passé avant ?' },
     type: 'list',
     short: 'Déclencheurs',
     title: 'Ce qui peut me mettre en crise',
@@ -109,6 +113,7 @@ const STEPS_ADULTE = [
   },
   {
     id: 'enCrise',
+    easy: { q: 'Comment je suis quand je vais très mal ? Ce que je pense. Ce que je ressens. Ce qui se passe dans mon corps. Ce que je fais.', tip: 'J’écris des choses précises. Par exemple : « je ne réponds plus au téléphone ».' },
     type: 'list',
     short: 'Quand je suis en crise',
     title: 'Comment je suis en crise',
@@ -137,6 +142,7 @@ const STEPS_ADULTE = [
   },
   {
     id: 'signesEntourage',
+    easy: { q: 'Qu’est-ce que mes proches remarquent quand je vais mal ?', tip: 'Je peux demander à mes proches : « Qu’est-ce que tu vois en premier quand je vais moins bien ? »' },
     type: 'list',
     short: 'Ce que voit mon entourage',
     title: 'Ce que remarque mon entourage',
@@ -150,6 +156,7 @@ const STEPS_ADULTE = [
   },
   {
     id: 'strategies',
+    easy: { q: 'Qu’est-ce qui m’aide quand je vais mal ? D’abord ce que je fais seul·e. Puis avec mes proches. Puis avec les professionnels.', tip: 'Je mets en haut ce que je fais en premier. Je peux utiliser les flèches pour changer l’ordre.' },
     type: 'list',
     ordered: true,
     short: 'Ce que je peux faire',
@@ -178,6 +185,7 @@ const STEPS_ADULTE = [
   },
   {
     id: 'aide',
+    easy: { q: 'À qui je peux demander de l’aide ? J’écris le nom, qui c’est pour moi et son téléphone. D’abord mes proches. Puis les professionnels. Puis les services d’urgence.', tip: 'Je demande à chaque personne si elle est d’accord. J’écris un numéro qui répond.' },
     type: 'records',
     ordered: true,
     contacts: { name: 'nom', tel: 'tel' },
@@ -204,6 +212,7 @@ const STEPS_ADULTE = [
   },
   {
     id: 'soinsSouhaites',
+    easy: { q: 'Quand je vais très mal, quels soins je veux ?', tip: 'Je pense à ce qui m’a aidé les autres fois. Cela peut être un médicament précis.' },
     type: 'list',
     short: 'Soins souhaités',
     title: 'Les soins que je souhaite recevoir',
@@ -219,6 +228,7 @@ const STEPS_ADULTE = [
   },
   {
     id: 'soinsEvites',
+    easy: { q: 'Quels soins je ne veux pas ? J’explique pourquoi.', tip: 'Pour chaque soin, je dis pourquoi je n’en veux pas. Par exemple : un effet que j’ai eu avant.' },
     type: 'records',
     short: 'Soins à éviter',
     title: 'Les soins que je souhaite éviter',
@@ -239,6 +249,7 @@ const STEPS_ADULTE = [
   },
   {
     id: 'alternatives',
+    easy: { q: 'Si je ne veux pas un soin, qu’est-ce qu’on peut faire à la place ?', tip: 'C’est important. Pour chaque soin que je ne veux pas, je propose une autre solution.' },
     type: 'list',
     short: 'Alternatives',
     title: 'Les alternatives possibles',
@@ -254,6 +265,7 @@ const STEPS_ADULTE = [
   },
   {
     id: 'demarches',
+    easy: { q: 'Si je vais très mal, qui peut s’occuper de mes affaires ? Par exemple : le courrier, les enfants, les animaux, la maison, le travail. J’écris qui fait quoi et comment le joindre.', tip: 'Je choisis une personne pour chaque chose. Je vérifie qu’elle est d’accord.' },
     type: 'records',
     short: 'Démarches à déléguer',
     title: 'Préserver mes intérêts et mon quotidien',
@@ -276,6 +288,7 @@ const STEPS_ADULTE = [
   },
   {
     id: 'transmis',
+    easy: { q: 'À qui je donne mon plan ? J’écris le lieu ou le nom, et qui c’est pour moi.', tip: 'Mon plan est à moi. Je le donne aux personnes écrites dans le plan.' },
     type: 'records',
     short: 'Transmis à',
     title: 'À qui je transmets mon plan',
@@ -295,6 +308,7 @@ const STEPS_ADULTE = [
   },
   {
     id: 'signature',
+    easy: { q: 'Où et quand on signe. Qui signe et son rôle.', tip: 'On relit le plan ensemble avant de signer. On peut signer avec le doigt sur le téléphone.' },
     type: 'final',
     short: 'Date et signatures',
     title: 'Lieu, date et signatures',

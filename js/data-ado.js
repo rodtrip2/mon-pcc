@@ -45,6 +45,7 @@ export const PROCESS_ADO = [
 export const STEPS_ADO = [
   {
     id: 'coordonnees',
+    easy: { q: 'Qui suis-je ? J’écris mon nom, mon prénom, ma date de naissance, mon téléphone et mon adresse.', tip: 'Ces informations servent à savoir que ce plan est le mien. Elles restent sur mon téléphone.' },
     type: 'identity',
     short: 'Coordonnées',
     title: 'Mes coordonnées',
@@ -53,6 +54,7 @@ export const STEPS_ADO = [
   },
   {
     id: 'partenaires',
+    easy: { q: 'Avec qui je fais mon plan ? J’écris le nom des personnes et leur rôle.', tip: 'Il faut au moins un professionnel qui m’aide. Je peux aussi choisir des adultes qui s’occupent de moi.' },
     type: 'records',
     short: 'Avec qui',
     title: 'Avec qui je fais mon plan',
@@ -73,6 +75,7 @@ export const STEPS_ADO = [
   },
   {
     id: 'difficultes',
+    easy: { q: 'Pourquoi je fais mon plan ? Quelles sont mes difficultés ?', tip: 'J’utilise mes mots. Je n’écris que ce que je veux dire.' },
     type: 'list',
     short: 'Mes difficultés',
     title: 'Ce qui m’amène à faire mon plan',
@@ -93,6 +96,7 @@ export const STEPS_ADO = [
   },
   {
     id: 'declencheurs',
+    easy: { q: 'Qu’est-ce qui peut me faire déborder ?', tip: 'Je pense aux dernières fois où ça n’allait pas. Qu’est-ce qui s’est passé avant ?' },
     type: 'list',
     short: 'Ce qui me déborde',
     title: 'Ce qui peut me déborder',
@@ -109,6 +113,7 @@ export const STEPS_ADO = [
   },
   {
     id: 'enCrise',
+    easy: { q: 'Qu’est-ce que je remarque chez moi quand ça ne va pas ? Ce que je pense. Ce que je ressens. Ce qui se passe dans mon corps. Ce que je fais.', tip: 'J’écris des choses précises. Par exemple : « je ne réponds plus aux messages ».' },
     type: 'list',
     short: 'Ce que je remarque',
     title: 'Ce que je remarque chez moi',
@@ -137,6 +142,7 @@ export const STEPS_ADO = [
   },
   {
     id: 'signesEntourage',
+    easy: { q: 'Qu’est-ce que les autres remarquent chez moi quand ça ne va pas ?', tip: 'Je peux demander : « Qu’est-ce que tu vois en premier quand je vais moins bien ? »' },
     type: 'list',
     short: 'Ce que voit mon entourage',
     title: 'Ce que remarque mon entourage',
@@ -150,6 +156,7 @@ export const STEPS_ADO = [
   },
   {
     id: 'strategies',
+    easy: { q: 'Qu’est-ce qui me fait du bien quand ça ne va pas ? Mes loisirs. Les personnes autour de moi. L’aide des professionnels.', tip: 'Je mets en haut ce qui m’aide le plus.' },
     type: 'list',
     short: 'Ce qui me fait du bien',
     title: 'Ce qui me fait du bien',
@@ -176,6 +183,7 @@ export const STEPS_ADO = [
   },
   {
     id: 'information',
+    easy: { q: 'Quand ça ne va pas, qui doit être prévenu ? Qui le prévient ? Comment ?', tip: 'Pour chaque personne, j’écris qui la prévient et comment. Je vérifie qu’elle est d’accord.' },
     type: 'records',
     short: 'Qui informer',
     title: 'Qui informer quand ça ne va pas',
@@ -196,6 +204,7 @@ export const STEPS_ADO = [
   },
   {
     id: 'transmis',
+    easy: { q: 'À qui je donne mon plan ? J’écris le lieu ou le nom, et qui c’est pour moi.', tip: 'Je le donne aux personnes écrites dans le plan.' },
     type: 'records',
     short: 'Transmis à',
     title: 'À qui je transmets mon plan',
@@ -215,6 +224,7 @@ export const STEPS_ADO = [
   },
   {
     id: 'signature',
+    easy: { q: 'Où et quand on signe. Qui signe et son rôle.', tip: 'On relit le plan ensemble avant de signer.' },
     type: 'final',
     short: 'Date et signatures',
     title: 'Lieu, date et signatures',

@@ -538,3 +538,7 @@ html[data-text="xl"] .save-state { display: none; }
 .free { align-items: center; }
 .mic-btn { width: 44px; height: 44px; flex: none; }
 .mic-corner { float: right; margin: .3rem 0 .3rem .5rem; }
+.q-easy { font-size: 1.15rem; line-height: 1.55; }
+.official { margin: -.4rem 0 .8rem; font-size: .9rem; color: var(--muted); }
+.official summary { cursor: pointer; }
+.official p { margin: .3rem 0 0; }

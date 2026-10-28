@@ -41,6 +41,7 @@ export const PROCESS_ADO_EN = [
 export const STEPS_ADO_EN = [
   {
     id: 'coordonnees',
+    easy: { q: 'Who am I? I write my last name, first name, date of birth, phone and address.', tip: 'This shows the plan is mine. It stays on my phone.' },
     type: 'identity',
     short: 'My details',
     title: 'My details',
@@ -49,6 +50,7 @@ export const STEPS_ADO_EN = [
   },
   {
     id: 'partenaires',
+    easy: { q: 'Who do I make my plan with? I write their names and their roles.', tip: 'I need at least one professional who supports me. I can also choose adults who look after me.' },
     type: 'records',
     short: 'Who with',
     title: 'Who I make my plan with',
@@ -69,6 +71,7 @@ export const STEPS_ADO_EN = [
   },
   {
     id: 'difficultes',
+    easy: { q: 'Why am I making my plan? What are my difficulties?', tip: 'I use my own words. I only write what I want to say.' },
     type: 'list',
     short: 'My difficulties',
     title: 'Why I am making my plan',
@@ -89,6 +92,7 @@ export const STEPS_ADO_EN = [
   },
   {
     id: 'declencheurs',
+    easy: { q: 'What can make me feel overwhelmed?', tip: 'I think about the last times things went wrong. What happened before?' },
     type: 'list',
     short: 'What overwhelms me',
     title: 'What can overwhelm me',
@@ -105,6 +109,7 @@ export const STEPS_ADO_EN = [
   },
   {
     id: 'enCrise',
+    easy: { q: 'What do I notice in myself when things are not okay? What I think. What I feel. What happens in my body. What I do.', tip: 'I write precise things. For example: “I stop answering messages”.' },
     type: 'list',
     short: 'What I notice',
     title: 'What I notice in myself',
@@ -133,6 +138,7 @@ export const STEPS_ADO_EN = [
   },
   {
     id: 'signesEntourage',
+    easy: { q: 'What do other people notice in me when things are not okay?', tip: 'I can ask: “What do you notice first when I start to feel worse?”' },
     type: 'list',
     short: 'What others notice',
     title: 'What the people around me notice',
@@ -146,6 +152,7 @@ export const STEPS_ADO_EN = [
   },
   {
     id: 'strategies',
+    easy: { q: 'What helps me feel better when things are not okay? My hobbies. The people around me. Help from professionals.', tip: 'I put what helps me most at the top.' },
     type: 'list',
     short: 'What helps me',
     title: 'What helps me feel better',
@@ -172,6 +179,7 @@ export const STEPS_ADO_EN = [
   },
   {
     id: 'information',
+    easy: { q: 'When things are not okay, who should be told? Who tells them? How?', tip: 'For each person, I write who tells them and how. I check they agree.' },
     type: 'records',
     short: 'Who to inform',
     title: 'Who to inform when things are not okay',
@@ -192,6 +200,7 @@ export const STEPS_ADO_EN = [
   },
   {
     id: 'transmis',
+    easy: { q: 'Who do I give my plan to? I write the place or name, and who they are to me.', tip: 'I give it to the people named in the plan.' },
     type: 'records',
     short: 'Sent to',
     title: 'Who I share my plan with',
@@ -211,6 +220,7 @@ export const STEPS_ADO_EN = [
   },
   {
     id: 'signature',
+    easy: { q: 'Where and when we sign. Who signs and their role.', tip: 'We read the plan together before signing.' },
     type: 'final',
     short: 'Date and signatures',
     title: 'Place, date and signatures',

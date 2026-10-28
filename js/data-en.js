@@ -36,6 +36,7 @@ export const PROCESS_ADULTE_EN = [
 export const STEPS_ADULTE_EN = [
   {
     id: 'coordonnees',
+    easy: { q: 'Who am I? I write my last name, first name, date of birth, phone and address.', tip: 'This shows the plan is mine. It stays on my phone.' },
     type: 'identity',
     short: 'My details',
     title: 'My details',
@@ -44,6 +45,7 @@ export const STEPS_ADULTE_EN = [
   },
   {
     id: 'partenaires',
+    easy: { q: 'Who do I make my plan with? I write their names and their roles.', tip: 'I need at least one professional who supports me. I can also choose someone close to me. It is my choice.' },
     type: 'records',
     short: 'Partners',
     title: 'Who I develop it with',
@@ -64,6 +66,7 @@ export const STEPS_ADULTE_EN = [
   },
   {
     id: 'difficultes',
+    easy: { q: 'Why do I get care? I write my difficulties.', tip: 'I use my own words. I only write what I want to say.' },
     type: 'list',
     short: 'My difficulties',
     title: 'What I receive treatment for',
@@ -84,6 +87,7 @@ export const STEPS_ADULTE_EN = [
   },
   {
     id: 'declencheurs',
+    easy: { q: 'What can make me become very unwell?', tip: 'I think about the last times I was unwell. What happened before?' },
     type: 'list',
     short: 'Triggers',
     title: 'What can trigger a crisis',
@@ -100,6 +104,7 @@ export const STEPS_ADULTE_EN = [
   },
   {
     id: 'enCrise',
+    easy: { q: 'What am I like when I am very unwell? What I think. What I feel. What happens in my body. What I do.', tip: 'I write precise things. For example: “I stop answering my phone”.' },
     type: 'list',
     short: 'When I am in crisis',
     title: 'What I am like in a crisis',
@@ -128,6 +133,7 @@ export const STEPS_ADULTE_EN = [
   },
   {
     id: 'signesEntourage',
+    easy: { q: 'What do the people close to me notice when I am unwell?', tip: 'I can ask them: “What do you notice first when I start to feel worse?”' },
     type: 'list',
     short: 'What others notice',
     title: 'What the people around me notice',
@@ -141,6 +147,7 @@ export const STEPS_ADULTE_EN = [
   },
   {
     id: 'strategies',
+    easy: { q: 'What helps me when I am unwell? First, what I do on my own. Then with people close to me. Then with professionals.', tip: 'I put what I do first at the top. I can use the arrows to change the order.' },
     type: 'list',
     ordered: true,
     short: 'What I can do',
@@ -169,6 +176,7 @@ export const STEPS_ADULTE_EN = [
   },
   {
     id: 'aide',
+    easy: { q: 'Who can I ask for help? I write their name, who they are to me, and their phone number. First people close to me. Then professionals. Then crisis services.', tip: 'I ask each person if they agree. I write a number that answers.' },
     type: 'records',
     ordered: true,
     contacts: { name: 'nom', tel: 'tel' },
@@ -194,6 +202,7 @@ export const STEPS_ADULTE_EN = [
   },
   {
     id: 'soinsSouhaites',
+    easy: { q: 'When I am very unwell, what care do I want?', tip: 'I think about what helped me before. It can be a specific medicine.' },
     type: 'list',
     short: 'Care I want',
     title: 'The care I want to receive',
@@ -209,6 +218,7 @@ export const STEPS_ADULTE_EN = [
   },
   {
     id: 'soinsEvites',
+    easy: { q: 'What care do I not want? I explain why.', tip: 'For each one, I say why I don’t want it. For example: an effect I had before.' },
     type: 'records',
     short: 'Care to avoid',
     title: 'The care I want to avoid',
@@ -229,6 +239,7 @@ export const STEPS_ADULTE_EN = [
   },
   {
     id: 'alternatives',
+    easy: { q: 'If I don’t want some care, what can be done instead?', tip: 'This is important. For each care I don’t want, I suggest another solution.' },
     type: 'list',
     short: 'Alternatives',
     title: 'The alternatives I suggest',
@@ -244,6 +255,7 @@ export const STEPS_ADULTE_EN = [
   },
   {
     id: 'demarches',
+    easy: { q: 'If I am very unwell, who can look after my things? For example: post, children, pets, home, work. I write who does what and how to reach them.', tip: 'I choose one person for each thing. I check they agree.' },
     type: 'records',
     short: 'Practical arrangements',
     title: 'Protecting my interests and my daily life',
@@ -266,6 +278,7 @@ export const STEPS_ADULTE_EN = [
   },
   {
     id: 'transmis',
+    easy: { q: 'Who do I give my plan to? I write the place or name, and who they are to me.', tip: 'My plan belongs to me. I give it to the people named in the plan.' },
     type: 'records',
     short: 'Sent to',
     title: 'Who I share my plan with',
@@ -285,6 +298,7 @@ export const STEPS_ADULTE_EN = [
   },
   {
     id: 'signature',
+    easy: { q: 'Where and when we sign. Who signs and their role.', tip: 'We read the plan together before signing. We can sign with a finger on the phone.' },
     type: 'final',
     short: 'Date and signatures',
     title: 'Place, date and signatures',

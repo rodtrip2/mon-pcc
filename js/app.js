@@ -341,8 +341,11 @@ function renderStep(i) {
       <div class="bar" aria-hidden="true"><span style="width:${pct}%"></span></div>
     </div>
     <h1>${esc(step.title)}</h1>
-    <blockquote class="question"><span class="q-label">${qLabel}</span>${esc(step.question)}${speakBtnHTML()}</blockquote>
-    <details class="tip"><summary>${tr('Conseil', 'Tip')}</summary><p>${esc(step.tip)}</p></details>
+    ${easyOn() && step.easy
+      ? `<blockquote class="question q-easy"><span class="q-label">${tr('En facile à lire', 'Easy read')}</span>${esc(step.easy.q)}${speakBtnHTML()}</blockquote>
+    <details class="official"><summary>${qLabel}</summary><p>${esc(step.question)}</p></details>`
+      : `<blockquote class="question"><span class="q-label">${qLabel}</span>${esc(step.question)}${speakBtnHTML()}</blockquote>`}
+    <details class="tip"><summary>${tr('Conseil', 'Tip')}</summary><p>${esc(easyOn() && step.easy ? step.easy.tip : step.tip)}</p></details>
     ${talkNoteHTML(step)}
     ${warn}
     <div class="step-body" data-step="${i}">${body}</div>
@@ -1891,21 +1894,31 @@ function revealSpeak() {
 
 async function voiceSectionHTML() {
   const mode = dictationPref();
-  const st = localCheckSupported() ? await localStatus() : 'unknown';
-  const localTxt = {
+  // La disponibilité n'est vérifiée qu'à la demande (certains navigateurs sans service de voix plantent sinon)
+  const st = localCheckSupported() ? 'check' : 'unknown';
+  const localTxt = localStatusText(st);
+  return voiceHTML(mode, localTxt);
+}
+
+function localStatusText(st) {
+  return {
+    check: `<button type="button" class="link small" data-act="dict-check">${tr('Vérifier si c’est disponible sur ce téléphone', 'Check whether it is available on this phone')}</button>`,
     available: tr('✓ Disponible sur ce téléphone.', '✓ Available on this phone.'),
     downloadable: tr('Disponible après un téléchargement unique de la langue (fait au premier usage).', 'Available after a one-time language download (done on first use).'),
     downloading: tr('Téléchargement de la langue en cours…', 'Language download in progress…'),
     unavailable: tr('Non disponible dans ce navigateur pour cette langue.', 'Not available in this browser for this language.'),
     unknown: tr('Ce navigateur ne permet pas la dictée sur l’appareil (essayer une version récente de Chrome).', 'This browser does not support on-device dictation (try a recent version of Chrome).'),
   }[st] || '';
+}
+
+function voiceHTML(mode, localTxt) {
   return `<section class="card" id="voix">
       <h2>🔊 ${tr('Voix', 'Voice')}</h2>
       <p class="small"><strong>${tr('Lecture à voix haute', 'Read aloud')}</strong> — ${ttsAvailable() ? tr('le bouton 🔊 lit chaque question avec une voix installée sur ce téléphone : aucun texte n’est envoyé.', 'the 🔊 button reads each question with a voice installed on this phone: no text is sent.') : tr('aucune voix n’est installée sur ce téléphone pour cette langue : le bouton 🔊 n’apparaît pas (Mon PCC n’utilise jamais de voix en ligne).', 'no voice is installed on this phone for this language: the 🔊 button does not appear (Mon PCC never uses online voices).')}</p>
       <fieldset class="choice"><legend class="small"><strong>${tr('Dictée vocale', 'Voice dictation')}</strong> ${tr('(désactivée par défaut)', '(off by default)')}</legend>
         ${!dictationSupported() ? `<p class="muted small">${tr('Ce navigateur ne propose pas la dictée.', 'This browser does not offer dictation.')}</p>` : `
         <label class="radio"><input type="radio" name="dict" value="off" data-act="dictation" ${mode === 'off' ? 'checked' : ''}> <span>${tr('Désactivée', 'Off')}</span></label>
-        <label class="radio"><input type="radio" name="dict" value="local" data-act="dictation" ${mode === 'local' ? 'checked' : ''}> <span><strong>${tr('Sur ce téléphone uniquement', 'On this phone only')}</strong> ${tr('(recommandé)', '(recommended)')}<br><span class="muted small">${tr('Ma voix est transformée en texte sur le téléphone, sans être envoyée.', 'My voice is turned into text on the phone, without being sent.')} ${localTxt}</span></span></label>
+        <label class="radio"><input type="radio" name="dict" value="local" data-act="dictation" ${mode === 'local' ? 'checked' : ''}> <span><strong>${tr('Sur ce téléphone uniquement', 'On this phone only')}</strong> ${tr('(recommandé)', '(recommended)')}<br><span class="muted small">${tr('Ma voix est transformée en texte sur le téléphone, sans être envoyée.', 'My voice is turned into text on the phone, without being sent.')} <span id="dict-local">${localTxt}</span></span></span></label>
         <label class="radio"><input type="radio" name="dict" value="online" data-act="dictation" ${mode === 'online' ? 'checked' : ''}> <span><strong>${tr('Autoriser la dictée en ligne', 'Allow online dictation')}</strong><br><span class="muted small">${tr('⚠ Ma voix est envoyée aux serveurs de l’éditeur du navigateur.', '⚠ My voice is sent to the browser maker’s servers.')}</span></span></label>`}
       </fieldset>
     </section>`;
@@ -1954,6 +1967,8 @@ function talkNoteHTML(step) {
 }
 
 const TEXT_KEY = 'monpcc.text';
+const EASY_KEY = 'monpcc.easy';
+const easyOn = () => { try { return localStorage.getItem(EASY_KEY) === '1'; } catch { return false; } };
 const textSize = () => { try { return localStorage.getItem(TEXT_KEY) || 'm'; } catch { return 'm'; } };
 function applyTextSize(v = textSize()) {
   document.documentElement.dataset.text = v;
@@ -2246,7 +2261,10 @@ function renderSettings() {
     ${localeSectionHTML()}
     <div id="voice-slot"></div>
     <section class="card" id="affichage">
-      <h2>🔠 ${tr('Taille du texte', 'Text size')}</h2>
+      <h2>🔠 ${tr('Lecture', 'Reading')}</h2>
+      <label class="check"><input type="checkbox" data-act="easy" ${easyOn() ? 'checked' : ''}> <strong>${tr('Questions en « facile à lire et à comprendre » (FALC)', 'Easy-read questions')}</strong></label>
+      <p class="muted small">${tr('Des phrases courtes et des mots simples. La question officielle du PCC reste visible en dessous, et c’est elle qui figure dans le plan imprimé.', 'Short sentences and simple words. The official JCP question stays visible below, and it is the one used in the printed plan.')}</p>
+      <p class="small"><strong>${tr('Taille du texte', 'Text size')}</strong></p>
       <div class="choice">${[['m', tr('Normale', 'Normal')], ['l', tr('Grande', 'Large')], ['xl', tr('Très grande', 'Extra large')]].map(([v, l]) => `<label class="radio"><input type="radio" name="text" value="${v}" data-act="text-size" ${textSize() === v ? 'checked' : ''}> <span>${l}</span></label>`).join('')}</div>
     </section>
     <section class="card" id="version">
@@ -3021,10 +3039,16 @@ document.addEventListener('click', async (e) => {
     case 'pdf-save': pdfSave(); break;
     case 'review-ics': reviewIcs(); break;
     case 'dictate': await runDictation(btn); break;
+    case 'dict-check': {
+      e.preventDefault();
+      const box = $('#dict-local');
+      if (box) box.innerHTML = localStatusText(await localStatus());
+      break;
+    }
     case 'speak': {
       const q = btn.closest('.question');
       const step = STEPS[parseInt(location.hash.split('/')[2], 10) || 0];
-      if (q && step) speak(`${step.title}. ${step.question}`, btn);
+      if (q && step) speak(`${step.title}. ${easyOn() && step.easy ? step.easy.q : step.question}`, btn);
       break;
     }
     case 'text-big': {
@@ -3216,6 +3240,11 @@ document.addEventListener('change', async (e) => {
     if (v === 'online' && !(await confirmOnlineDictation())) { rerender(renderSettings); return; }
     setDictationPref(v);
     toast(v === 'off' ? tr('Dictée désactivée.', 'Dictation off.') : v === 'local' ? tr('Dictée sur le téléphone activée : un bouton 🎙 apparaît dans les champs de texte.', 'On-device dictation on: a 🎙 button appears in text fields.') : tr('Dictée en ligne autorisée.', 'Online dictation allowed.'));
+    return;
+  }
+  if (act === 'easy') {
+    try { if (e.target.checked) localStorage.setItem(EASY_KEY, '1'); else localStorage.removeItem(EASY_KEY); } catch { /* ignoré */ }
+    toast(e.target.checked ? tr('Questions en facile à lire activées.', 'Easy-read questions on.') : tr('Questions officielles.', 'Official questions.'));
     return;
   }
   if (act === 'text-size') {
