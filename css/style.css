@@ -542,3 +542,6 @@ html[data-text="xl"] .save-state { display: none; }
 .official { margin: -.4rem 0 .8rem; font-size: .9rem; color: var(--muted); }
 .official summary { cursor: pointer; }
 .official p { margin: .3rem 0 0; }
+#voix { margin-top: 1rem; padding-top: .8rem; border-top: 1px solid var(--line); }
+#accessibilite .check input[type="checkbox"] { width: 22px; height: 22px; flex: none; }
+#dict-local .link { text-align: left; display: inline; padding: 0; }

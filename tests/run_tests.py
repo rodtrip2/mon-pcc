@@ -107,6 +107,19 @@ def english_version(ctx, page, errors):
 
 
 @test
+def accessibility_off_by_default(ctx, page, errors):
+    page.goto(BASE)
+    page.click('[data-act=start][data-v=adulte]')
+    page.goto(BASE + '#/etape/6')
+    assert page.locator('.tts-btn, .mic-btn, .q-easy').count() == 0, 'options d’accessibilité visibles par défaut'
+    assert page.evaluate('document.documentElement.dataset.text') == 'm'
+    page.goto(BASE + '#/reglages')
+    page.check('[data-act=easy]')
+    page.goto(BASE + '#/etape/6')
+    assert page.locator('.q-easy').count() == 1
+
+
+@test
 def teen_version(ctx, page, errors):
     page.goto(BASE)
     page.click('[data-act=start][data-v=ado]')

@@ -1881,6 +1881,7 @@ function renderPros() {
 /* ---------- voix : lecture à voix haute et dictée ---------- */
 
 function speakBtnHTML() {
+  if (!ttsOn()) return '';
   return `<button type="button" class="icon tts-btn" data-act="speak" aria-pressed="false" aria-label="${tr('Lire à voix haute', 'Read aloud')}" title="${tr('Lire à voix haute', 'Read aloud')}" hidden>🔊</button>`;
 }
 function micBtnHTML(target, cls = '') {
@@ -1912,16 +1913,16 @@ function localStatusText(st) {
 }
 
 function voiceHTML(mode, localTxt) {
-  return `<section class="card" id="voix">
-      <h2>🔊 ${tr('Voix', 'Voice')}</h2>
-      <p class="small"><strong>${tr('Lecture à voix haute', 'Read aloud')}</strong> — ${ttsAvailable() ? tr('le bouton 🔊 lit chaque question avec une voix installée sur ce téléphone : aucun texte n’est envoyé.', 'the 🔊 button reads each question with a voice installed on this phone: no text is sent.') : tr('aucune voix n’est installée sur ce téléphone pour cette langue : le bouton 🔊 n’apparaît pas (Mon PCC n’utilise jamais de voix en ligne).', 'no voice is installed on this phone for this language: the 🔊 button does not appear (Mon PCC never uses online voices).')}</p>
+  return `<div id="voix">
+      <label class="check"><input type="checkbox" data-act="tts" ${ttsOn() ? 'checked' : ''}> <strong>${tr('Lecture à voix haute des questions', 'Read questions aloud')}</strong></label>
+      <p class="muted small">${ttsAvailable() ? tr('Un bouton 🔊 lit chaque question avec une voix installée sur ce téléphone : aucun texte n’est envoyé.', 'A 🔊 button reads each question with a voice installed on this phone: no text is sent.') : tr('Aucune voix n’est installée sur ce téléphone pour cette langue : le bouton 🔊 n’apparaîtra pas (Mon PCC n’utilise jamais de voix en ligne).', 'No voice is installed on this phone for this language: the 🔊 button will not appear (Mon PCC never uses online voices).')}</p>
       <fieldset class="choice"><legend class="small"><strong>${tr('Dictée vocale', 'Voice dictation')}</strong> ${tr('(désactivée par défaut)', '(off by default)')}</legend>
         ${!dictationSupported() ? `<p class="muted small">${tr('Ce navigateur ne propose pas la dictée.', 'This browser does not offer dictation.')}</p>` : `
         <label class="radio"><input type="radio" name="dict" value="off" data-act="dictation" ${mode === 'off' ? 'checked' : ''}> <span>${tr('Désactivée', 'Off')}</span></label>
         <label class="radio"><input type="radio" name="dict" value="local" data-act="dictation" ${mode === 'local' ? 'checked' : ''}> <span><strong>${tr('Sur ce téléphone uniquement', 'On this phone only')}</strong> ${tr('(recommandé)', '(recommended)')}<br><span class="muted small">${tr('Ma voix est transformée en texte sur le téléphone, sans être envoyée.', 'My voice is turned into text on the phone, without being sent.')} <span id="dict-local">${localTxt}</span></span></span></label>
         <label class="radio"><input type="radio" name="dict" value="online" data-act="dictation" ${mode === 'online' ? 'checked' : ''}> <span><strong>${tr('Autoriser la dictée en ligne', 'Allow online dictation')}</strong><br><span class="muted small">${tr('⚠ Ma voix est envoyée aux serveurs de l’éditeur du navigateur.', '⚠ My voice is sent to the browser maker’s servers.')}</span></span></label>`}
       </fieldset>
-    </section>`;
+    </div>`;
 }
 
 async function confirmOnlineDictation() {
@@ -1968,6 +1969,8 @@ function talkNoteHTML(step) {
 
 const TEXT_KEY = 'monpcc.text';
 const EASY_KEY = 'monpcc.easy';
+const TTS_KEY = 'monpcc.tts';
+const ttsOn = () => { try { return localStorage.getItem(TTS_KEY) === '1'; } catch { return false; } };
 const easyOn = () => { try { return localStorage.getItem(EASY_KEY) === '1'; } catch { return false; } };
 const textSize = () => { try { return localStorage.getItem(TEXT_KEY) || 'm'; } catch { return 'm'; } };
 function applyTextSize(v = textSize()) {
@@ -1993,7 +1996,7 @@ function renderTalk() {
         <a class="btn btn-secondary" href="#/plan">📄 ${tr('Relire mon plan', 'Read my plan')}</a>
         ${(plan.data.versions || []).length ? `<a class="btn btn-secondary" href="#/versions">🔄 ${tr('Ce qui a changé depuis la dernière signature', 'What has changed since the last signature')}</a>` : ''}
       </div>
-      <p class="muted small">${tr('La taille du texte se règle aussi dans les Réglages.', 'Text size can also be set in Settings.')}</p>
+      <p class="muted small">${tr('La taille du texte se règle aussi dans Réglages › Accessibilité.', 'Text size can also be set in Settings › Accessibility.')}</p>
     </section>`;
 }
 
@@ -2259,13 +2262,14 @@ function renderSettings() {
   app.innerHTML = `
     <h1>${tr('Réglages', 'Settings')}</h1>
     ${localeSectionHTML()}
-    <div id="voice-slot"></div>
-    <section class="card" id="affichage">
-      <h2>🔠 ${tr('Lecture', 'Reading')}</h2>
+    <section class="card" id="accessibilite">
+      <h2>♿ ${tr('Accessibilité', 'Accessibility')}</h2>
+      <p class="muted small">${tr('Options désactivées par défaut, à activer selon mes besoins.', 'Options are off by default; I turn on the ones I need.')}</p>
       <label class="check"><input type="checkbox" data-act="easy" ${easyOn() ? 'checked' : ''}> <strong>${tr('Questions en « facile à lire et à comprendre » (FALC)', 'Easy-read questions')}</strong></label>
       <p class="muted small">${tr('Des phrases courtes et des mots simples. La question officielle du PCC reste visible en dessous, et c’est elle qui figure dans le plan imprimé.', 'Short sentences and simple words. The official JCP question stays visible below, and it is the one used in the printed plan.')}</p>
       <p class="small"><strong>${tr('Taille du texte', 'Text size')}</strong></p>
       <div class="choice">${[['m', tr('Normale', 'Normal')], ['l', tr('Grande', 'Large')], ['xl', tr('Très grande', 'Extra large')]].map(([v, l]) => `<label class="radio"><input type="radio" name="text" value="${v}" data-act="text-size" ${textSize() === v ? 'checked' : ''}> <span>${l}</span></label>`).join('')}</div>
+      <div id="voice-slot"></div>
     </section>
     <section class="card" id="version">
       <h2>${tr('Version du plan', 'Plan version')}</h2>
@@ -3240,6 +3244,12 @@ document.addEventListener('change', async (e) => {
     if (v === 'online' && !(await confirmOnlineDictation())) { rerender(renderSettings); return; }
     setDictationPref(v);
     toast(v === 'off' ? tr('Dictée désactivée.', 'Dictation off.') : v === 'local' ? tr('Dictée sur le téléphone activée : un bouton 🎙 apparaît dans les champs de texte.', 'On-device dictation on: a 🎙 button appears in text fields.') : tr('Dictée en ligne autorisée.', 'Online dictation allowed.'));
+    return;
+  }
+  if (act === 'tts') {
+    try { if (e.target.checked) localStorage.setItem(TTS_KEY, '1'); else localStorage.removeItem(TTS_KEY); } catch { /* ignoré */ }
+    if (!e.target.checked) stopSpeaking();
+    toast(e.target.checked ? tr('Lecture à voix haute activée : bouton 🔊 sur chaque question.', 'Read aloud on: 🔊 button on each question.') : tr('Lecture à voix haute désactivée.', 'Read aloud off.'));
     return;
   }
   if (act === 'easy') {
