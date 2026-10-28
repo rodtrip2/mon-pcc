@@ -177,7 +177,7 @@ const STEPS_ADULTE = [
       ] },
       { id: 'pros', label: '3. Avec l’intervention de professionnel·les', suggestions: [
         'J’appelle mon infirmier·ère référent·e', 'Je demande un rendez-vous rapide avec mon psychiatre',
-        'Je contacte mon médecin traitant', 'Je me rends au centre médico-psychologique (CMP)',
+        'Je contacte mon médecin traitant', '@cmpAct',
         'J’appelle une ligne d’écoute', 'Je demande une hospitalisation de courte durée',
         'Je me rends aux urgences',
       ] },
@@ -204,7 +204,7 @@ const STEPS_ADULTE = [
         'Parent', 'Frère ou sœur', 'Conjoint·e', 'Ami·e', 'Voisin·e', 'Personne de confiance',
       ] },
       { id: 'pros', label: '2. Mes professionnel·les habituel·les', contacts: true, suggestField: 'lien', suggestions: [
-        'Infirmier·ère référent·e', 'Psychiatre', 'Médecin traitant', 'Psychologue', 'CMP de mon secteur', 'Pair-aidant·e',
+        'Infirmier·ère référent·e', 'Psychiatre', 'Médecin traitant', 'Psychologue', '@cmpRole', 'Pair-aidant·e',
       ] },
       // Exemples tirés du pays choisi dans les Réglages (resources.js)
       { id: 'garde', label: '3. Services et institutions de garde', countrySuggestions: true, suggestions: [] },
@@ -295,7 +295,7 @@ const STEPS_ADULTE = [
     question: 'Mon plan de crise conjoint a été transmis à : (lieu ou nom, nature du lien)',
     tip: 'Le document m’appartient. Je le transmets aux personnes citées dans le plan et je le range dans un endroit facile à trouver.',
     fields: [
-      { key: 'nom', label: 'Lieu ou nom', placeholder: 'Ex. : CMP de mon secteur' },
+      { key: 'nom', label: 'Lieu ou nom', placeholder: 'Ex. : @cmpRole' },
       { key: 'lien', label: 'Nature du lien', placeholder: 'Ex. : équipe qui me suit' },
     ],
     suggestField: 'nom',

@@ -10,7 +10,7 @@ import {
 } from './export.js';
 import { buildPlanPdf } from './planpdf.js';
 import { buildSummaryPdf } from './summary.js';
-import { COUNTRIES, countryData } from './resources.js';
+import { COUNTRIES, countryData, localExample } from './resources.js';
 import { parseEmbed, fetchTitle } from './embed.js';
 import { exercises, exerciseById, exerciseUrl, offlineStatus, prepareOffline } from './exercises.js';
 import { renderCrisisCard, toJpeg, crisisCardPdf } from './crisiscard.js';
@@ -152,8 +152,12 @@ const groupsOf = (step) => step.groups || [{
 }];
 
 /** Exemples d'un groupe ; services de garde : ceux du pays choisi */
+/** Exemples adaptés au pays : « @clé » → valeur du pays (resources.js) */
+const loc = (x) => localExample(COUNTRY, x);
+const locPh = (x) => (x || '').replace(/@\w+/, (m) => loc(m) || '');
+
 function groupSuggestions(g) {
-  if (!g.countrySuggestions) return g.suggestions || [];
+  if (!g.countrySuggestions) return (g.suggestions || []).map(loc).filter(Boolean);
   return country().garde.map((x) => ({ nom: L(x.nom), lien: L(x.lien), tel: x.tel }));
 }
 
@@ -430,8 +434,8 @@ function recordsGroupHTML(step, g) {
       <div class="record-fields">
         ${step.fields.map((f) => `<label class="field"><span>${esc(f.label)}</span>
           ${f.multiline
-            ? `<textarea rows="2" data-g="${g.id}" data-i="${idx}" data-f="${f.key}" data-fk="rf:${g.id}:${idx}:${f.key}" placeholder="${esc(f.placeholder || '')}">${esc(r[f.key] || '')}</textarea>`
-            : `<input type="${f.type === 'tel' ? 'text' : 'text'}" ${f.type === 'tel' ? 'inputmode="tel"' : ''} data-g="${g.id}" data-i="${idx}" data-f="${f.key}" data-fk="rf:${g.id}:${idx}:${f.key}" value="${esc(r[f.key] || '')}" placeholder="${esc(f.placeholder || '')}">`}
+            ? `<textarea rows="2" data-g="${g.id}" data-i="${idx}" data-f="${f.key}" data-fk="rf:${g.id}:${idx}:${f.key}" placeholder="${esc(locPh(f.placeholder))}">${esc(r[f.key] || '')}</textarea>`
+            : `<input type="${f.type === 'tel' ? 'text' : 'text'}" ${f.type === 'tel' ? 'inputmode="tel"' : ''} data-g="${g.id}" data-i="${idx}" data-f="${f.key}" data-fk="rf:${g.id}:${idx}:${f.key}" value="${esc(r[f.key] || '')}" placeholder="${esc(locPh(f.placeholder))}">`}
         </label>`).join('')}
         ${r.tel && /^[\d +().-]{2,}$/.test(r.tel) ? `<a class="call" href="tel:${esc(r.tel.replace(/[^\d+]/g, ''))}">${tr('Appeler', 'Call')} ${esc(r.tel)}</a>` : ''}
       </div>
@@ -476,7 +480,7 @@ function finalHTML(step) {
       </div>
       ${arr.length ? `<ol class="records">${arr.map((r, idx) => `
         <li class="record"><div class="record-fields">
-          ${step.fields.map((f) => `<label class="field"><span>${esc(f.label)}</span><input data-g="_" data-i="${idx}" data-f="${f.key}" data-fk="rf:_:${idx}:${f.key}" value="${esc(r[f.key] || '')}" placeholder="${esc(f.placeholder)}"></label>`).join('')}
+          ${step.fields.map((f) => `<label class="field"><span>${esc(f.label)}</span><input data-g="_" data-i="${idx}" data-f="${f.key}" data-fk="rf:_:${idx}:${f.key}" value="${esc(r[f.key] || '')}" placeholder="${esc(locPh(f.placeholder))}"></label>`).join('')}
           <div class="sig-area">
             ${r.sig
               ? `<img class="sig-img${sigValid(r, plan) ? '' : ' stale'}" src="${r.sig}" alt="${tr('Signature de', 'Signature of')} ${esc(r.nom || tr('ce·tte signataire', 'this signatory'))}"><p class="muted small">${tr('Signé le', 'Signed on')} ${esc(fmtDateTime(r.signedAt))}</p>

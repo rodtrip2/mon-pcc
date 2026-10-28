@@ -283,6 +283,27 @@ def review_reminder_with_chosen_date(ctx, page, errors):
     assert 'DTSTART;VALUE=DATE:20270315' in ics and 'SUMMARY:Relecture' in ics
 
 
+@test
+def examples_follow_country(ctx, page, errors):
+    def chips(country, version, step):
+        page.goto(BASE)
+        page.evaluate(f'localStorage.clear(); localStorage.setItem("monpcc.country", "{country}")')
+        page.reload()
+        page.click(f'[data-act=start][data-v={version}]')
+        page.goto(BASE + f'#/etape/{step}')
+        for b in page.locator('[data-act=examples]').all():
+            b.click()
+        return page.inner_text('main')
+    fr = chips('FR', 'adulte', 7)
+    assert 'CMP de mon secteur' in fr
+    be = chips('BE', 'adulte', 7)
+    assert 'CMP' not in be and 'Service de santé mentale (SSM) de ma région' in be
+    assert 'Je me rends au service de santé mentale (SSM)' in chips('BE', 'adulte', 6)
+    ado = chips('GB', 'ado', 6)
+    assert 'Childline (0800 1111)' in ado and 'Samaritans' in ado and '3114' not in ado and 'Maison des adolescents' not in ado
+    assert '@' not in chips('INT', 'ado', 6)
+
+
 def main():
     failed = 0
     with sync_playwright() as pw:

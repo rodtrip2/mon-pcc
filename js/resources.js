@@ -676,3 +676,63 @@ export const COUNTRIES = {
 
 /** Pays courant (repli : autre pays) */
 export const countryData = (code) => COUNTRIES[code] || COUNTRIES.INT;
+
+/*
+ * Exemples des étapes qui dépendent du pays (versions françaises du plan).
+ * Dans data.js et data-ado.js, un exemple écrit « @clé » est remplacé par
+ * la valeur du pays ; s'il n'y en a pas (null), l'exemple n'est pas proposé.
+ * Les numéros viennent des ressources vérifiées ci-dessus.
+ */
+const LOCAL_DEFAULT = {
+  cmpRole: 'Service de santé mentale de mon secteur',
+  cmpAct: 'Je contacte le service de santé mentale de mon secteur',
+  adoCmpRole: 'Professionnel·le du service de santé mentale',
+  adoCmpAct: 'Je contacte le service de santé mentale',
+  adoPlaceRole: null,
+  adoPlaceAct: null,
+  youthLineAct: null,
+  suicideLineAct: null,
+};
+const LOCAL = {
+  FR: {
+    cmpRole: 'CMP de mon secteur', cmpAct: 'Je me rends au centre médico-psychologique (CMP)',
+    adoCmpRole: 'Infirmier·ère du CMP', adoCmpAct: 'Je vais au CMP',
+    adoPlaceRole: 'Professionnel·le de la Maison des adolescents', adoPlaceAct: 'Je contacte la Maison des adolescents',
+    youthLineAct: 'J’appelle Fil Santé Jeunes (0 800 235 236)', suicideLineAct: 'J’appelle le 3114',
+  },
+  BE: {
+    cmpRole: 'Service de santé mentale (SSM) de ma région', cmpAct: 'Je me rends au service de santé mentale (SSM)',
+    adoCmpRole: 'Professionnel·le du service de santé mentale', adoCmpAct: 'Je vais au service de santé mentale',
+    youthLineAct: 'J’appelle Écoute-Enfants (103)', suicideLineAct: 'J’appelle le Centre de Prévention du Suicide (0800 32 123)',
+  },
+  CH: {
+    cmpRole: 'Consultation psychiatrique ambulatoire de ma région', cmpAct: 'Je me rends à la consultation psychiatrique ambulatoire',
+    adoCmpRole: 'Professionnel·le de la consultation de pédopsychiatrie', adoCmpAct: 'Je vais à la consultation de pédopsychiatrie',
+    youthLineAct: 'J’appelle le 147 (Pro Juventute)', suicideLineAct: 'J’appelle La Main Tendue (143)',
+  },
+  QC: {
+    cmpRole: 'CLSC de mon secteur', cmpAct: 'Je me rends à mon CLSC',
+    adoCmpRole: 'Intervenant·e du CLSC', adoCmpAct: 'Je vais au CLSC',
+    youthLineAct: 'J’appelle Tel-jeunes (1 800 263-2266)', suicideLineAct: 'J’appelle la ligne de prévention du suicide (1 866 277-3553)',
+  },
+  CA: { youthLineAct: 'J’appelle Jeunesse, J’écoute (1-800-668-6868)', suicideLineAct: 'J’appelle le 9-8-8' },
+  GB: {
+    adoCmpRole: 'Professionnel·le du CAMHS', adoCmpAct: 'Je contacte le CAMHS (santé mentale des jeunes)',
+    youthLineAct: 'J’appelle Childline (0800 1111)', suicideLineAct: 'J’appelle les Samaritans (116 123)',
+  },
+  IE: {
+    adoPlaceRole: 'Professionnel·le de Jigsaw', adoPlaceAct: 'Je contacte Jigsaw',
+    youthLineAct: 'J’appelle Childline (1800 66 66 66)', suicideLineAct: 'J’appelle Pieta (1800 247 247)',
+  },
+  US: { suicideLineAct: 'J’appelle le 988' },
+  AU: { youthLineAct: 'J’appelle Kids Helpline (1800 55 1800)', suicideLineAct: 'J’appelle Lifeline (13 11 14)' },
+  NZ: { youthLineAct: 'J’appelle Youthline (0800 376 633)', suicideLineAct: 'J’appelle ou j’écris au 1737' },
+};
+
+/** Remplace un exemple « @clé » par sa version du pays (null : exemple non proposé) */
+export function localExample(code, s) {
+  if (typeof s !== 'string' || s[0] !== '@') return s;
+  const k = s.slice(1);
+  const v = { ...LOCAL_DEFAULT, ...(LOCAL[code] || {}) }[k];
+  return v === undefined ? s : v;
+}

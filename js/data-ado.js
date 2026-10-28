@@ -69,8 +69,8 @@ export const STEPS_ADO = [
     suggestLabel: 'Ajouter une personne selon son rôle',
     suggestions: [
       ...ADULTES,
-      'Infirmier·ère scolaire', 'Pédopsychiatre ou psychiatre', 'Psychologue', 'Infirmier·ère du CMP',
-      'Médecin traitant', 'Professionnel·le de la Maison des adolescents', 'Pair-aidant·e',
+      'Infirmier·ère scolaire', 'Pédopsychiatre ou psychiatre', 'Psychologue', '@adoCmpRole',
+      'Médecin traitant', '@adoPlaceRole', 'Pair-aidant·e',
     ],
   },
   {
@@ -176,8 +176,8 @@ export const STEPS_ADO = [
       ] },
       { id: 'pros', label: 'L’aide de professionnel·les', suggestions: [
         'Je vais voir l’infirmier·ère scolaire', 'J’appelle mon ou ma psychologue ou mon pédopsychiatre',
-        'Je contacte la Maison des adolescents', 'Je vais au CMP', 'J’appelle Fil Santé Jeunes (0 800 235 236)',
-        'J’appelle le 3114', 'Je vais aux urgences',
+        '@adoPlaceAct', '@adoCmpAct', '@youthLineAct',
+        '@suicideLineAct', 'Je vais aux urgences',
       ] },
     ],
   },
