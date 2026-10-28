@@ -262,3 +262,63 @@ function jpegSize(b) {
   }
   return CARD_PX;
 }
+
+/* ---------- affiche A4 pour un service (salle d'attente, unité de soins) ---------- */
+
+/** Affiche A4 portrait (1240 × 1754 px, 150 dpi) avec QR code. */
+export function renderPoster(url, qr) {
+  const W = 1240; const H = 1754;
+  const canvas = document.createElement('canvas');
+  canvas.width = W; canvas.height = H;
+  const ctx = canvas.getContext('2d');
+  ctx.fillStyle = '#fff'; ctx.fillRect(0, 0, W, H);
+  ctx.fillStyle = BRAND; ctx.fillRect(0, 0, W, 300);
+  ctx.save(); ctx.fillStyle = '#fff'; roundRect(ctx, 90, 75, 150, 150, 36); ctx.fill(); ctx.restore();
+  ctx.strokeStyle = BRAND; ctx.lineWidth = 11;
+  ctx.beginPath(); ctx.arc(140, 150, 30, 0, Math.PI * 2); ctx.stroke();
+  ctx.beginPath(); ctx.arc(190, 150, 30, 0, Math.PI * 2); ctx.stroke();
+  ctx.fillStyle = '#fff';
+  fitText(ctx, 'Mon PCC', 290, 180, W - 380, 96, 700);
+  ctx.fillStyle = '#dff0ec';
+  fitText(ctx, tr('Mon plan de crise conjoint', 'My joint crisis plan'), 292, 245, W - 380, 44, 500);
+
+  const L = 100; const maxW = W - 2 * L;
+  ctx.fillStyle = '#1d2a2c';
+  ctx.font = `700 64px ${FONT}`;
+  let y = wrapText(ctx, tr('Et si on préparait ensemble ce qui m’aide en cas de crise ?', 'What if we prepared together what helps me in a crisis?'), L, 430, maxW, 78);
+  ctx.fillStyle = '#4b5a5c'; ctx.font = `400 38px ${FONT}`;
+  y = wrapText(ctx, tr('Le plan de crise conjoint décrit ce qui peut me mettre en crise, comment le repérer, ce qui m’aide, qui prévenir et les soins que je souhaite. Je le prépare avec mes mots, puis je le construis avec les professionnel·les qui m’accompagnent.', 'A joint crisis plan describes what can trigger a crisis, how to spot it, what helps me, who to contact and the care I want. I prepare it in my own words, then build it with the professionals who support me.'), L, y + 30, maxW, 52);
+  ctx.fillStyle = BRAND_DARK; ctx.font = `600 38px ${FONT}`;
+  for (const b of [tr('Gratuit, sans compte, sans publicité', 'Free, no account, no ads'), tr('Mes réponses restent sur mon téléphone', 'My answers stay on my phone'), tr('Version adulte et version ado', 'Adult and teen versions')]) {
+    y += 22; ctx.fillText('✓  ' + b, L, y + 40); y += 52;
+  }
+  // QR code
+  // QR code ancré en bas, au-dessus des mentions ; réduit si le texte est long
+  const box = Math.max(360, Math.min(560, H - 340 - (y + 60))); const bx = (W - box) / 2; const by = H - 330 - box;
+  ctx.save(); ctx.shadowColor = 'rgba(36, 82, 78, 0.18)'; ctx.shadowBlur = 30; ctx.shadowOffsetY = 8;
+  ctx.fillStyle = '#fff'; roundRect(ctx, bx, by, box, box, 36); ctx.fill(); ctx.restore();
+  ctx.strokeStyle = '#d9e6e3'; ctx.lineWidth = 3; roundRect(ctx, bx, by, box, box, 36); ctx.stroke();
+  const margin = 46; const cell = Math.floor((box - 2 * margin) / qr.size); const qp = cell * qr.size;
+  const qx = Math.round(bx + (box - qp) / 2); const qy = Math.round(by + (box - qp) / 2);
+  ctx.fillStyle = '#111';
+  for (let r = 0; r < qr.size; r++) for (let c = 0; c < qr.size; c++) if (qr.isDark(r, c)) ctx.fillRect(qx + c * cell, qy + r * cell, cell, cell);
+  ctx.textAlign = 'center';
+  ctx.fillStyle = '#374445'; fitText(ctx, tr('Scannez avec votre téléphone', 'Scan with your phone'), W / 2, by + box + 62, maxW, 40, 600);
+  ctx.fillStyle = '#1d2a2c'; fitText(ctx, displayUrl(url), W / 2, by + box + 118, maxW, 40, 700);
+  ctx.fillStyle = '#7a8687'; fitText(ctx, tr('Parlez-en à l’équipe qui vous accompagne.', 'Talk about it with the team that supports you.'), W / 2, H - 120, maxW, 34, 500);
+  fitText(ctx, tr('D’après le Plan de Crise Conjoint — plandecriseconjoint.ch (CC BY-NC-SA)', 'Based on the Joint Crisis Plan — plandecriseconjoint.ch (CC BY-NC-SA)'), W / 2, H - 65, maxW, 26, 400);
+  ctx.textAlign = 'left';
+  return canvas;
+}
+
+/** PDF A4 d'une page avec l'affiche en pleine page */
+export async function posterPdf(jpegBlob) {
+  const { PdfDoc, jpegSize } = await import('./pdf.js');
+  const bytes = new Uint8Array(await jpegBlob.arrayBuffer());
+  const { width, height } = jpegSize(bytes) || { width: 1240, height: 1754 };
+  const doc = new PdfDoc();
+  const p = doc.addPage();
+  const im = doc.addJpeg(bytes, width, height);
+  doc.image(p, im, 0, 0, doc.width, doc.height);
+  return doc.build({ title: tr('Mon PCC - affiche', 'Mon PCC - poster') });
+}

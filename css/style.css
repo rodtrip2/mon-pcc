@@ -531,3 +531,4 @@ html[data-text="xl"] { font-size: 132%; }
 .brand { white-space: nowrap; }
 html[data-text="l"] .save-state { font-size: .65rem; }
 html[data-text="xl"] .save-state { display: none; }
+.pro-steps li { margin: .5rem 0; line-height: 1.5; }

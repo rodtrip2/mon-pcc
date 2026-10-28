@@ -3,7 +3,7 @@ import { tr, L, LANG, COUNTRY, LANGS, COUNTRY_CODES, initLocale, setLangPref, se
 import { STEPS, PROCESS, SOURCE, VERSION, VERSIONS, setVersion, hiddenSteps } from './data.js';
 import * as store from './storage.js';
 import * as media from './media.js';
-import { appUrl, displayUrl, makeQr, qrSvg, renderCard, canvasToJpeg, buildSheetPdf } from './share.js';
+import { appUrl, displayUrl, makeQr, qrSvg, renderCard, canvasToJpeg, buildSheetPdf, renderPoster, posterPdf } from './share.js';
 import {
   esc, fmtDate, addMonths, stepIsFilled, stepContent, progress, documentHTML, planText,
   fileBaseName, sigValid, lastUpdate, fmtDateTime,
@@ -184,6 +184,7 @@ function route() {
     case 'crise': renderCrisis(); break;
     case 'versions': renderVersions(arg); break;
     case 'entretien': renderTalk(); break;
+    case 'professionnels': renderPros(); break;
     case 'apropos': renderAbout(); break;
     case 'confidentialite': renderPrivacy(); break;
     default: renderHome();
@@ -1828,6 +1829,47 @@ async function reviewIcs() {
   toast(tr('Fichier d’agenda téléchargé : je l’ouvre pour ajouter le rappel.', 'Calendar file downloaded: I open it to add the reminder.'));
 }
 
+/* ---------- page pour les professionnel·les ---------- */
+
+function renderPros() {
+  const elearn = 'https://plandecriseconjoint.ch/se-former-au-pcc/';
+  app.innerHTML = `
+    <h1>🩺 ${tr('Pour les professionnel·les', 'For professionals')}</h1>
+    <p class="lead">${tr('Mon PCC aide la personne à préparer son plan de crise conjoint. Le plan, lui, se construit avec vous : voici comment l’accompagner.', 'Mon PCC helps people prepare their joint crisis plan. The plan itself is built with you: here is how to support it.')}</p>
+    <section class="card">
+      <h2>${tr('Le plan de crise conjoint en bref', 'The joint crisis plan in brief')}</h2>
+      <p>${tr('Le PCC est une forme de déclaration anticipée en santé mentale, élaborée par <strong>décision partagée</strong> entre la personne, au moins un·e professionnel·le de son réseau et, si elle le souhaite, ses proches. Contrairement à des directives anticipées rédigées seul·e, chacun·e y définit son rôle avant la crise.', 'A joint crisis plan is a form of advance statement in mental health, developed through <strong>shared decision-making</strong> between the person, at least one professional from their network and, if they wish, the people close to them. Unlike advance directives written alone, everyone defines their role before a crisis.')}</p>
+      <p>${tr('Ce que disent les études : des travaux pionniers (Henderson et al., <em>BMJ</em>, 2004) suggéraient moins d’hospitalisations sous contrainte. Un essai plus large (Thornicroft et al., <em>Lancet</em>, 2013) n’a pas retrouvé cette différence, mais une meilleure relation thérapeutique perçue ; ses auteurs et commentateurs pointent surtout la <strong>mise en œuvre</strong> : équipes peu impliquées, plans pas toujours consultés ni respectés lors des crises suivantes. L’adhésion de l’équipe fait la différence.', 'What the studies say: early work (Henderson et al., <em>BMJ</em>, 2004) suggested fewer compulsory admissions. A larger trial (Thornicroft et al., <em>Lancet</em>, 2013) did not find this difference, but did find a better perceived therapeutic relationship; its authors and commentators mainly point to <strong>implementation</strong>: teams not fully involved, plans not always consulted or followed in later crises. Team commitment makes the difference.')}</p>
+    </section>
+    <section class="card">
+      <h2>${tr('Accompagner la démarche', 'Supporting the process')}</h2>
+      <ol class="pro-steps">
+        <li><strong>${tr('Proposer', 'Offer')}</strong> — ${tr('à distance d’une crise, comme une démarche volontaire. Montrer Mon PCC (QR code ou affiche ci-dessous) ; la version ado existe pour les adolescent·es.', 'away from a crisis, as a voluntary process. Show Mon PCC (QR code or poster below); there is a teen version for adolescents.')}</li>
+        <li><strong>${tr('Laisser la personne préparer', 'Let the person prepare')}</strong> — ${tr('seule, avec ses mots. Les exemples ne s’affichent que sur demande, pour ne pas induire les réponses. Elle peut noter des points « à aborder avec mon soignant ».', 'on their own, in their own words. Examples only appear on request, so as not to lead the answers. They can note points “to discuss with my professional”.')}</li>
+        <li><strong>${tr('Construire ensemble', 'Build it together')}</strong> — ${tr('relire chaque rubrique. Sur les soins à éviter, chercher une alternative réaliste. Dire clairement ce que l’équipe peut s’engager à respecter, et ce qui ne sera pas possible, et pourquoi.', 'read through each section. For care to avoid, look for a realistic alternative. Say clearly what the team can commit to, what will not be possible, and why.')}</li>
+        <li><strong>${tr('Signer et diffuser', 'Sign and share')}</strong> — ${tr('chaque partenaire indique son rôle et signe. Le plan est ajouté au dossier, avec la synthèse d’une page pour les urgences. La personne choisit qui le reçoit.', 'each partner gives their role and signs. The plan is added to the records, with the one-page summary for emergencies. The person chooses who receives it.')}</li>
+        <li><strong>${tr('Le faire vivre', 'Keep it alive')}</strong> — ${tr('le consulter lors des crises, le relire après chaque crise et au moins tous les six mois. Mon PCC montre ce qui a changé depuis la dernière signature.', 'consult it during crises, review it after each crisis and at least every six months. Mon PCC shows what has changed since the last signature.')}</li>
+      </ol>
+    </section>
+    <section class="card">
+      <h2>${tr('Confidentialité', 'Privacy')}</h2>
+      <p>${tr('Mon PCC ne collecte aucune donnée : le plan reste sur le téléphone de la personne, qui décide de l’envoyer, à qui et comment (PDF protégeable par code, synthèse d’une page, dossier de santé). Aucun compte n’est nécessaire, ni pour elle ni pour vous.', 'Mon PCC collects no data: the plan stays on the person’s phone, and they decide whether to send it, to whom and how (code-protected PDF, one-page summary, health record). No account is needed, for them or for you.')}</p>
+    </section>
+    <section class="card">
+      <h2>${tr('Faire connaître Mon PCC', 'Spreading the word')}</h2>
+      <div class="stack">
+        <button type="button" class="btn btn-primary" data-act="poster-download">🖨 ${tr('Affiche A4 avec QR code (PDF)', 'A4 poster with QR code (PDF)')}</button>
+        <a class="btn btn-secondary" href="#/partager">📤 ${tr('Cartes, QR code et lien', 'Cards, QR code and link')}</a>
+      </div>
+    </section>
+    <section class="card">
+      <h2>${tr('Se former', 'Training')}</h2>
+      <p>${tr('Le site officiel du PCC propose un e-learning gratuit et des informations sur la formation pratique en présentiel, ainsi que les formulaires officiels.', 'The official JCP website offers free e-learning (in French) and information on in-person practical training, as well as the official forms.')}</p>
+      <a class="btn btn-secondary" href="${elearn}" target="_blank" rel="noopener">${tr('Se former au PCC ↗', 'JCP training ↗')}</a>
+      <p class="muted small">${tr('Mon PCC est un projet indépendant, non validé par les auteur·es du PCC. Une remarque, une idée ?', 'Mon PCC is an independent project, not reviewed by the authors of the JCP. A comment, an idea?')} <a href="https://github.com/rodtrip2/mon-pcc/issues" target="_blank" rel="noopener noreferrer">${tr('Écrire sur GitHub', 'Write on GitHub')}</a></p>
+    </section>`;
+}
+
 /* ---------- préparer l'entretien avec le soignant ---------- */
 
 /** Notes « à aborder avec mon soignant » d'une étape (jamais dans le plan imprimé ou envoyé) */
@@ -2486,13 +2528,14 @@ function renderChrome() {
       <button type="button" class="menu-link menu-btn-link" data-act="install-open" id="menu-install">📲 ${tr('Installer l’application', 'Install the app')}</button>
       <a class="menu-link" href="#/partager">📤 ${tr('Partager l’application', 'Share the app')}</a>
       <a class="menu-link" href="#/reglages">${tr('Réglages et sauvegarde', 'Settings and backup')}</a>
+      <a class="menu-link" href="#/professionnels">🩺 ${tr('Pour les professionnel·les', 'For professionals')}</a>
       <a class="menu-link" href="#/apropos">${tr('À propos et sources', 'About and sources')}</a>
       <a class="menu-link" href="#/confidentialite">${tr('Confidentialité', 'Privacy')}</a>
       <button type="button" class="menu-link menu-btn-link" data-act="lang-switch" data-l="${other}" lang="${other}">🌐 ${LANGS[other]}</button>`;
   const mb = $('#menu-btn .sr-only'); if (mb) mb.textContent = 'Menu';
   $('.footer').innerHTML = `
     <p>${tr('D’après le', 'Based on the')} <a href="https://plandecriseconjoint.ch/" target="_blank" rel="noopener">${tr('Plan de Crise Conjoint', 'Joint Crisis Plan')}</a> (Ferrari, Suter, Martino, 2026) © Haute École de la Santé La Source — <a href="${tr('https://creativecommons.org/licenses/by-nc-sa/4.0/deed.fr', 'https://creativecommons.org/licenses/by-nc-sa/4.0/deed.en')}" target="_blank" rel="noopener">CC BY-NC-SA</a>. ${tr('Projet indépendant, gratuit et non commercial.', 'Independent, free and non-commercial project.')}</p>
-    <p><a href="#/apropos">${tr('À propos', 'About')}</a> · <a href="#/confidentialite">${tr('Confidentialité', 'Privacy')}</a> · <a href="https://github.com/rodtrip2/mon-pcc" target="_blank" rel="noopener noreferrer">GitHub</a></p>`;
+    <p><a href="#/professionnels">${tr('Professionnel·les', 'Professionals')}</a> · <a href="#/apropos">${tr('À propos', 'About')}</a> · <a href="#/confidentialite">${tr('Confidentialité', 'Privacy')}</a> · <a href="https://github.com/rodtrip2/mon-pcc" target="_blank" rel="noopener noreferrer">GitHub</a></p>`;
   $('#exercise')?.setAttribute('aria-label', tr('Exercice', 'Exercise'));
   $('#qr-full')?.setAttribute('aria-label', tr('QR code de Mon PCC', 'Mon PCC QR code'));
   $('#sigpad')?.setAttribute('aria-label', 'Signature');
@@ -3043,6 +3086,13 @@ document.addEventListener('click', async (e) => {
       try { await navigator.share({ files: [f], title: 'Mon PCC', text: shareBlurb() + ' ' + c.url }); } catch (err) { if (err?.name !== 'AbortError') download(c.blob, cardFileName()); }
       break;
     }
+    case 'poster-download':
+      try {
+        const c = await prepareShare();
+        const jpg = await canvasToJpeg(renderPoster(c.url, c.qr), 0.9);
+        download(await posterPdf(jpg), tr('affiche-mon-pcc.pdf', 'mon-pcc-poster.pdf'));
+      } catch { toast(tr('Impossible de préparer l’affiche.', 'The poster cannot be prepared.')); }
+      break;
     case 'card-download': try { download((await prepareShare()).blob, cardFileName()); } catch { toast(tr('Impossible de préparer la carte.', 'The card cannot be prepared.')); } break;
     case 'sheet-download':
       try {
