@@ -36,6 +36,15 @@ def seed(page, data):
     page.reload()
 
 
+def wait_until(page, expr, timeout=5000):
+    """Attend qu'une expression soit vraie (wait_for_function est bloqué par la CSP stricte du site)."""
+    for _ in range(timeout // 100):
+        if page.evaluate(expr):
+            return
+        page.wait_for_timeout(100)
+    raise AssertionError('délai dépassé : ' + expr)
+
+
 def download(page, click):
     with page.expect_download() as dl:
         click()
@@ -167,7 +176,7 @@ def toolbox_dialogs(ctx, page, errors):
     page.click('[data-act=tb-quote-new]')
     page.fill('#tb-qtext', 'Une phrase qui m’aide')
     page.click('#modal button[value=ok]')
-    page.wait_for_function('document.querySelectorAll(".tbv-cell").length === 2', timeout=5000)
+    wait_until(page, 'document.querySelectorAll(".tbv-cell").length === 2')
 
 
 @test
@@ -195,7 +204,7 @@ def changes_between_two_signatures(ctx, page, errors):
     seed(page, {'version': 'adulte', 'difficultes': ['Angoisse'],
                 'signature': {'signataires': [{'nom': 'Léa', 'sig': 'data:image/png;base64,iVBORw0KGgo=',
                                                'signedAt': '2026-10-21T10:00:00.000Z'}]}})
-    page.wait_for_function('(JSON.parse(localStorage.getItem("monpcc.v1")).plan.data.versions || []).length === 1', timeout=5000)
+    wait_until(page, '(JSON.parse(localStorage.getItem("monpcc.v1")).plan.data.versions || []).length === 1')
     page.goto(BASE + '#/etape/2')
     page.fill('#free-_', 'Insomnie')
     page.click('form.free button')
