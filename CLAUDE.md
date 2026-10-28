@@ -27,7 +27,7 @@ Mon PCC est une application web installable (PWA), gratuite et sans serveur, qui
 
 - **Deux langues, français et anglais.** Tout texte affiché s'écrit `tr('français', 'English')` (`js/i18n.js`) ; les valeurs bilingues des données s'écrivent `{ fr, en }` et se lisent avec `L()`. Aucun texte d'interface en dur dans une seule langue.
 - Langue : celle du téléphone par défaut, changeable dans le menu et les Réglages, sans recharger. Les réponses de la personne ne sont **jamais traduites**.
-- Version adulte anglaise : questions **reprises mot pour mot** du formulaire officiel anglais (V5), même avec ses maladresses. Version ado anglaise : **traduction non officielle**, à signaler partout où la source est citée.
+- Version adulte anglaise : questions **reprises mot pour mot** du formulaire officiel anglais (V5). Version ado anglaise : **traduction non officielle**, à signaler partout où la source est citée.
 - **Pays** (réglage séparé de la langue, déduit du fuseau horaire) : il décide des numéros d'urgence, des ressources, des exemples « services de garde » (`countrySuggestions`) et de la page dossier de santé. Mon Espace Santé et la note pour les mineur·es ne concernent que la France.
 - Exemples en anglais : neutres, valables dans tous les pays anglophones (pas de service propre à un pays) ; orthographe britannique, sauf dans les questions officielles.
 - Toute nouvelle fonctionnalité est testée en français **et** en anglais. Avant de toucher au code, vérifier qu'en français l'affichage reste identique.
