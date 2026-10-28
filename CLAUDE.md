@@ -70,8 +70,15 @@ Mon PCC est une application web installable (PWA), gratuite et sans serveur, qui
 - Les données sont dans `js/resources.js`, par pays, avec leur date de vérification (`checked`). Ne garder que des services vérifiés sur une source officielle (exemple : PAPYRUS, au Royaume-Uni, a fermé en septembre 2026). **Revérifier numéros et horaires sur les sites officiels** avant toute modification, et mettre la date à jour.
 - La présentation actuelle des ressources est validée : ne pas la changer sans demande.
 
+## 6 bis. Fonctions sensibles
+
+- **Écran « Ça ne va pas » sans code** : uniquement si la personne l'active, plan protégé ; la copie lisible sans code (`monpcc.crisisSnap`) ne contient que stratégies, personnes à appeler, citations, liens et exercices. Ne jamais y ajouter d'autres données sans le dire dans l'avertissement.
+- **Notes « à aborder avec mon soignant »** : privées, jamais dans le plan imprimé ou envoyé, sans effet sur les signatures (`scheduleSave(false)`).
+- **Voix** : lecture à voix haute seulement avec une voix locale (`localService`). Dictée désactivée par défaut ; mode « sur ce téléphone » refusé si le navigateur ne peut pas garantir le traitement local ; mode en ligne seulement après l'avertissement. Ne pas appeler `SpeechRecognition.available()` automatiquement (plantage de certains navigateurs) : seulement à la demande.
+- **FALC** : la question officielle reste visible et c'est elle qui figure dans les documents.
+
 ## 7. Méthode de travail
 
-- Tester chaque changement dans un navigateur à la taille d'un téléphone (Playwright, 390 × 844), en version adulte **et** ado, sans erreur dans la console.
+- Tester chaque changement dans un navigateur à la taille d'un téléphone (Playwright, 390 × 844), en version adulte **et** ado, sans erreur dans la console. Lancer `tests/run_tests.py` (aussi exécuté par GitHub à chaque envoi) et y ajouter un test pour chaque nouvelle fonctionnalité.
 - Messages de commit en français. Pousser sur `main` : GitHub Pages publie depuis la racine de `main`.
 - Mettre à jour le README quand une fonctionnalité change, et **ce fichier quand une décision est prise**.

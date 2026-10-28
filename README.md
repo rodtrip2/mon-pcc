@@ -13,6 +13,13 @@ un·e professionnel·le qui l’accompagne et, si elle le souhaite, ses proches.
 - **Deux versions** : adulte (support PCC V6, 14 étapes) et **ado** (support PCC Ado V1 « phase test », 10 étapes : questions reformulées, rubrique « Qui informer ? Par qui ? Comment ? », sans les rubriques de soins). Choix au démarrage, changement possible à tout moment dans les Réglages : les réponses communes sont gardées, les rubriques propres à l’autre version masquées mais conservées. Exemples adaptés aux ados et à toutes les situations de vie (parents, famille d’accueil, foyer, ASE…).
 - **Français et anglais** : langue du téléphone par défaut, changeable dans le menu (🌐) et les Réglages, sans recharger ni perdre de réponses (les réponses ne sont pas traduites). Version adulte anglaise : questions du formulaire officiel anglais du PCC (*Validated Joint Crisis Plan Support*, V5). Version ado anglaise : **traduction non officielle** par Mon PCC du support Ado V1 (signalée dans l’application et le document). Textes de l’interface dans le code (`tr('français', 'English')`, `js/i18n.js`), trames dans `js/data-en.js` et `js/data-ado-en.js`.
 - **Pays** (Réglages, déduit du fuseau horaire) : France, Belgique, Suisse, Québec, Canada, Royaume-Uni, Irlande, États-Unis, Australie, Nouvelle-Zélande ou autre pays. Il règle les numéros d’urgence, les ressources d’aide, les exemples « services de garde » de l’étape 8 et la page dossier de santé (Mon Espace Santé en France, conseils généraux ailleurs).
+- **Écran « Ça ne va pas »** (accueil, menu, raccourci de l’icône) : mes stratégies dans l’ordre, les personnes à appeler en un toucher, ma boîte à outils et les numéros d’urgence. Si le plan est protégé, option (Réglages) pour l’ouvrir sans le code : seule une copie de ces éléments est alors lisible sans code, jamais les photos, vidéos ou sons.
+- **Synthèse d’une page** (PDF) pour les urgences : personnes à prévenir, soins à éviter et alternatives, soins souhaités, ce qui aide, signes de crise.
+- **Versions signées** : copie du contenu à chaque signature (10 au plus), et page des changements depuis la dernière version signée.
+- **Préparer mon entretien** : notes privées « à aborder avec mon soignant » dans chaque étape (hors du plan), récapitulatif, affichage en grand.
+- **Rappel de relecture** : fichier d’agenda (.ics) à la date conseillée.
+- **Pour les professionnel·les** : le PCC en bref, ce que disent les études, accompagner la démarche, affiche A4 avec QR code (PDF).
+- **Lecture et voix** : questions en « facile à lire et à comprendre » (FALC / easy read), taille du texte, lecture à voix haute avec une voix installée sur l’appareil, dictée désactivée par défaut (« sur ce téléphone uniquement », ou en ligne après avertissement).
 - **Rédaction guidée sans induire les réponses** : pour chaque question, un conseil de rédaction et une saisie libre « avec mes mots » en premier. Des **exemples à cocher** n’apparaissent qu’en touchant le bouton « Exemples ».
 - **Priorités** : stratégies et personnes ressources se classent par ordre de priorité (moi-même → entourage → professionnel·les → services de garde), comme le demande le PCC.
 - **Cohérence** : rappel si des soins à éviter sont indiqués sans alternative (champ indispensable selon le PCC).
@@ -54,6 +61,8 @@ Aucune compilation : HTML, CSS et JavaScript natifs. Pour tester en local : `pyt
 
 À chaque mise à jour des fichiers, incrémenter `CACHE` dans `sw.js` pour que les téléphones récupèrent la nouvelle version.
 
+**Tests** : `tests/run_tests.py` (Playwright, Chromium en taille téléphone, français et anglais) vérifie les parcours principaux et l’absence d’erreur JavaScript. Ils tournent automatiquement sur GitHub à chaque envoi (`.github/workflows/tests.yml`). En local : `pip install playwright pypdf && python -m playwright install chromium`, puis `python3 -m http.server 8765` et `python3 tests/run_tests.py`.
+
 ## Structure
 
 ```
@@ -64,6 +73,9 @@ js/data-ado.js          trame PCC ado, conseils, exemples  ← contenu à relire
 js/data-en.js           trame adulte en anglais (formulaire officiel anglais)  ← contenu à relire
 js/data-ado-en.js       trame ado en anglais (traduction non officielle)  ← contenu à relire
 js/i18n.js              langue (fr/en) et pays
+js/summary.js           synthèse d’une page (PDF)
+js/voice.js             lecture à voix haute et dictée
+tests/run_tests.py      tests de bout en bout
 js/app.js               interface et navigation
 js/storage.js           stockage local et chiffrement
 js/pdf.js               écriture PDF et chiffrement AES-256

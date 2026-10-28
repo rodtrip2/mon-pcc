@@ -1,0 +1,23 @@
+name: Tests
+
+on:
+  push:
+  pull_request:
+
+jobs:
+  e2e:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+      - name: Installer Playwright et pypdf
+        run: |
+          pip install playwright pypdf
+          python -m playwright install --with-deps chromium
+      - name: Lancer le site et les tests
+        run: |
+          python -m http.server 8765 >/dev/null 2>&1 &
+          sleep 1
+          python tests/run_tests.py http://localhost:8765/
