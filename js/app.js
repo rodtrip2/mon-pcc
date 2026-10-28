@@ -9,6 +9,7 @@ import {
   fileBaseName, sigValid, lastUpdate, fmtDateTime,
 } from './export.js';
 import { buildPlanPdf } from './planpdf.js';
+import { buildSummaryPdf } from './summary.js';
 import { COUNTRIES, countryData } from './resources.js';
 import { parseEmbed, fetchTitle } from './embed.js';
 import { exercises, exerciseById, exerciseUrl, offlineStatus, prepareOffline } from './exercises.js';
@@ -1490,7 +1491,10 @@ function recordPdfHTML(intro) {
       <h2>${tr('1. Télécharger mon plan en PDF', '1. Download my plan as a PDF')}</h2>
       <p class="muted small">${intro}</p>
       ${modifiedAfterSigning() ? `<p class="warn small">${tr('Certaines signatures sont antérieures à la dernière modification : elles ne figureront pas dans le PDF.', 'Some signatures are older than the latest change: they will not appear in the PDF.')} <a href="#/etape/${STEPS.length - 1}">${tr('Signer à nouveau', 'Sign again')}</a></p>` : ''}
-      <button type="button" class="btn btn-primary" data-act="mes-pdf">📄 ${tr('Télécharger le PDF', 'Download the PDF')}</button>
+      <div class="stack">
+        <button type="button" class="btn btn-primary" data-act="mes-pdf">📄 ${tr('Télécharger le PDF', 'Download the PDF')}</button>
+        <button type="button" class="btn btn-secondary" data-act="mes-summary">📋 ${tr('Et la synthèse d’une page', 'And the one-page summary')}</button>
+      </div>
     </section>`;
 }
 
@@ -1685,9 +1689,11 @@ function renderPlan() {
       <div class="stack">
         <button class="btn btn-secondary" data-act="print">🖨 ${tr('Imprimer', 'Print')}</button>
         <button class="btn btn-secondary" data-act="pdf-save">📄 ${tr('Enregistrer en PDF', 'Save as PDF')}</button>
+        <button class="btn btn-secondary" data-act="summary-save">📋 ${tr('Synthèse d’une page (PDF)', 'One-page summary (PDF)')}</button>
         <button class="btn btn-primary" data-act="pdf-send">📤 ${tr('Envoyer le PDF', 'Send the PDF')}</button>
         <a class="btn btn-secondary" href="#/mon-espace-sante">${recordButtonLabel()}</a>
       </div>
+      <p class="muted small">${tr('La <strong>synthèse d’une page</strong> reprend l’essentiel (signes de crise, ce qui m’aide, soins à éviter et alternatives, personnes à prévenir), pour être lue en quelques secondes aux urgences.', 'The <strong>one-page summary</strong> gives the essentials (crisis signs, what helps me, care to avoid and alternatives, people to contact), so it can be read in seconds in an emergency.')}</p>
       <p class="muted small">${tr('À l’enregistrement, je peux <strong>protéger le PDF par un code</strong>. Pour un envoi, je privilégie un moyen sûr et un PDF sans code, que le destinataire pourra ouvrir en cas de crise.', 'When saving, I can <strong>protect the PDF with a code</strong>. To send it, I prefer a secure channel and a PDF without a code, which the recipient can open in a crisis.')}</p>
       <details class="more">
         <summary>${tr('Autre option : envoyer en texte', 'Other option: send as text')}</summary>
@@ -1858,11 +1864,11 @@ function pdfDialog(mode) {
   });
 }
 
-async function makePlanPdf(password) {
+async function makePlanPdf(password, summary = false) {
   saveState.textContent = tr('Préparation du PDF…', 'Preparing the PDF…');
   try {
-    const blob = await buildPlanPdf(plan, password);
-    return new File([blob], fileBaseName(plan) + (password ? tr('-protege', '-protected') : '') + '.pdf', { type: 'application/pdf' });
+    const blob = await (summary ? buildSummaryPdf : buildPlanPdf)(plan, password);
+    return new File([blob], fileBaseName(plan) + (summary ? tr('-synthese', '-summary') : '') + (password ? tr('-protege', '-protected') : '') + '.pdf', { type: 'application/pdf' });
   } finally {
     saveState.textContent = savedLabel();
   }
@@ -1870,11 +1876,11 @@ async function makePlanPdf(password) {
 
 const pdfFail = () => toast(tr('Impossible de créer le PDF sur cet appareil.', 'The PDF cannot be created on this device.'));
 
-async function pdfSave() {
+async function pdfSave(summary = false) {
   const opt = await pdfDialog('save');
   if (!opt) return;
   try {
-    const file = await makePlanPdf(opt.password);
+    const file = await makePlanPdf(opt.password, summary);
     download(file, file.name);
     toast(opt.password ? tr('PDF protégé enregistré. Gardez le code en lieu sûr.', 'Protected PDF saved. Keep the code somewhere safe.') : tr('PDF enregistré.', 'PDF saved.'));
   } catch {
@@ -2732,6 +2738,10 @@ document.addEventListener('click', async (e) => {
     }
     case 'print': window.print(); break;
     case 'pdf-save': pdfSave(); break;
+    case 'summary-save': pdfSave(true); break;
+    case 'mes-summary':
+      try { const file = await makePlanPdf('', true); download(file, file.name); toast(tr('Synthèse téléchargée.', 'Summary downloaded.')); } catch { pdfFail(); }
+      break;
     case 'start':
       plan.data.version = btn.dataset.v === 'ado' ? 'ado' : 'adulte';
       applyVersion();

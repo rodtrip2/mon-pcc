@@ -89,6 +89,7 @@ export function stepContent(step, data, plan = null) {
     if (tb.length) {
       out.push({
         label: tr('Ma boîte à outils (sur mon téléphone)', 'My toolbox (on my phone)'),
+        toolbox: true,
         lines: tb.map((it) => {
           const n = (it.photos || []).length;
           if (it.kind === 'citation') return tr(`« ${it.text.trim()} »`, `“${it.text.trim()}”`) + (it.author ? ' — ' + it.author : '');
