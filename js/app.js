@@ -14,6 +14,7 @@ import { COUNTRIES, countryData, localExample } from './resources.js';
 import { parseEmbed, fetchTitle } from './embed.js';
 import { exercises, exerciseById, exerciseUrl, offlineStatus, prepareOffline } from './exercises.js';
 import { renderCrisisCard, toJpeg, crisisCardPdf } from './crisiscard.js';
+import { renderWallpaper, toPng } from './lockscreen.js';
 import { ttsReady, ttsAvailable, speak, stopSpeaking, dictationPref, setDictationPref, dictationSupported, localCheckSupported, localStatus, dictationOn, dictateInto } from './voice.js';
 
 initLocale();
@@ -188,6 +189,7 @@ function route() {
     case 'ressources': renderResources(); break;
     case 'boite-outils': renderToolbox(arg === 'etape'); break;
     case 'crise': renderCrisis(); break;
+    case 'ecran-verrouille': renderLockscreen(); break;
     case 'versions': renderVersions(arg); break;
     case 'entretien': renderTalk(); break;
     case 'professionnels': renderPros(); break;
@@ -601,6 +603,165 @@ function crisisButtonHTML() {
 
 const telFrom = (t) => { const m = String(t || '').match(/(\+?\d[\d .()-]{1,}\d)/); return m ? m[1] : ''; };
 
+/** Personnes à appeler, dans l'ordre du plan */
+function crisisPeople(d) {
+  if (d.version === 'ado') {
+    return (d.information || []).filter((r) => r.qui).map((r) => ({ nom: r.qui, lien: r.parQui ? `${tr('prévenu·e par', 'told by')} ${r.parQui}` : '', tel: telFrom(r.comment), note: r.comment }));
+  }
+  const a = d.aide || {};
+  return ['proches', 'pros', 'garde'].flatMap((k) => (a[k] || []).filter((r) => r.nom || r.tel));
+}
+/** Stratégies, dans l'ordre : moi, entourage, professionnel·les */
+const crisisStrategies = (d) => ['moi', 'entourage', 'pros'].flatMap((k) => (d.strategies?.[k] || []).filter((x) => x && x.trim()));
+
+/* ---------- écran verrouillé : fond d'écran et fiche d'urgence ---------- */
+
+/** Réglages de l'image (gardés avec le plan, hors contenu signé) */
+function lockOpts() {
+  const d = plan.data;
+  const o = d.ecranVerrouille?.opts || {};
+  const people = crisisPeople(d);
+  const strat = crisisStrategies(d);
+  return {
+    level: o.level || 'discret',
+    theme: o.theme || 'sombre',
+    title: o.title ?? tr('J’ai un plan de crise conjoint', 'I have a joint crisis plan'),
+    mention: o.mention ?? true,
+    people: (o.people || [0]).filter((i) => i < people.length),
+    strategies: (o.strategies || [0, 1, 2]).filter((i) => i < strat.length),
+  };
+}
+const MAX_LOCK_PEOPLE = 3;
+const MAX_LOCK_STRAT = 5;
+
+function lockWallpaperCanvas(o = lockOpts()) {
+  const people = crisisPeople(plan.data);
+  const strat = crisisStrategies(plan.data);
+  return renderWallpaper({
+    ...o,
+    people: o.people.map((i) => people[i]).filter(Boolean).map((p) => ({ nom: p.nom, lien: p.lien, tel: p.tel && /\d/.test(p.tel) ? p.tel : '' })),
+    strategies: o.strategies.map((i) => strat[i]).filter(Boolean),
+  });
+}
+
+/** Texte proposé pour la fiche d'urgence du téléphone */
+function emergencyNoteText() {
+  const people = crisisPeople(plan.data).filter((p) => p.tel && /\d/.test(p.tel)).slice(0, 3);
+  const lines = [tr('J’ai un plan de crise conjoint, dans l’application Mon PCC sur ce téléphone.', 'I have a joint crisis plan, in the Mon PCC app on this phone.')];
+  if (people.length) lines.push(tr('En cas de crise, merci de prévenir : ', 'In a crisis, please contact: ') + people.map((p) => [p.nom, p.lien && `(${p.lien})`, p.tel].filter(Boolean).join(' ')).join(' ; '));
+  return lines.join('\n');
+}
+
+function lockStale() {
+  const at = plan.data.ecranVerrouille?.at;
+  return at && plan.contentUpdated && plan.contentUpdated > at;
+}
+
+function renderLockscreen() {
+  const o = lockOpts();
+  const people = crisisPeople(plan.data);
+  const strat = crisisStrategies(plan.data);
+  const callable = people.map((p, i) => [p, i]);
+  const ios = env.isIos;
+  app.innerHTML = `
+    <h1>📱 ${tr('Mon écran verrouillé', 'My lock screen')}</h1>
+    <p class="lead">${tr('Les téléphones ne laissent aucune application web s’afficher par-dessus l’écran verrouillé. Je peux quand même y retrouver l’essentiel de mon plan, de deux façons, que je peux combiner.', 'Phones don’t let any web app appear over the lock screen. I can still keep the essentials of my plan there, in two ways, which I can combine.')}</p>
+    <div class="warn" role="note"><strong>${tr('Ce qui est sur l’écran verrouillé est visible par toute personne qui voit mon téléphone', 'What is on the lock screen can be seen by anyone who sees my phone')}</strong>${tr(', sans code. Je choisis ce que j’y mets.', ', without a code. I choose what to put there.')}</div>
+
+    <section class="card" id="fond-ecran">
+      <h2>🖼 ${tr('Un fond d’écran avec l’essentiel', 'A wallpaper with the essentials')}</h2>
+      <p class="muted small">${tr('Mon PCC crée une image à mon format d’écran. C’est moi qui la choisis ensuite comme fond d’écran verrouillé : un site ne peut pas le faire à ma place. L’image est créée sur ce téléphone, rien n’est envoyé.', 'Mon PCC creates an image sized for my screen. I then set it as my lock screen wallpaper myself: a website cannot do it for me. The image is created on this phone; nothing is sent.')}</p>
+      <div class="radios">
+        <label class="radio"><input type="radio" name="lk-level" value="discret" data-act="lk" ${o.level === 'discret' ? 'checked' : ''}><span><strong>${tr('Discret', 'Discreet')}</strong><br><span class="muted small">${tr('Un titre et les personnes à appeler.', 'A title and the people to call.')}</span></span></label>
+        <label class="radio"><input type="radio" name="lk-level" value="detaille" data-act="lk" ${o.level === 'detaille' ? 'checked' : ''}><span><strong>${tr('Détaillé', 'Detailed')}</strong><br><span class="muted small">${tr('Aussi les premières choses qui m’aident.', 'Also the first things that help me.')}</span></span></label>
+      </div>
+      <label class="field"><span>${tr('Titre', 'Title')}</span><input id="lk-title" data-act="lk" value="${esc(o.title)}" maxlength="60"></label>
+      <p class="muted small">${tr('Je peux mettre un titre plus discret (par exemple «&nbsp;En cas de besoin&nbsp;»), ou le laisser vide.', 'I can use a more discreet title (for example “If needed”), or leave it empty.')}</p>
+      <fieldset class="lk-pick"><legend>${tr(`Personnes à appeler (${MAX_LOCK_PEOPLE} au plus)`, `People to call (up to ${MAX_LOCK_PEOPLE})`)}</legend>
+        ${callable.length ? callable.map(([p, i]) => `<label class="check"><input type="checkbox" name="lk-p" value="${i}" data-act="lk" ${o.people.includes(i) ? 'checked' : ''}> ${esc([p.nom, p.lien && `(${p.lien})`].filter(Boolean).join(' '))}${p.tel && /\d/.test(p.tel) ? ` <span class="muted small">${esc(p.tel)}</span>` : ''}</label>`).join('')
+          : `<p class="muted small">${tr('Aucune personne dans mon plan pour l’instant.', 'No one in my plan yet.')} <a href="#/etape/${STEPS.findIndex((s) => s.id === (VERSION === 'ado' ? 'information' : 'aide'))}">${tr('Ajouter', 'Add')}</a></p>`}
+      </fieldset>
+      <fieldset class="lk-pick" id="lk-strat" ${o.level === 'detaille' ? '' : 'hidden'}><legend>${tr(`Ce qui m’aide (${MAX_LOCK_STRAT} au plus)`, `What helps me (up to ${MAX_LOCK_STRAT})`)}</legend>
+        ${strat.length ? strat.map((x, i) => `<label class="check"><input type="checkbox" name="lk-s" value="${i}" data-act="lk" ${o.strategies.includes(i) ? 'checked' : ''}> ${esc(x)}</label>`).join('')
+          : `<p class="muted small">${tr('Aucune stratégie dans mon plan pour l’instant.', 'No strategies in my plan yet.')}</p>`}
+      </fieldset>
+      <label class="check"><input type="checkbox" id="lk-mention" data-act="lk" ${o.mention ? 'checked' : ''}> ${tr('Indiquer que mon plan est dans l’application Mon PCC', 'Say that my plan is in the Mon PCC app')}</label>
+      <div class="seg" role="group" aria-label="${tr('Couleurs', 'Colours')}">
+        <button type="button" class="seg-btn" data-act="lk-theme" data-t="sombre" aria-pressed="${o.theme === 'sombre'}">${tr('Sombre', 'Dark')}</button>
+        <button type="button" class="seg-btn" data-act="lk-theme" data-t="clair" aria-pressed="${o.theme === 'clair'}">${tr('Clair', 'Light')}</button>
+      </div>
+      <div class="lk-preview"><img id="lk-img" alt="${tr('Aperçu du fond d’écran', 'Wallpaper preview')}"></div>
+      ${lockStale() ? `<p class="warn small" role="status">${tr('Mon plan a changé depuis que j’ai créé mon fond d’écran : je peux enregistrer une nouvelle image.', 'My plan has changed since I created my wallpaper: I can save a new image.')}</p>` : ''}
+      <button type="button" class="btn btn-primary" data-act="lk-save">💾 ${ios ? tr('Enregistrer l’image dans Photos', 'Save the image to Photos') : tr('Enregistrer l’image', 'Save the image')}</button>
+      <details class="more"><summary>${tr('La mettre en fond d’écran verrouillé', 'Set it as my lock screen wallpaper')}</summary>
+        <p><strong>iPhone</strong>${tr(' : j’ouvre l’image dans Photos, je touche ⬆ (Partager) › « Utiliser en fond d’écran », puis « Ajouter » et « Définir comme paire de fonds d’écran » ou « Personnaliser l’écran d’accueil ».', ': I open the image in Photos, tap ⬆ (Share) › “Use as Wallpaper”, then “Add” and “Set as Wallpaper Pair” or “Customise Home Screen”.')}</p>
+        <p><strong>Android</strong>${tr(' : j’ouvre l’image dans ma galerie (ou Google Photos), menu ⋮ › « Utiliser comme » ou « Définir comme fond d’écran », puis « Écran de verrouillage ». Les noms varient selon les téléphones.', ': I open the image in my gallery (or Google Photos), menu ⋮ › “Use as” or “Set as wallpaper”, then “Lock screen”. Names vary between phones.')}</p>
+      </details>
+      <details class="more"><summary>${tr('Revenir à mon fond d’écran précédent', 'Go back to my previous wallpaper')}</summary>
+        <p>${tr('Mon PCC ne peut ni lire ni changer mon fond d’écran : c’est moi qui reviens au précédent.', 'Mon PCC can neither read nor change my wallpaper: I switch back myself.')}</p>
+        <p><strong>iPhone</strong>${tr(' : l’ancien écran verrouillé est gardé. Je touche longuement l’écran verrouillé, je fais glisser jusqu’à l’ancien, puis je le touche. Je peux supprimer celui de Mon PCC en le faisant glisser vers le haut.', ': the old lock screen is kept. I touch and hold the lock screen, swipe to the old one, then tap it. I can delete the Mon PCC one by swiping it up.')}</p>
+        <p><strong>Android</strong>${tr(' : Paramètres › Fond d’écran (ou « Fond d’écran et style »). Beaucoup de téléphones gardent les fonds récents. <strong>Avant de changer</strong>, je vérifie que mon image actuelle est dans ma galerie, pour pouvoir la remettre.', ': Settings › Wallpaper (or “Wallpaper & style”). Many phones keep recent wallpapers. <strong>Before changing</strong>, I check that my current image is in my gallery so I can put it back.')}</p>
+      </details>
+    </section>
+
+    <section class="card" id="fiche-urgence">
+      <h2>🩺 ${tr('La fiche d’urgence du téléphone', 'My phone’s emergency information')}</h2>
+      <p>${tr('Les secours et mon entourage peuvent l’ouvrir depuis l’écran verrouillé (bouton « Urgence »), et appeler mes contacts d’urgence sans mon code. Elle est plus discrète qu’un fond d’écran.', 'Emergency services and the people around me can open it from the lock screen (“Emergency” button) and call my emergency contacts without my code. It is more discreet than a wallpaper.')}</p>
+      <label class="field"><span>${tr('Texte à coller dans la fiche (je peux le modifier)', 'Text to paste into it (I can edit it)')}</span><textarea id="lk-note" rows="4">${esc(emergencyNoteText())}</textarea></label>
+      <div class="stack">
+        <button type="button" class="btn btn-primary" data-act="lk-copy">📋 ${tr('Copier le texte', 'Copy the text')}</button>
+        <button type="button" class="btn btn-ghost btn-sm" data-act="lk-note-reset">↺ ${tr('Reprendre le texte proposé', 'Restore the suggested text')}</button>
+      </div>
+      <details class="more"><summary>iPhone</summary><ol>
+        <li>${tr('J’ouvre l’application Santé, je touche ma photo en haut, puis « Fiche médicale » › « Modifier ».', 'I open the Health app, tap my photo at the top, then “Medical ID” › “Edit”.')}</li>
+        <li>${tr('Je colle le texte dans « Notes médicales ».', 'I paste the text into “Medical Notes”.')}</li>
+        <li>${tr('J’ajoute mes contacts d’urgence (ils doivent être dans mes Contacts).', 'I add my emergency contacts (they must be in my Contacts).')}</li>
+        <li>${tr('J’active « Afficher en mode verrouillé », puis « OK ».', 'I turn on “Show When Locked”, then “Done”.')}</li></ol></details>
+      <details class="more"><summary>Android</summary><ol>
+        <li>${tr('Paramètres › « Sécurité et urgence » (ou « Urgence ») › « Informations médicales ».', 'Settings › “Safety & emergency” (or “Emergency”) › “Medical information”.')}</li>
+        <li>${tr('Je colle le texte dans les notes ou « Remarques médicales ».', 'I paste the text into the notes or “Medical notes”.')}</li>
+        <li>${tr('Dans « Contacts d’urgence », j’ajoute les personnes à prévenir.', 'In “Emergency contacts”, I add the people to contact.')}</li>
+        <li>${tr('Je vérifie que l’accès depuis l’écran verrouillé est activé, si mon téléphone le propose. Les noms varient selon les téléphones.', 'I check that access from the lock screen is turned on, if my phone offers it. Names vary between phones.')}</li></ol></details>
+      <p class="muted small">${tr('Pour retirer ces informations, je les efface simplement de la fiche.', 'To remove this information, I simply delete it from the emergency information.')}</p>
+    </section>`;
+  updateLockPreview();
+}
+
+/** Lit le formulaire, garde les réglages et redessine l'aperçu */
+function readLockForm() {
+  const prev = lockOpts();
+  const q = (sel) => app.querySelector(sel);
+  const checked = (name) => [...app.querySelectorAll(`input[name="${name}"]:checked`)].map((x) => +x.value);
+  const o = {
+    level: q('input[name="lk-level"]:checked')?.value || prev.level,
+    theme: prev.theme,
+    title: q('#lk-title')?.value ?? prev.title,
+    mention: q('#lk-mention')?.checked ?? prev.mention,
+    people: checked('lk-p'),
+    strategies: checked('lk-s'),
+  };
+  plan.data.ecranVerrouille = { ...(plan.data.ecranVerrouille || {}), opts: o };
+  scheduleSave(false); // réglage d'affichage : n'invalide pas les signatures
+  return o;
+}
+function updateLockPreview(o = lockOpts()) {
+  const img = $('#lk-img');
+  if (!img) return;
+  img.src = lockWallpaperCanvas(o).toDataURL('image/png');
+  const st = $('#lk-strat');
+  if (st) st.hidden = o.level !== 'detaille';
+}
+async function saveLockWallpaper() {
+  const blob = await toPng(lockWallpaperCanvas());
+  const file = new File([blob], tr('mon-pcc-ecran-verrouille.png', 'mon-pcc-lock-screen.png'), { type: 'image/png' });
+  if (env.isIos && navigator.canShare?.({ files: [file] })) {
+    try { await navigator.share({ files: [file] }); } catch (e) { if (e.name === 'AbortError') return; download(file, file.name); }
+  } else download(file, file.name);
+  plan.data.ecranVerrouille = { ...(plan.data.ecranVerrouille || {}), at: new Date().toISOString() };
+  scheduleSave(false);
+  toast(tr('Image enregistrée : je la choisis maintenant comme fond d’écran verrouillé.', 'Image saved: I can now set it as my lock screen wallpaper.'));
+}
+
 function renderCrisis() {
   const limited = !plan;
   const d = limited ? crisisSnapshot() : plan.data;
@@ -614,14 +775,7 @@ function renderCrisis() {
     ['pros', tr('Avec des professionnel·les', 'With professionals')],
   ].map(([k, label]) => [label, (strat[k] || []).filter((x) => x && x.trim())]).filter(([, l]) => l.length);
 
-  // Personnes à appeler, dans l'ordre du plan
-  let people = [];
-  if (ado) {
-    people = (d.information || []).filter((r) => r.qui).map((r) => ({ nom: r.qui, lien: r.parQui ? `${tr('prévenu·e par', 'told by')} ${r.parQui}` : '', tel: telFrom(r.comment), note: r.comment }));
-  } else {
-    const a = d.aide || {};
-    people = ['proches', 'pros', 'garde'].flatMap((k) => (a[k] || []).filter((r) => r.nom || r.tel));
-  }
+  const people = crisisPeople(d);
   const tb = (d.boiteOutils || []);
   const tbHTML = limited
     ? tb.map((it) => {
@@ -2094,7 +2248,7 @@ function renderTalk() {
 
 /** Contenu du plan sans les signatures dessinées ni les fichiers (pour l'archive) */
 function contentData(d) {
-  const { signature, carte, versions, dossiers, masquerNoteMineur, boiteOutils, notes, rappel, ...rest } = d;
+  const { signature, carte, versions, dossiers, masquerNoteMineur, boiteOutils, notes, rappel, ecranVerrouille, ...rest } = d;
   const copy = JSON.parse(JSON.stringify(rest));
   copy.boiteOutils = (boiteOutils || []).map(({ kind, title, text, author, url, ex, photos }) => ({ kind, title, text, author, url, ex, photos: photos ? photos.map(() => ({})) : undefined }));
   copy.signature = { lieu: signature?.lieu || '', date: signature?.date || '' };
@@ -2402,6 +2556,11 @@ function renderSettings() {
             <label class="field"><span>${tr('Confirmer le code', 'Confirm the code')}</span><input type="password" name="c2" minlength="6" required autocomplete="new-password"></label>
             <p class="muted small">${tr('Attention : si j’oublie ce code, personne ne pourra récupérer mon plan, pas même les créateurs de l’application.', 'Warning: if I forget this code, nobody can recover my plan, not even the app’s creators.')}</p>
             <button class="btn btn-primary">${tr('Activer la protection', 'Turn on protection')}</button></form>`}
+    </section>
+    <section class="card" id="ecran-verrouille">
+      <h2>📱 ${tr('Mon plan sur l’écran verrouillé', 'My plan on the lock screen')}</h2>
+      <p>${tr('Pour retrouver l’essentiel sans déverrouiller mon téléphone : un fond d’écran (discret ou détaillé) et la fiche d’urgence du téléphone.', 'To see the essentials without unlocking my phone: a wallpaper (discreet or detailed) and my phone’s emergency information.')}</p>
+      <a class="btn btn-secondary" href="#/ecran-verrouille">${tr('Préparer mon écran verrouillé', 'Set up my lock screen')}</a>
     </section>
     <section class="card" id="exercices-hors-connexion">
       <h2>${tr('Exercices hors connexion', 'Offline exercises')}</h2>
@@ -2767,6 +2926,15 @@ function closeMenu() {
 app.addEventListener('input', (e) => {
   const el = e.target;
   if (!plan || el.type === 'file') return;
+  if (el.dataset.act === 'lk') {
+    const max = el.name === 'lk-p' ? MAX_LOCK_PEOPLE : el.name === 'lk-s' ? MAX_LOCK_STRAT : 0;
+    if (max && el.checked && app.querySelectorAll(`input[name="${el.name}"]:checked`).length > max) {
+      el.checked = false;
+      toast(tr(`${max} au plus, pour que tout reste lisible.`, `${max} at most, so that everything stays readable.`));
+    }
+    updateLockPreview(readLockForm());
+    return;
+  }
   if (el.dataset.card !== undefined) {
     carte()[el.dataset.card] = el.value;
     scheduleSave(false); // la carte ne fait pas partie du plan signé
@@ -3153,6 +3321,17 @@ document.addEventListener('click', async (e) => {
     case 'print': window.print(); break;
     case 'pdf-save': pdfSave(); break;
     case 'review-ics': reminderDialog(); break;
+    case 'lk-theme': {
+      const cur = readLockForm();
+      plan.data.ecranVerrouille.opts = { ...cur, theme: btn.dataset.t };
+      scheduleSave(false);
+      app.querySelectorAll('[data-act=lk-theme]').forEach((b) => b.setAttribute('aria-pressed', String(b === btn)));
+      updateLockPreview();
+      break;
+    }
+    case 'lk-save': saveLockWallpaper(); break;
+    case 'lk-copy': toast(await copyText($('#lk-note').value) ? tr('Texte copié : je le colle dans la fiche d’urgence.', 'Text copied: I paste it into my emergency information.') : tr('Copie impossible sur cet appareil.', 'Copying is not possible on this device.')); break;
+    case 'lk-note-reset': $('#lk-note').value = emergencyNoteText(); break;
     case 'dictate': await runDictation(btn); break;
     case 'dict-check': {
       e.preventDefault();

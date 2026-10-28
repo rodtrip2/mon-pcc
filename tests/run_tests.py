@@ -307,6 +307,24 @@ def examples_follow_country(ctx, page, errors):
     assert 'Référent·e de l’aide sociale à l’enfance (ASE)' in chips('FR', 'ado', 1)
 
 
+@test
+def lock_screen_wallpaper_and_note(ctx, page, errors):
+    seed(page, {'version': 'adulte', 'strategies': {'moi': ['Je respire']},
+                'aide': {'proches': [{'nom': 'Julie', 'lien': 'ma sœur', 'tel': '06 12 34 56 78'}]}})
+    page.goto(BASE + '#/reglages')
+    page.click('a[href="#/ecran-verrouille"]')
+    wait_until(page, '(document.querySelector("#lk-img")?.src || "").startsWith("data:image/png")')
+    assert 'Julie' in page.input_value('#lk-note') and '06 12 34 56 78' in page.input_value('#lk-note')
+    page.check('input[name=lk-level][value=detaille]')
+    assert page.is_visible('#lk-strat')
+    png = download(page, lambda: page.click('[data-act=lk-save]'))
+    assert png[:4] == b'\x89PNG'
+    wait_until(page, '!!JSON.parse(localStorage.getItem("monpcc.v1")).plan.data.ecranVerrouille?.at')
+    seed(page, {'version': 'ado', 'information': [{'qui': 'Ma référente', 'comment': '07 11 22 33 44'}]})
+    page.goto(BASE + '#/ecran-verrouille')
+    assert 'Ma référente' in page.inner_text('#fond-ecran')
+
+
 def main():
     failed = 0
     with sync_playwright() as pw:

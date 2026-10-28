@@ -556,3 +556,10 @@ html[data-text="xl"] .save-state { display: none; }
 body.has-talk-bar { padding-top: 48px; }
 body.has-talk-bar .topbar { top: 48px; }
 .album-pick-th .album-play { display: none; }
+
+/* écran verrouillé */
+.lk-pick { border: 1px solid var(--line); border-radius: 10px; padding: .5rem .8rem .7rem; margin: .8rem 0; display: flex; flex-direction: column; gap: .35rem; }
+.lk-pick legend { font-weight: 600; font-size: .9rem; padding: 0 .3rem; }
+.lk-preview { display: flex; justify-content: center; margin: 1rem 0; }
+.lk-preview img { width: min(200px, 55vw); aspect-ratio: 9 / 19.5; object-fit: cover; border-radius: 22px; border: 6px solid #111; box-shadow: 0 6px 20px rgba(0,0,0,.25); background: #0c2321; }
+#ecran-verrouille .btn, #fond-ecran > .btn { margin-top: .4rem; }
