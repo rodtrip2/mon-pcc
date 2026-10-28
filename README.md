@@ -11,6 +11,8 @@ un·e professionnel·le qui l’accompagne et, si elle le souhaite, ses proches.
 
 - **Trame officielle** : les 14 étapes suivent, dans l’ordre, les questions du support PCC version adulte (V6, 2026).
 - **Deux versions** : adulte (support PCC V6, 14 étapes) et **ado** (support PCC Ado V1 « phase test », 10 étapes : questions reformulées, rubrique « Qui informer ? Par qui ? Comment ? », sans les rubriques de soins). Choix au démarrage, changement possible à tout moment dans les Réglages : les réponses communes sont gardées, les rubriques propres à l’autre version masquées mais conservées. Exemples adaptés aux ados et à toutes les situations de vie (parents, famille d’accueil, foyer, ASE…).
+- **Français et anglais** : langue du téléphone par défaut, changeable dans le menu (🌐) et les Réglages, sans recharger ni perdre de réponses (les réponses ne sont pas traduites). Version adulte anglaise : questions du formulaire officiel anglais du PCC (*Validated Joint Crisis Plan Support*, V5). Version ado anglaise : **traduction non officielle** par Mon PCC du support Ado V1 (signalée dans l’application et le document). Textes de l’interface dans le code (`tr('français', 'English')`, `js/i18n.js`), trames dans `js/data-en.js` et `js/data-ado-en.js`.
+- **Pays** (Réglages, déduit du fuseau horaire) : France, Royaume-Uni, Irlande, États-Unis, Canada, Australie, Nouvelle-Zélande ou autre pays. Il règle les numéros d’urgence, les ressources d’aide, les exemples « services de garde » de l’étape 8 et la page dossier de santé (Mon Espace Santé en France, conseils généraux ailleurs).
 - **Rédaction guidée sans induire les réponses** : pour chaque question, un conseil de rédaction et une saisie libre « avec mes mots » en premier. Des **exemples à cocher** n’apparaissent qu’en touchant le bouton « Exemples ».
 - **Priorités** : stratégies et personnes ressources se classent par ordre de priorité (moi-même → entourage → professionnel·les → services de garde), comme le demande le PCC.
 - **Cohérence** : rappel si des soins à éviter sont indiqués sans alternative (champ indispensable selon le PCC).
@@ -22,7 +24,7 @@ un·e professionnel·le qui l’accompagne et, si elle le souhaite, ses proches.
 - **Contacts du téléphone** (Android/Chrome) : aux étapes Partenaires, À qui demander de l’aide et Démarches, bouton « Choisir dans mes contacts » après information et accord. Seuls les contacts cochés sont transmis (API Contact Picker) ; le bouton n’apparaît pas sur les appareils non compatibles (iPhone, ordinateur) ni dans Brave, qui expose l’API sans la faire fonctionner ([brave-browser#18908](https://github.com/brave/brave-browser/issues/18908)) ; un message invite alors à utiliser Chrome.
 - **Signature sur l’écran** : la personne et chaque partenaire peuvent signer au doigt sur le smartphone (ou à la main sur la version imprimée). Alerte si le plan est modifié après les signatures.
 - **Imprimer, enregistrer, envoyer** : impression séparée de l’export ; **PDF généré sur l’appareil** (enregistré ou envoyé via le menu de partage du téléphone), **protégeable par un code** (chiffrement PDF standard AES-256, ISO 32000-2, demandé à l’ouverture par tous les lecteurs PDF récents). Code recommandé à l’enregistrement ; pour l’envoi, PDF sans code par défaut avec conseils de canaux sûrs, code en option accompagné d’un rappel des risques (illisible en crise sans le code, non intégrable au dossier). Envoi en texte possible, signalé comme non protégé.
-- **Ressources** (menu et encadré d’urgence) : lignes d’écoute et sites fiables classés par besoin (urgence, écoute, jeunes et étudiant·es, monde agricole, proches, addictions, violences, information et soins), avec appel direct, lien et ajout du numéro au plan (étape 8). Données dans `js/resources.js`, vérifiées le 26 octobre 2026 : à revérifier régulièrement.
+- **Ressources** (menu et encadré d’urgence), **par pays** : lignes d’écoute et sites fiables classés par besoin (urgence, écoute, jeunes, monde agricole, proches, addictions, violences, information et soins), avec appel ou SMS direct, lien et ajout du numéro au plan (étape 8). Données bilingues dans `js/resources.js`, vérifiées sur les sites officiels (France : 26 octobre 2026 ; autres pays : 28 octobre 2026) : à revérifier régulièrement.
 - **Ajouter à Mon Espace Santé** (page Mon plan et menu) : PDF sans code à déposer soi-même (Documents › Ajouter un document), étapes guidées, conseil d’autoriser l’accès en cas d’urgence, pistes en cas d’hospitalisation (DPI relié au DMP, remise à l’équipe, MSSanté par le soignant). Aucune connexion directe : Mon PCC n’est pas référencé au catalogue Mon Espace Santé.
 - **Carte de crise** (même page) : carte 85 × 55 mm pour le portefeuille (« J’ai un plan de crise conjoint », où le trouver, personne à prévenir, soignant référent), sans information de santé ; image ou PDF à imprimer.
 - **Installation** : bandeau proposé sur smartphone (« Plus tard » = 30 jours, « Ne plus proposer » = définitif, réactivable dans les Réglages), aussi accessible depuis le menu.
@@ -59,6 +61,9 @@ index.html              page unique
 css/style.css           styles (clair/sombre, impression)
 js/data.js              trame PCC adulte, conseils, exemples ; choix de version  ← contenu à relire
 js/data-ado.js          trame PCC ado, conseils, exemples  ← contenu à relire
+js/data-en.js           trame adulte en anglais (formulaire officiel anglais)  ← contenu à relire
+js/data-ado-en.js       trame ado en anglais (traduction non officielle)  ← contenu à relire
+js/i18n.js              langue (fr/en) et pays
 js/app.js               interface et navigation
 js/storage.js           stockage local et chiffrement
 js/pdf.js               écriture PDF et chiffrement AES-256
@@ -73,13 +78,13 @@ js/vendor/qrcode.js     générateur de QR code (MIT)
 js/media.js             fichiers de la boîte à outils (IndexedDB)
 js/export.js            mise en forme, impression, texte, document autonome
 sw.js                   hors connexion
-manifest.webmanifest    installation
+manifest.webmanifest    installation (manifest-en.webmanifest en anglais)
 icons/                  icônes
 ```
 
 ## Sources et droits d’auteur
 
-Les questions reprennent le **Support Plan de Crise Conjoint uniformisé et validé** :
+Les questions reprennent le **Support Plan de Crise Conjoint uniformisé et validé** (et sa version anglaise officielle, *Validated Joint Crisis Plan Support*) :
 Ferrari, P., Suter, C., Martino, P. (2026). https://plandecriseconjoint.ch/
 © Haute École de la Santé La Source, Lausanne — licence **CC BY-NC-SA**.
 

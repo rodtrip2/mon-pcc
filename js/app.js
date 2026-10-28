@@ -1,4 +1,5 @@
 /* Mon PCC — application (sans dépendance, sans serveur, sans traceur) */
+import { tr, L, LANG, COUNTRY, LANGS, COUNTRY_CODES, initLocale, setLangPref, setCountryPref, langPref, countryPref, deviceLang, deviceCountry, plural } from './i18n.js';
 import { STEPS, PROCESS, SOURCE, VERSION, VERSIONS, setVersion, hiddenSteps } from './data.js';
 import * as store from './storage.js';
 import * as media from './media.js';
@@ -8,10 +9,12 @@ import {
   fileBaseName, sigValid, lastUpdate, fmtDateTime,
 } from './export.js';
 import { buildPlanPdf } from './planpdf.js';
-import { RESOURCES, CHECKED } from './resources.js';
+import { COUNTRIES, countryData } from './resources.js';
 import { parseEmbed, fetchTitle } from './embed.js';
-import { EXERCISES, exerciseById, exerciseUrl, offlineStatus, prepareOffline } from './exercises.js';
+import { exercises, exerciseById, exerciseUrl, offlineStatus, prepareOffline } from './exercises.js';
 import { renderCrisisCard, toJpeg, crisisCardPdf } from './crisiscard.js';
+
+initLocale();
 
 const $ = (sel, root = document) => root.querySelector(sel);
 const app = $('#app');
@@ -25,10 +28,15 @@ const openExamples = new Set(); // groupes dont les exemples sont affichés
 const editing = new Set(); // listes en mode modification (sinon affichage compact)
 const editKey = (step, g) => step.id + ':' + g.id;
 
-function editToggleHTML(key, label = 'Modifier') {
+/** Pays choisi pour les ressources d'aide */
+const country = () => countryData(COUNTRY);
+const isFrance = () => COUNTRY === 'FR';
+const savedLabel = () => tr('Enregistré sur ce téléphone', 'Saved on this phone');
+
+function editToggleHTML(key, label = tr('Modifier', 'Edit')) {
   const on = editing.has(key);
   return on
-    ? `<span class="editing-tag" data-edit-key="${esc(key)}">✏️ En modification</span>`
+    ? `<span class="editing-tag" data-edit-key="${esc(key)}">✏️ ${tr('En modification', 'Editing')}</span>`
     : `<button type="button" class="icon edit-btn" data-act="edit-toggle" data-key="${esc(key)}" data-fk="edit:${esc(key)}" aria-label="${esc(label)}" title="${esc(label)}">✏️</button>`;
 }
 
@@ -37,7 +45,7 @@ const telLink = (t) => (t && /^[\d +().-]{2,}$/.test(t) ? `<a class="call" href=
 /** Résumé lisible d'une fiche (mode affichage) */
 function recordSummaryHTML(step, r) {
   if (step.id === 'soinsEvites') {
-    return `<span class="rv-main">${esc(r.soin || '')}</span>${r.raison ? `<span class="rv-sub">parce que : ${esc(r.raison)}</span>` : ''}`;
+    return `<span class="rv-main">${esc(r.soin || '')}</span>${r.raison ? `<span class="rv-sub">${tr('parce que :', 'because:')} ${esc(r.raison)}</span>` : ''}`;
   }
   if (step.labelled) {
     return step.fields.filter((f) => (r[f.key] || '').trim()).map((f) => `<span class="rv-sub"><strong>${esc(f.label)}</strong> ${esc(r[f.key])}</span>`).join('');
@@ -45,7 +53,7 @@ function recordSummaryHTML(step, r) {
   const [first, ...rest] = step.fields;
   const main = (r[first.key] || '').trim();
   const others = rest.filter((f) => (r[f.key] || '').trim()).map((f) => (f.type === 'tel' ? telLink(r[f.key]) : esc(r[f.key])));
-  return `<span class="rv-main">${esc(main) || '<span class="muted">à compléter</span>'}</span>${others.length ? `<span class="rv-sub">${others.join(' · ')}</span>` : ''}`;
+  return `<span class="rv-main">${esc(main) || `<span class="muted">${tr('à compléter', 'to complete')}</span>`}</span>${others.length ? `<span class="rv-sub">${others.join(' · ')}</span>` : ''}`;
 }
 const AUTO_LOCK_MS = 5 * 60 * 1000;
 
@@ -61,20 +69,20 @@ function toast(msg) {
 
 function scheduleSave(content = true) {
   if (content && plan) plan.contentUpdated = new Date().toISOString();
-  saveState.textContent = 'Enregistrement…';
+  saveState.textContent = tr('Enregistrement…', 'Saving…');
   clearTimeout(saveTimer);
   saveTimer = setTimeout(async () => {
     try {
       await store.save(plan);
-      saveState.textContent = 'Enregistré sur ce téléphone';
+      saveState.textContent = savedLabel();
     } catch {
-      saveState.textContent = 'Échec de l’enregistrement';
-      toast('Impossible d’enregistrer : la mémoire du navigateur est peut-être pleine ou bloquée.');
+      saveState.textContent = tr('Échec de l’enregistrement', 'Could not save');
+      toast(tr('Impossible d’enregistrer : la mémoire du navigateur est peut-être pleine ou bloquée.', 'Could not save: the browser’s storage may be full or blocked.'));
     }
   }, 350);
 }
 
-function modal({ title, body, ok = 'Continuer', cancel = 'Annuler', danger = false }) {
+function modal({ title, body, ok = tr('Continuer', 'Continue'), cancel = tr('Annuler', 'Cancel'), danger = false }) {
   return new Promise((resolve) => {
     const d = $('#modal');
     d.innerHTML = `<form method="dialog" class="modal-inner">
@@ -109,12 +117,12 @@ function rerender(fn) {
   }
 }
 
-/** Applique la version du plan (adulte / ado) à toute l'application */
+/** Applique la version du plan (adulte / ado) à toute l'application, dans la langue courante */
 function applyVersion() {
   setVersion(plan?.data?.version || 'adulte');
 }
 const isAdo = () => VERSION === 'ado';
-const versionLabel = (v = VERSION) => (v === 'ado' ? 'version ado' : 'version adulte');
+const versionLabel = (v = VERSION) => (v === 'ado' ? tr('version ado', 'teen version') : tr('version adulte', 'adult version'));
 
 const hasData = () => plan && STEPS.some((s) => stepIsFilled(s, plan.data));
 
@@ -140,6 +148,12 @@ const groupsOf = (step) => step.groups || [{
   id: '_', label: null, suggestions: step.suggestions || [], suggestField: step.suggestField,
 }];
 
+/** Exemples d'un groupe ; services de garde : ceux du pays choisi */
+function groupSuggestions(g) {
+  if (!g.countrySuggestions) return g.suggestions || [];
+  return country().garde.map((x) => ({ nom: L(x.nom), lien: L(x.lien), tel: x.tel }));
+}
+
 /* ---------- routage ---------- */
 
 function route() {
@@ -148,12 +162,16 @@ function route() {
   const [page, arg] = h.split('/');
   document.body.dataset.page = page || 'accueil';
   closeMenu();
+  if (!$('#exercise').hidden) closeExercise();
   switch (page) {
     case '': case 'accueil': renderHome(); break;
     case 'demarche': renderProcess(); break;
     case 'etape': renderStep(Math.max(0, Math.min(STEPS.length - 1, parseInt(arg, 10) || 0))); break;
     case 'plan': renderPlan(); break;
-    case 'reglages': renderSettings(); if (arg === 'version') setTimeout(() => $('#version')?.scrollIntoView({ block: 'start' }), 0); break;
+    case 'reglages':
+      renderSettings();
+      if (arg) setTimeout(() => $('#' + CSS.escape(arg))?.scrollIntoView({ block: 'start' }), 0);
+      break;
     case 'partager': renderShare(); break;
     case 'mon-espace-sante': renderMES(); break;
     case 'ressources': renderResources(); break;
@@ -169,12 +187,29 @@ function route() {
 
 /* ---------- écrans ---------- */
 
+/** Texte avec les numéros (et liens) du pays transformés en liens */
+function linkify(text, tels = [], links = {}) {
+  const parts = [...tels].sort((a, b) => b.length - a.length).map((t) => t.replace(/[.*+?^${}()|[\]\\]/g, '\\$&'));
+  const keys = Object.keys(links).map((k) => k.replace(/[.*+?^${}()|[\]\\]/g, '\\$&'));
+  const all = [...keys, ...parts];
+  if (!all.length) return esc(text);
+  const re = new RegExp(`(?<![\\d])(${all.join('|')})(?![\\d])`, 'g');
+  let out = ''; let last = 0;
+  for (const m of text.matchAll(re)) {
+    out += esc(text.slice(last, m.index));
+    const v = m[0];
+    out += links[v] ? `<a href="${esc(links[v])}" target="_blank" rel="noopener noreferrer">${esc(v)}</a>` : `<a href="tel:${esc(v.replace(/[^\d+]/g, ''))}">${esc(v)}</a>`;
+    last = m.index + v.length;
+  }
+  return out + esc(text.slice(last));
+}
+
 function emergencyNote() {
-  return `<aside class="emergency" aria-label="Urgence">
-    <strong>Besoin d’aide maintenant ?</strong>
-    Appelez le <a href="tel:15">15</a> ou le <a href="tel:112">112</a>.
-    Si vous pensez au suicide, le <a href="tel:3114">3114</a> répond 24 h/24, 7 j/7 (France).
-    <a class="res-link" href="#/ressources">Toutes les ressources d’aide →</a>
+  const e = country().emergency;
+  return `<aside class="emergency" aria-label="${tr('Urgence', 'Emergency')}">
+    <strong>${tr('Besoin d’aide maintenant ?', 'Need help now?')}</strong>
+    ${linkify(L(e.text), e.tels, e.links)}
+    <a class="res-link" href="#/ressources">${tr('Toutes les ressources d’aide →', 'All help resources →')}</a>
   </aside>`;
 }
 
@@ -184,22 +219,22 @@ function renderHome() {
       <section class="hero">
         <div class="hero-logo" aria-hidden="true">${logoSVG()}</div>
         <h1>Mon PCC</h1>
-        <p class="lead">Préparer mon <strong>plan de crise conjoint</strong>, pas à pas, avec mes propres mots.</p>
+        <p class="lead">${tr('Préparer mon <strong>plan de crise conjoint</strong>, pas à pas, avec mes propres mots.', 'Prepare my <strong>joint crisis plan</strong>, step by step, in my own words.')}</p>
         <div class="start-choice">
-          <button type="button" class="btn btn-primary btn-lg" data-act="start" data-v="adulte">Commencer — version adulte</button>
-          <button type="button" class="btn btn-secondary btn-lg" data-act="start" data-v="ado">Commencer — version ado</button>
+          <button type="button" class="btn btn-primary btn-lg" data-act="start" data-v="adulte">${tr('Commencer — version adulte', 'Start — adult version')}</button>
+          <button type="button" class="btn btn-secondary btn-lg" data-act="start" data-v="ado">${tr('Commencer — version ado', 'Start — teen version')}</button>
         </div>
-        <p class="muted small">La version ado est adaptée aux adolescent·es. Je pourrai changer de version à tout moment, sans perdre mes réponses.</p>
+        <p class="muted small">${tr('La version ado est adaptée aux adolescent·es. Je pourrai changer de version à tout moment, sans perdre mes réponses.', 'The teen version is adapted for teenagers. I can switch versions at any time without losing my answers.')}</p>
       </section>
       <section class="card">
-        <h2>Le plan de crise conjoint, c’est quoi ?</h2>
-        <p>Un document que je construis <strong>avec un·e professionnel·le</strong> qui m’accompagne, et avec mes proches si je le souhaite. Il décrit ce qui peut me mettre en crise, comment le repérer, ce qui m’aide et qui prévenir. Dans la version adulte, il précise aussi les soins que je souhaite recevoir ou éviter.</p>
-        <p>Il sert à prévenir les crises et, si elles arrivent, à ce que mes choix soient connus et respectés.</p>
+        <h2>${tr('Le plan de crise conjoint, c’est quoi ?', 'What is a joint crisis plan?')}</h2>
+        <p>${tr('Un document que je construis <strong>avec un·e professionnel·le</strong> qui m’accompagne, et avec mes proches si je le souhaite. Il décrit ce qui peut me mettre en crise, comment le repérer, ce qui m’aide et qui prévenir. Dans la version adulte, il précise aussi les soins que je souhaite recevoir ou éviter.', 'A document I build <strong>with a professional</strong> who supports me, and with people close to me if I wish. It describes what can trigger a crisis, how to spot it, what helps me and who to contact. In the adult version, it also sets out the care I want to receive or avoid.')}</p>
+        <p>${tr('Il sert à prévenir les crises et, si elles arrivent, à ce que mes choix soient connus et respectés.', 'It helps prevent crises and, if they happen, makes sure my choices are known and respected.')}</p>
       </section>
       <section class="card card-soft">
-        <h2>Mes réponses restent chez moi</h2>
-        <p>Pas de compte, pas de serveur, pas de publicité. Ce que j’écris est enregistré uniquement sur ce téléphone. C’est moi qui décide de l’envoyer, et à qui.</p>
-        <p><a href="#/confidentialite">En savoir plus sur la confidentialité</a></p>
+        <h2>${tr('Mes réponses restent chez moi', 'My answers stay with me')}</h2>
+        <p>${tr('Pas de compte, pas de serveur, pas de publicité. Ce que j’écris est enregistré uniquement sur ce téléphone. C’est moi qui décide de l’envoyer, et à qui.', 'No account, no server, no ads. What I write is saved only on this phone. I decide whether to send it, and to whom.')}</p>
+        <p><a href="#/confidentialite">${tr('En savoir plus sur la confidentialité', 'More about privacy')}</a></p>
       </section>
       ${emergencyNote()}
     ${toolboxHomeHTML()}`;
@@ -212,26 +247,27 @@ function renderHome() {
   if (sigDate) {
     const due = addMonths(sigDate, 6);
     const late = due <= new Date().toISOString().slice(0, 10);
-    review = `<p class="review ${late ? 'late' : ''}">${late ? 'Il est temps de relire mon plan' : 'Prochaine relecture conseillée'} : <strong>${fmtDate(due)}</strong></p>`;
+    review = `<p class="review ${late ? 'late' : ''}">${late ? tr('Il est temps de relire mon plan', 'It’s time to review my plan') : tr('Prochaine relecture conseillée', 'Next suggested review')}${tr(' :', ':')} <strong>${fmtDate(due)}</strong></p>`;
   }
+  const vl = versionLabel();
   app.innerHTML = `
-    <h1 class="sr-only">Accueil</h1>
+    <h1 class="sr-only">${tr('Accueil', 'Home')}</h1>
     <section class="card progress-card">
-      <h2>Mon plan de crise conjoint</h2>
-      <div class="bar" role="progressbar" aria-valuemin="0" aria-valuemax="${p.total}" aria-valuenow="${p.done}" aria-label="Étapes complétées"><span style="width:${(p.done / p.total) * 100}%"></span></div>
-      <p class="muted">${p.done} étape${p.done > 1 ? 's' : ''} sur ${p.total} complétée${p.done > 1 ? 's' : ''} · modifié le ${fmtDate(lastUpdate(plan))}</p>
-      <p class="version-line small">${isAdo() ? '🧑‍🎓' : '🧑'} ${esc(versionLabel())[0].toUpperCase() + esc(versionLabel()).slice(1)} · <a href="#/reglages/version">changer</a></p>
+      <h2>${tr('Mon plan de crise conjoint', 'My joint crisis plan')}</h2>
+      <div class="bar" role="progressbar" aria-valuemin="0" aria-valuemax="${p.total}" aria-valuenow="${p.done}" aria-label="${tr('Étapes complétées', 'Steps completed')}"><span style="width:${(p.done / p.total) * 100}%"></span></div>
+      <p class="muted">${tr(`${p.done} étape${p.done > 1 ? 's' : ''} sur ${p.total} complétée${p.done > 1 ? 's' : ''} · modifié le ${fmtDate(lastUpdate(plan))}`, `${p.done} of ${p.total} steps completed · updated ${fmtDate(lastUpdate(plan))}`)}</p>
+      <p class="version-line small">${isAdo() ? '🧑‍🎓' : '🧑'} ${esc(vl[0].toUpperCase() + vl.slice(1))} · <a href="#/reglages/version">${tr('changer', 'change')}</a></p>
       ${review}
       <div class="stack">
-        ${next >= 0 ? `<a class="btn btn-primary" href="#/etape/${next}">Continuer : ${esc(STEPS[next].short)}</a>` : ''}
-        <a class="btn ${next >= 0 ? 'btn-secondary' : 'btn-primary'}" href="#/plan">Voir, imprimer ou envoyer mon plan</a>
+        ${next >= 0 ? `<a class="btn btn-primary" href="#/etape/${next}">${tr('Continuer :', 'Continue:')} ${esc(STEPS[next].short)}</a>` : ''}
+        <a class="btn ${next >= 0 ? 'btn-secondary' : 'btn-primary'}" href="#/plan">${tr('Voir, imprimer ou envoyer mon plan', 'View, print or send my plan')}</a>
       </div>
     </section>
     <section class="card">
-      <h2>Les étapes</h2>
+      <h2>${tr('Les étapes', 'The steps')}</h2>
       ${stepsListHTML()}
     </section>
-    <p class="center"><a href="#/demarche">Revoir la démarche</a></p>
+    <p class="center"><a href="#/demarche">${tr('Revoir la démarche', 'Review how it works')}</a></p>
     ${emergencyNote()}
     ${toolboxHomeHTML()}`;
 }
@@ -241,28 +277,28 @@ function stepsListHTML() {
     <li><a href="#/etape/${i}" class="${stepIsFilled(s, plan.data) ? 'done' : ''}">
       <span class="dot" aria-hidden="true">${stepIsFilled(s, plan.data) ? '✓' : i + 1}</span>
       <span>${esc(s.title)}</span>
-      <span class="sr-only">${stepIsFilled(s, plan.data) ? '(complétée)' : '(à faire)'}</span>
+      <span class="sr-only">${stepIsFilled(s, plan.data) ? tr('(complétée)', '(completed)') : tr('(à faire)', '(to do)')}</span>
     </a></li>`).join('')}</ol>`;
 }
 
 function renderProcess() {
   app.innerHTML = `
-    <h1>Comment se déroule la démarche</h1>
-    <p class="lead">Le plan de crise conjoint est une démarche <strong>volontaire</strong>, qui se construit en plusieurs temps.</p>
-    <p class="version-line small">${isAdo() ? '🧑‍🎓' : '🧑'} Je remplis la <strong>${versionLabel()}</strong>${isAdo() ? ' (en phase de test sur le site officiel)' : ''} · <a href="#/reglages/version">changer de version</a></p>
+    <h1>${tr('Comment se déroule la démarche', 'How it works')}</h1>
+    <p class="lead">${tr('Le plan de crise conjoint est une démarche <strong>volontaire</strong>, qui se construit en plusieurs temps.', 'The joint crisis plan is a <strong>voluntary</strong> process, built in several stages.')}</p>
+    <p class="version-line small">${isAdo() ? '🧑‍🎓' : '🧑'} ${tr('Je remplis la', 'I am filling in the')} <strong>${versionLabel()}</strong>${isAdo() ? tr(' (en phase de test sur le site officiel)', ' (test phase on the official website; unofficial English translation)') : ''} · <a href="#/reglages/version">${tr('changer de version', 'change version')}</a></p>
     <ol class="process">${PROCESS.map((s) => `<li><h2>${esc(s.t)}</h2><p>${esc(s.d)}</p></li>`).join('')}</ol>
     <section class="card card-soft">
-      <h2>Comment utiliser Mon PCC</h2>
+      <h2>${tr('Comment utiliser Mon PCC', 'How to use Mon PCC')}</h2>
       <ul>
-        <li>Chaque étape reprend une question du plan de crise conjoint officiel.</li>
-        <li>Je commence par <strong>écrire avec mes mots</strong>. Si je manque d’idées, le bouton <strong>« Exemples »</strong> propose des formulations que je peux ajouter puis reformuler.</li>
-        <li>Chaque ligne reste modifiable.</li>
-        <li>À la fin, chaque signataire peut <strong>signer avec le doigt</strong> sur le téléphone, ou à la main sur la version imprimée.</li>
-        <li>Rien n’est obligatoire, vous pouvez sauter une étape et y revenir.</li>
-        <li>Tout est enregistré automatiquement sur ce téléphone.</li>
+        <li>${tr('Chaque étape reprend une question du plan de crise conjoint officiel.', 'Each step follows a question from the official joint crisis plan.')}</li>
+        <li>${tr('Je commence par <strong>écrire avec mes mots</strong>. Si je manque d’idées, le bouton <strong>« Exemples »</strong> propose des formulations que je peux ajouter puis reformuler.', 'I start by <strong>writing in my own words</strong>. If I run out of ideas, the <strong>“Examples”</strong> button suggests wordings that I can add and then rephrase.')}</li>
+        <li>${tr('Chaque ligne reste modifiable.', 'Every line can still be edited.')}</li>
+        <li>${tr('À la fin, chaque signataire peut <strong>signer avec le doigt</strong> sur le téléphone, ou à la main sur la version imprimée.', 'At the end, each signatory can <strong>sign with a finger</strong> on the phone, or by hand on the printed copy.')}</li>
+        <li>${tr('Rien n’est obligatoire, vous pouvez sauter une étape et y revenir.', 'Nothing is compulsory: you can skip a step and come back to it.')}</li>
+        <li>${tr('Tout est enregistré automatiquement sur ce téléphone.', 'Everything is saved automatically on this phone.')}</li>
       </ul>
     </section>
-    <div class="nav-bottom"><a class="btn btn-ghost" href="#/">Retour</a><a class="btn btn-primary" href="#/etape/0">C’est parti</a></div>`;
+    <div class="nav-bottom"><a class="btn btn-ghost" href="#/">${tr('Retour', 'Back')}</a><a class="btn btn-primary" href="#/etape/0">${tr('C’est parti', 'Let’s start')}</a></div>`;
 }
 
 function renderStep(i) {
@@ -280,24 +316,25 @@ function renderStep(i) {
     if (refused.length) {
       const empty = !(plan.data[step.id] || []).some((x) => x.trim());
       warn = `<div class="${empty ? 'warn' : 'note'}" role="status">
-        <strong>${empty ? 'À compléter :' : 'Rappel :'}</strong> j’ai indiqué des soins à éviter. Pour chacun, je propose une alternative.
+        <strong>${empty ? tr('À compléter :', 'To complete:') : tr('Rappel :', 'Reminder:')}</strong> ${tr('j’ai indiqué des soins à éviter. Pour chacun, je propose une alternative.', 'I have listed care I want to avoid. For each one, I suggest an alternative.')}
         <ul>${refused.map((r) => `<li>${esc(r.soin)}</li>`).join('')}</ul></div>`;
     }
   }
+  const qLabel = isAdo() && LANG === 'en' ? 'JCP question (unofficial translation)' : tr('Question du PCC', 'JCP question');
 
   app.innerHTML = `
     <div class="step-top">
-      <p class="step-count">Étape ${i + 1} sur ${STEPS.length}</p>
+      <p class="step-count">${tr(`Étape ${i + 1} sur ${STEPS.length}`, `Step ${i + 1} of ${STEPS.length}`)}</p>
       <div class="bar" aria-hidden="true"><span style="width:${pct}%"></span></div>
     </div>
     <h1>${esc(step.title)}</h1>
-    <blockquote class="question"><span class="q-label">Question du PCC</span>${esc(step.question)}</blockquote>
-    <details class="tip"><summary>Conseil</summary><p>${esc(step.tip)}</p></details>
+    <blockquote class="question"><span class="q-label">${qLabel}</span>${esc(step.question)}</blockquote>
+    <details class="tip"><summary>${tr('Conseil', 'Tip')}</summary><p>${esc(step.tip)}</p></details>
     ${warn}
     <div class="step-body" data-step="${i}">${body}</div>
     <div class="nav-bottom">
-      ${i > 0 ? `<a class="btn btn-ghost" href="#/etape/${i - 1}">← Précédent</a>` : '<a class="btn btn-ghost" href="#/demarche">← Démarche</a>'}
-      ${i < STEPS.length - 1 ? `<a class="btn btn-primary" href="#/etape/${i + 1}">Suivant →</a>` : '<a class="btn btn-primary" href="#/plan">Voir mon plan →</a>'}
+      ${i > 0 ? `<a class="btn btn-ghost" href="#/etape/${i - 1}">${tr('← Précédent', '← Previous')}</a>` : `<a class="btn btn-ghost" href="#/demarche">${tr('← Démarche', '← How it works')}</a>`}
+      ${i < STEPS.length - 1 ? `<a class="btn btn-primary" href="#/etape/${i + 1}">${tr('Suivant →', 'Next →')}</a>` : `<a class="btn btn-primary" href="#/plan">${tr('Voir mon plan →', 'See my plan →')}</a>`}
     </div>`;
 }
 
@@ -307,11 +344,11 @@ function identityHTML() {
     <label class="field"><span>${label}</span>
       <input type="${type}" data-k="${k}" data-fk="id:${k}" value="${esc(v[k] || '')}" ${extra}></label>`;
   return `<div class="card form-grid">
-    ${f('prenom', 'Prénom', 'text', 'autocomplete="given-name"')}
-    ${f('nom', 'Nom', 'text', 'autocomplete="family-name"')}
-    ${f('naissance', 'Date de naissance', 'date', 'autocomplete="bday"')}
-    ${f('tel', 'Téléphone', 'tel', 'autocomplete="tel" inputmode="tel"')}
-    <label class="field field-wide"><span>Adresse</span>
+    ${f('prenom', tr('Prénom', 'First name'), 'text', 'autocomplete="given-name"')}
+    ${f('nom', tr('Nom', 'Last name'), 'text', 'autocomplete="family-name"')}
+    ${f('naissance', tr('Date de naissance', 'Date of birth'), 'date', 'autocomplete="bday"')}
+    ${f('tel', tr('Téléphone', 'Phone'), 'tel', 'autocomplete="tel" inputmode="tel"')}
+    <label class="field field-wide"><span>${tr('Adresse', 'Address')}</span>
       <textarea rows="2" data-k="adresse" data-fk="id:adresse" autocomplete="street-address">${esc(v.adresse || '')}</textarea></label>
   </div>`;
 }
@@ -321,13 +358,13 @@ function chipLabel(s) {
 }
 
 function suggestionsHTML(step, g, isOn) {
-  const list = g.suggestions || [];
+  const list = groupSuggestions(g);
   if (!list.length) return '';
   const key = step.id + ':' + g.id;
   const open = openExamples.has(key);
   return `<div class="sugg">
-    <button type="button" class="btn btn-ghost btn-sm ex-btn" data-act="examples" data-g="${g.id}" data-fk="ex:${g.id}" aria-expanded="${open}">${open ? 'Masquer les exemples' : 'Exemples'}</button>
-    ${open ? `<p class="muted small">Si un exemple me correspond, je le touche pour l’ajouter, puis je peux le reformuler avec mes mots. Je le touche à nouveau pour le retirer.</p>
+    <button type="button" class="btn btn-ghost btn-sm ex-btn" data-act="examples" data-g="${g.id}" data-fk="ex:${g.id}" aria-expanded="${open}">${open ? tr('Masquer les exemples', 'Hide examples') : tr('Exemples', 'Examples')}</button>
+    ${open ? `<p class="muted small">${tr('Si un exemple me correspond, je le touche pour l’ajouter, puis je peux le reformuler avec mes mots. Je le touche à nouveau pour le retirer.', 'If an example fits me, I tap it to add it, then I can rephrase it in my own words. I tap it again to remove it.')}</p>
     <div class="chips">${list.map((s, si) => {
       const on = isOn(s);
       return `<button type="button" class="chip" aria-pressed="${on}" data-act="chip" data-g="${g.id}" data-si="${si}" data-fk="chip:${g.id}:${si}">${on ? '✓ ' : '+ '}${esc(chipLabel(s))}</button>`;
@@ -339,23 +376,23 @@ function listGroupHTML(step, g) {
   const items = arr.map((t, idx) => `
     <li class="item">
       ${step.ordered ? `<span class="rank" aria-hidden="true">${idx + 1}</span>` : ''}
-      <textarea rows="1" class="item-input" aria-label="${esc(g.label || step.title)}, ligne ${idx + 1}" data-g="${g.id}" data-i="${idx}" data-fk="it:${g.id}:${idx}">${esc(t)}</textarea>
+      <textarea rows="1" class="item-input" aria-label="${esc(g.label || step.title)}, ${tr('ligne', 'line')} ${idx + 1}" data-g="${g.id}" data-i="${idx}" data-fk="it:${g.id}:${idx}">${esc(t)}</textarea>
       <div class="item-tools">
-        ${step.ordered ? `<button type="button" class="icon" data-act="up" data-g="${g.id}" data-i="${idx}" data-fk="up:${g.id}:${idx}" aria-label="Monter" ${idx === 0 ? 'disabled' : ''}>↑</button>
-        <button type="button" class="icon" data-act="down" data-g="${g.id}" data-i="${idx}" data-fk="down:${g.id}:${idx}" aria-label="Descendre" ${idx === arr.length - 1 ? 'disabled' : ''}>↓</button>` : ''}
-        <button type="button" class="icon icon-del" data-act="del" data-g="${g.id}" data-i="${idx}" aria-label="Supprimer">✕</button>
+        ${step.ordered ? `<button type="button" class="icon" data-act="up" data-g="${g.id}" data-i="${idx}" data-fk="up:${g.id}:${idx}" aria-label="${tr('Monter', 'Move up')}" ${idx === 0 ? 'disabled' : ''}>↑</button>
+        <button type="button" class="icon" data-act="down" data-g="${g.id}" data-i="${idx}" data-fk="down:${g.id}:${idx}" aria-label="${tr('Descendre', 'Move down')}" ${idx === arr.length - 1 ? 'disabled' : ''}>↓</button>` : ''}
+        <button type="button" class="icon icon-del" data-act="del" data-g="${g.id}" data-i="${idx}" aria-label="${tr('Supprimer', 'Delete')}">✕</button>
       </div>
     </li>`).join('');
   return `<section class="group card">
     ${g.label ? `<h2>${esc(g.label)}</h2>` : ''}
-    ${arr.length ? `<div class="kept-head"><p class="kept-label">Ce que je retiens${step.ordered ? ' <span class="muted">(par ordre de priorité)</span>' : ''}</p>${editToggleHTML(editKey(step, g))}</div>
+    ${arr.length ? `<div class="kept-head"><p class="kept-label">${tr('Ce que je retiens', 'What I keep')}${step.ordered ? ` <span class="muted">${tr('(par ordre de priorité)', '(in order of priority)')}</span>` : ''}</p>${editToggleHTML(editKey(step, g))}</div>
       ${editing.has(editKey(step, g))
         ? `<ol class="items ${step.ordered ? 'ordered' : ''}">${items}</ol>`
         : `<${step.ordered ? 'ol' : 'ul'} class="view-list ${step.ordered ? 'ordered' : ''}">${arr.map((t) => `<li>${esc(t)}</li>`).join('')}</${step.ordered ? 'ol' : 'ul'}>`}` : ''}
     <form class="free" data-act="free" data-g="${g.id}">
-      <label class="sr-only" for="free-${g.id}">Écrire avec mes mots</label>
-      <input id="free-${g.id}" data-fk="free:${g.id}" placeholder="Écrire avec mes mots…" autocomplete="off">
-      <button class="btn btn-secondary btn-sm">Ajouter</button>
+      <label class="sr-only" for="free-${g.id}">${tr('Écrire avec mes mots', 'Write in my own words')}</label>
+      <input id="free-${g.id}" data-fk="free:${g.id}" placeholder="${tr('Écrire avec mes mots…', 'Write in my own words…')}" autocomplete="off">
+      <button class="btn btn-secondary btn-sm">${tr('Ajouter', 'Add')}</button>
     </form>
     ${suggestionsHTML(step, g, (s) => arr.includes(s))}
     ${step.id === 'strategies' && g.id === 'moi' ? toolboxTeaserHTML() : ''}
@@ -377,23 +414,23 @@ function recordsGroupHTML(step, g) {
             ? `<textarea rows="2" data-g="${g.id}" data-i="${idx}" data-f="${f.key}" data-fk="rf:${g.id}:${idx}:${f.key}" placeholder="${esc(f.placeholder || '')}">${esc(r[f.key] || '')}</textarea>`
             : `<input type="${f.type === 'tel' ? 'text' : 'text'}" ${f.type === 'tel' ? 'inputmode="tel"' : ''} data-g="${g.id}" data-i="${idx}" data-f="${f.key}" data-fk="rf:${g.id}:${idx}:${f.key}" value="${esc(r[f.key] || '')}" placeholder="${esc(f.placeholder || '')}">`}
         </label>`).join('')}
-        ${r.tel && /^[\d +().-]{2,}$/.test(r.tel) ? `<a class="call" href="tel:${esc(r.tel.replace(/[^\d+]/g, ''))}">Appeler ${esc(r.tel)}</a>` : ''}
+        ${r.tel && /^[\d +().-]{2,}$/.test(r.tel) ? `<a class="call" href="tel:${esc(r.tel.replace(/[^\d+]/g, ''))}">${tr('Appeler', 'Call')} ${esc(r.tel)}</a>` : ''}
       </div>
       <div class="item-tools">
-        ${step.ordered ? `<button type="button" class="icon" data-act="up" data-g="${g.id}" data-i="${idx}" data-fk="up:${g.id}:${idx}" aria-label="Monter" ${idx === 0 ? 'disabled' : ''}>↑</button>
-        <button type="button" class="icon" data-act="down" data-g="${g.id}" data-i="${idx}" data-fk="down:${g.id}:${idx}" aria-label="Descendre" ${idx === arr.length - 1 ? 'disabled' : ''}>↓</button>` : ''}
-        <button type="button" class="icon icon-del" data-act="del" data-g="${g.id}" data-i="${idx}" aria-label="Supprimer">✕</button>
+        ${step.ordered ? `<button type="button" class="icon" data-act="up" data-g="${g.id}" data-i="${idx}" data-fk="up:${g.id}:${idx}" aria-label="${tr('Monter', 'Move up')}" ${idx === 0 ? 'disabled' : ''}>↑</button>
+        <button type="button" class="icon" data-act="down" data-g="${g.id}" data-i="${idx}" data-fk="down:${g.id}:${idx}" aria-label="${tr('Descendre', 'Move down')}" ${idx === arr.length - 1 ? 'disabled' : ''}>↓</button>` : ''}
+        <button type="button" class="icon icon-del" data-act="del" data-g="${g.id}" data-i="${idx}" aria-label="${tr('Supprimer', 'Delete')}">✕</button>
       </div>
     </li>`).join('');
   return `<section class="group card">
     ${g.label ? `<h2>${esc(g.label)}</h2>` : ''}
-    ${arr.length ? `<div class="kept-head"><p class="kept-label">${step.ordered ? 'Par ordre de priorité' : 'Ce que je retiens'}</p>${editToggleHTML(editKey(step, g))}</div>
+    ${arr.length ? `<div class="kept-head"><p class="kept-label">${step.ordered ? tr('Par ordre de priorité', 'In order of priority') : tr('Ce que je retiens', 'What I keep')}</p>${editToggleHTML(editKey(step, g))}</div>
       ${editing.has(editKey(step, g))
         ? `<ol class="records">${cards}</ol>`
         : `<${step.ordered ? 'ol' : 'ul'} class="view-list view-records ${step.ordered ? 'ordered' : ''}">${arr.map((r) => `<li>${recordSummaryHTML(step, r)}</li>`).join('')}</${step.ordered ? 'ol' : 'ul'}>`}` : ''}
     <div class="row-btns">
-      <button type="button" class="btn btn-secondary btn-sm" data-act="empty" data-g="${g.id}" data-fk="empty:${g.id}">+ Ajouter une ligne</button>
-      ${contactsEnabled(step, g) ? `<button type="button" class="btn btn-secondary btn-sm" data-act="contacts" data-g="${g.id}" data-fk="contacts:${g.id}">👤 Choisir dans mes contacts</button>` : ''}
+      <button type="button" class="btn btn-secondary btn-sm" data-act="empty" data-g="${g.id}" data-fk="empty:${g.id}">${tr('+ Ajouter une ligne', '+ Add a line')}</button>
+      ${contactsEnabled(step, g) ? `<button type="button" class="btn btn-secondary btn-sm" data-act="contacts" data-g="${g.id}" data-fk="contacts:${g.id}">${tr('👤 Choisir dans mes contacts', '👤 Choose from my contacts')}</button>` : ''}
     </div>
     ${contactsNoteHTML(step, g)}
     ${suggestionsHTML(step, g, isOn)}
@@ -405,31 +442,31 @@ function finalHTML(step) {
   const arr = getArr(step);
   const partners = (plan.data.partenaires || []).filter((r) => r.nom || r.role);
   return `<section class="card form-grid">
-      <label class="field"><span>Lieu</span><input data-k="lieu" data-fk="fin:lieu" value="${esc(v.lieu || '')}" placeholder="Ex. : CMP, à domicile…"></label>
-      <label class="field"><span>Date</span><input type="date" data-k="date" data-fk="fin:date" value="${esc(v.date || '')}"></label>
-      <button type="button" class="btn btn-ghost btn-sm" data-act="today">Mettre la date du jour</button>
+      <label class="field"><span>${tr('Lieu', 'Place')}</span><input data-k="lieu" data-fk="fin:lieu" value="${esc(v.lieu || '')}" placeholder="${tr('Ex. : CMP, à domicile…', 'E.g. clinic, at home…')}"></label>
+      <label class="field"><span>${tr('Date', 'Date')}</span><input type="date" data-k="date" data-fk="fin:date" value="${esc(v.date || '')}"></label>
+      <button type="button" class="btn btn-ghost btn-sm" data-act="today">${tr('Mettre la date du jour', 'Use today’s date')}</button>
     </section>
-    ${modifiedAfterSigning() ? `<div class="warn" role="status"><strong>Le plan a été modifié le ${esc(fmtDateTime(lastUpdate(plan)))}, après certaines signatures.</strong> Ces signatures ne figurent plus sur l’impression ni sur le PDF : relisez le plan ensemble puis signez à nouveau.</div>` : ''}
+    ${modifiedAfterSigning() ? `<div class="warn" role="status"><strong>${tr(`Le plan a été modifié le ${esc(fmtDateTime(lastUpdate(plan)))}, après certaines signatures.`, `The plan was changed on ${esc(fmtDateTime(lastUpdate(plan)))}, after some signatures.`)}</strong> ${tr('Ces signatures ne figurent plus sur l’impression ni sur le PDF : relisez le plan ensemble puis signez à nouveau.', 'These signatures no longer appear on the printout or the PDF: read the plan through together, then sign again.')}</div>` : ''}
     <section class="group card">
-      <h2>Signataires</h2>
-      <p class="muted small">Chacun·e peut signer avec le doigt directement sur ce téléphone, ou à la main sur le document imprimé.</p>
+      <h2>${tr('Signataires', 'Signatories')}</h2>
+      <p class="muted small">${tr('Chacun·e peut signer avec le doigt directement sur ce téléphone, ou à la main sur le document imprimé.', 'Everyone can sign with a finger directly on this phone, or by hand on the printed copy.')}</p>
       <div class="chips">
-        <button type="button" class="chip" data-act="me" data-fk="me">+ Moi-même</button>
-        ${partners.length ? `<button type="button" class="chip" data-act="partners" data-fk="partners">+ Mes partenaires (${partners.length})</button>` : ''}
+        <button type="button" class="chip" data-act="me" data-fk="me">${tr('+ Moi-même', '+ Me')}</button>
+        ${partners.length ? `<button type="button" class="chip" data-act="partners" data-fk="partners">${tr('+ Mes partenaires', '+ My partners')} (${partners.length})</button>` : ''}
       </div>
       ${arr.length ? `<ol class="records">${arr.map((r, idx) => `
         <li class="record"><div class="record-fields">
           ${step.fields.map((f) => `<label class="field"><span>${esc(f.label)}</span><input data-g="_" data-i="${idx}" data-f="${f.key}" data-fk="rf:_:${idx}:${f.key}" value="${esc(r[f.key] || '')}" placeholder="${esc(f.placeholder)}"></label>`).join('')}
           <div class="sig-area">
             ${r.sig
-              ? `<img class="sig-img${sigValid(r, plan) ? '' : ' stale'}" src="${r.sig}" alt="Signature de ${esc(r.nom || 'ce·tte signataire')}"><p class="muted small">Signé le ${esc(fmtDateTime(r.signedAt))}</p>
-                 ${sigValid(r, plan) ? '' : '<p class="sig-stale">⚠ Signature antérieure à la dernière modification du plan : elle n’apparaîtra pas sur l’impression ni sur le PDF. À signer à nouveau.</p>'}
-                 <div class="sig-tools"><button type="button" class="btn btn-ghost btn-sm" data-act="sign" data-i="${idx}" data-fk="sign:${idx}">Signer à nouveau</button>
-                 <button type="button" class="btn btn-ghost btn-sm" data-act="unsign" data-i="${idx}">Effacer la signature</button></div>`
-              : `<button type="button" class="btn btn-primary btn-sm" data-act="sign" data-i="${idx}" data-fk="sign:${idx}">✍ Signer sur l’écran</button>`}
+              ? `<img class="sig-img${sigValid(r, plan) ? '' : ' stale'}" src="${r.sig}" alt="${tr('Signature de', 'Signature of')} ${esc(r.nom || tr('ce·tte signataire', 'this signatory'))}"><p class="muted small">${tr('Signé le', 'Signed on')} ${esc(fmtDateTime(r.signedAt))}</p>
+                 ${sigValid(r, plan) ? '' : `<p class="sig-stale">${tr('⚠ Signature antérieure à la dernière modification du plan : elle n’apparaîtra pas sur l’impression ni sur le PDF. À signer à nouveau.', '⚠ This signature is older than the latest change to the plan: it will not appear on the printout or the PDF. Please sign again.')}</p>`}
+                 <div class="sig-tools"><button type="button" class="btn btn-ghost btn-sm" data-act="sign" data-i="${idx}" data-fk="sign:${idx}">${tr('Signer à nouveau', 'Sign again')}</button>
+                 <button type="button" class="btn btn-ghost btn-sm" data-act="unsign" data-i="${idx}">${tr('Effacer la signature', 'Clear signature')}</button></div>`
+              : `<button type="button" class="btn btn-primary btn-sm" data-act="sign" data-i="${idx}" data-fk="sign:${idx}">${tr('✍ Signer sur l’écran', '✍ Sign on screen')}</button>`}
           </div>
-        </div><div class="item-tools"><button type="button" class="icon icon-del" data-act="del" data-g="_" data-i="${idx}" aria-label="Supprimer">✕</button></div></li>`).join('')}</ol>` : '<p class="muted empty">Personne pour l’instant.</p>'}
-      <button type="button" class="btn btn-secondary btn-sm" data-act="empty" data-g="_">+ Ajouter un·e signataire</button>
+        </div><div class="item-tools"><button type="button" class="icon icon-del" data-act="del" data-g="_" data-i="${idx}" aria-label="${tr('Supprimer', 'Delete')}">✕</button></div></li>`).join('')}</ol>` : `<p class="muted empty">${tr('Personne pour l’instant.', 'No one yet.')}</p>`}
+      <button type="button" class="btn btn-secondary btn-sm" data-act="empty" data-g="_">${tr('+ Ajouter un·e signataire', '+ Add a signatory')}</button>
     </section>`;
 }
 
@@ -443,12 +480,12 @@ function signaturePad(who) {
     const d = $('#sigpad');
     d.innerHTML = `<div class="sig-inner">
       <p class="sig-who">${esc(who)}</p>
-      <p class="muted small">Signez avec le doigt dans le cadre. Tournez le téléphone pour plus de place.</p>
-      <div class="sig-canvas-wrap"><canvas aria-label="Zone de signature"></canvas><span class="sig-base" aria-hidden="true">✕</span></div>
+      <p class="muted small">${tr('Signez avec le doigt dans le cadre. Tournez le téléphone pour plus de place.', 'Sign with your finger inside the box. Turn the phone sideways for more space.')}</p>
+      <div class="sig-canvas-wrap"><canvas aria-label="${tr('Zone de signature', 'Signature area')}"></canvas><span class="sig-base" aria-hidden="true">✕</span></div>
       <div class="modal-actions">
-        <button type="button" class="btn btn-ghost" data-sig="clear">Effacer</button>
-        <button type="button" class="btn btn-ghost" data-sig="cancel">Annuler</button>
-        <button type="button" class="btn btn-primary" data-sig="ok">Valider la signature</button>
+        <button type="button" class="btn btn-ghost" data-sig="clear">${tr('Effacer', 'Clear')}</button>
+        <button type="button" class="btn btn-ghost" data-sig="cancel">${tr('Annuler', 'Cancel')}</button>
+        <button type="button" class="btn btn-primary" data-sig="ok">${tr('Valider la signature', 'Confirm signature')}</button>
       </div></div>`;
     const canvas = d.querySelector('canvas');
     const ctx = canvas.getContext('2d');
@@ -479,8 +516,7 @@ function signaturePad(who) {
       if (a === 'clear') size();
       else if (a === 'cancel') finish(null);
       else if (a === 'ok') {
-        if (!inked) { toast('La zone de signature est vide.'); return; }
-        // réduction pour limiter la place occupée
+        if (!inked) { toast(tr('La zone de signature est vide.', 'The signature area is empty.')); return; }
         // recadrage sur le tracé, puis réduction pour limiter la place occupée
         const px = ctx.getImageData(0, 0, canvas.width, canvas.height).data;
         let x1 = canvas.width, y1 = canvas.height, x2 = 0, y2 = 0;
@@ -509,60 +545,62 @@ function signaturePad(who) {
 /* ---------- boîte à outils (photos, vidéos, sons, liens) ---------- */
 
 const KINDS = {
-  photo: { icon: '📷', label: 'Photo', accept: 'image/*' },
-  video: { icon: '🎬', label: 'Vidéo', accept: 'video/*' },
-  audio: { icon: '🎵', label: 'Son ou musique', accept: 'audio/*' },
-  voix: { icon: '🎙', label: 'Message vocal' },
-  lien: { icon: '🔗', label: 'Lien' },
-  citation: { icon: '❝', label: 'Citation' },
-  album: { icon: '🖼', label: 'Album photo' },
-  exercice: { icon: '🧘', label: 'Exercice' },
+  photo: { icon: '📷', label: () => tr('Photo', 'Photo'), accept: 'image/*' },
+  video: { icon: '🎬', label: () => tr('Vidéo', 'Video'), accept: 'video/*' },
+  audio: { icon: '🎵', label: () => tr('Son ou musique', 'Sound or music'), accept: 'audio/*' },
+  voix: { icon: '🎙', label: () => tr('Message vocal', 'Voice message') },
+  lien: { icon: '🔗', label: () => tr('Lien', 'Link') },
+  citation: { icon: '❝', label: () => tr('Citation', 'Quote') },
+  album: { icon: '🖼', label: () => tr('Album photo', 'Photo album') },
+  exercice: { icon: '🧘', label: () => tr('Exercice', 'Exercise') },
 };
-const SIZES = [['s', 'Petit'], ['m', 'Moyen'], ['l', 'Grand']];
+const SIZES = () => [['s', tr('Petit', 'Small')], ['m', tr('Moyen', 'Medium')], ['l', tr('Grand', 'Large')]];
 const dossiers = () => (plan.data.dossiers ??= []);
 const openFolders = new Set(); // dossiers dépliés (session)
 
 /* Exemples de citations (affichés seulement sur demande) :
    phrases-repères rédigées pour Mon PCC et extraits d'auteurs
    (traductions reformulées). La « prière de la sérénité », souvent attribuée
-   à Marc Aurèle, est du théologien Reinhold Niebuhr (années 1930-1940). */
-const QUOTES = [
-  { text: 'Cette vague passera, comme les autres sont passées.' },
-  { text: 'J’ai déjà traversé des moments difficiles. Je peux traverser celui-ci.' },
-  { text: 'Je n’ai pas à tout régler aujourd’hui. Juste le prochain pas.' },
-  { text: 'Ce que je ressens est réel, et ça ne durera pas toujours.' },
-  { text: 'Demander de l’aide, c’est prendre soin de moi.' },
-  { text: 'Je suis plus que ce moment difficile.' },
-  { text: 'Une respiration à la fois.' },
-  { text: 'Je fais de mon mieux, et c’est suffisant pour aujourd’hui.' },
-  { text: 'Mes émotions sont des visiteuses : elles viennent, puis elles repartent.' },
-  { text: 'Je ne suis pas seul·e.' },
-  { text: 'Prendre soin de moi n’est pas égoïste.' },
-  { text: 'Les mauvais jours ne font pas une mauvaise vie.' },
-  { text: 'Je me parle comme je parlerais à quelqu’un que j’aime.' },
-  { text: 'J’ai le droit de ralentir.' },
-  { text: 'Parmi les choses, les unes dépendent de nous, les autres n’en dépendent pas.', author: 'Épictète, Manuel' },
-  { text: 'Ce ne sont pas les choses qui nous troublent, mais les jugements que nous portons sur elles.', author: 'Épictète, Manuel' },
-  { text: 'Nous souffrons plus souvent en imagination que dans la réalité.', author: 'Sénèque, Lettres à Lucilius' },
-  { text: 'Que la force me soit donnée d’accepter ce qui ne peut être changé, le courage de changer ce qui peut l’être, et surtout la sagesse de distinguer l’un de l’autre.', author: 'Prière de la sérénité, Reinhold Niebuhr' },
-  { text: 'Ce n’est pas parce que les choses sont difficiles que nous n’osons pas, c’est parce que nous n’osons pas qu’elles sont difficiles.', author: 'Sénèque, Lettres à Lucilius' },
-  { text: 'Nulle part on ne trouve de retraite plus paisible qu’en son âme.', author: 'Marc Aurèle, Pensées' },
-  { text: 'L’âme prend la couleur de ses pensées.', author: 'Marc Aurèle, Pensées' },
-  { text: 'Qui craint de souffrir souffre déjà de ce qu’il craint.', author: 'Montaigne, Essais' },
-  { text: 'Un voyage de mille lieues commence par un pas.', author: 'Lao Tseu, Tao Te King' },
-  { text: 'L’espoir est cette chose à plumes qui se pose dans l’âme.', author: 'Emily Dickinson' },
-  { text: 'Laisse tout t’arriver, la beauté comme l’effroi. Avance simplement : aucun sentiment n’est définitif.', author: 'Rainer Maria Rilke, Le Livre d’heures' },
+   à Marc Aurèle, est du théologien Reinhold Niebuhr (années 1930-1940).
+   En anglais : texte d'origine pour les auteurs anglophones. */
+const QUOTES_ALL = [
+  { fr: { text: 'Cette vague passera, comme les autres sont passées.' }, en: { text: 'This wave will pass, like the others have.' } },
+  { fr: { text: 'J’ai déjà traversé des moments difficiles. Je peux traverser celui-ci.' }, en: { text: 'I have got through hard times before. I can get through this one.' } },
+  { fr: { text: 'Je n’ai pas à tout régler aujourd’hui. Juste le prochain pas.' }, en: { text: 'I don’t have to fix everything today. Just the next step.' } },
+  { fr: { text: 'Ce que je ressens est réel, et ça ne durera pas toujours.' }, en: { text: 'What I feel is real, and it won’t last forever.' } },
+  { fr: { text: 'Demander de l’aide, c’est prendre soin de moi.' }, en: { text: 'Asking for help is taking care of myself.' } },
+  { fr: { text: 'Je suis plus que ce moment difficile.' }, en: { text: 'I am more than this difficult moment.' } },
+  { fr: { text: 'Une respiration à la fois.' }, en: { text: 'One breath at a time.' } },
+  { fr: { text: 'Je fais de mon mieux, et c’est suffisant pour aujourd’hui.' }, en: { text: 'I am doing my best, and that is enough for today.' } },
+  { fr: { text: 'Mes émotions sont des visiteuses : elles viennent, puis elles repartent.' }, en: { text: 'My emotions are visitors: they come, and then they go.' } },
+  { fr: { text: 'Je ne suis pas seul·e.' }, en: { text: 'I am not alone.' } },
+  { fr: { text: 'Prendre soin de moi n’est pas égoïste.' }, en: { text: 'Taking care of myself is not selfish.' } },
+  { fr: { text: 'Les mauvais jours ne font pas une mauvaise vie.' }, en: { text: 'Bad days don’t make a bad life.' } },
+  { fr: { text: 'Je me parle comme je parlerais à quelqu’un que j’aime.' }, en: { text: 'I speak to myself the way I would speak to someone I love.' } },
+  { fr: { text: 'J’ai le droit de ralentir.' }, en: { text: 'I am allowed to slow down.' } },
+  { fr: { text: 'Parmi les choses, les unes dépendent de nous, les autres n’en dépendent pas.', author: 'Épictète, Manuel' }, en: { text: 'Some things are within our power, and some are not.', author: 'Epictetus, Enchiridion' } },
+  { fr: { text: 'Ce ne sont pas les choses qui nous troublent, mais les jugements que nous portons sur elles.', author: 'Épictète, Manuel' }, en: { text: 'It is not things that disturb us, but our judgements about them.', author: 'Epictetus, Enchiridion' } },
+  { fr: { text: 'Nous souffrons plus souvent en imagination que dans la réalité.', author: 'Sénèque, Lettres à Lucilius' }, en: { text: 'We suffer more often in imagination than in reality.', author: 'Seneca, Letters to Lucilius' } },
+  { fr: { text: 'Que la force me soit donnée d’accepter ce qui ne peut être changé, le courage de changer ce qui peut l’être, et surtout la sagesse de distinguer l’un de l’autre.', author: 'Prière de la sérénité, Reinhold Niebuhr' }, en: { text: 'Grant me the serenity to accept the things I cannot change, the courage to change the things I can, and the wisdom to know the difference.', author: 'Serenity Prayer, Reinhold Niebuhr' } },
+  { fr: { text: 'Ce n’est pas parce que les choses sont difficiles que nous n’osons pas, c’est parce que nous n’osons pas qu’elles sont difficiles.', author: 'Sénèque, Lettres à Lucilius' }, en: { text: 'It is not because things are difficult that we do not dare; it is because we do not dare that they are difficult.', author: 'Seneca, Letters to Lucilius' } },
+  { fr: { text: 'Nulle part on ne trouve de retraite plus paisible qu’en son âme.', author: 'Marc Aurèle, Pensées' }, en: { text: 'Nowhere can one find a quieter retreat than in one’s own soul.', author: 'Marcus Aurelius, Meditations' } },
+  { fr: { text: 'L’âme prend la couleur de ses pensées.', author: 'Marc Aurèle, Pensées' }, en: { text: 'The soul takes on the colour of its thoughts.', author: 'Marcus Aurelius, Meditations' } },
+  { fr: { text: 'Qui craint de souffrir souffre déjà de ce qu’il craint.', author: 'Montaigne, Essais' }, en: { text: 'Whoever fears suffering already suffers from what they fear.', author: 'Montaigne, Essays' } },
+  { fr: { text: 'Un voyage de mille lieues commence par un pas.', author: 'Lao Tseu, Tao Te King' }, en: { text: 'A journey of a thousand miles begins with a single step.', author: 'Lao Tzu, Tao Te Ching' } },
+  { fr: { text: 'L’espoir est cette chose à plumes qui se pose dans l’âme.', author: 'Emily Dickinson' }, en: { text: '“Hope” is the thing with feathers that perches in the soul.', author: 'Emily Dickinson' } },
+  { fr: { text: 'Laisse tout t’arriver, la beauté comme l’effroi. Avance simplement : aucun sentiment n’est définitif.', author: 'Rainer Maria Rilke, Le Livre d’heures' }, en: { text: 'Let everything happen to you, beauty and terror alike. Just keep going: no feeling is final.', author: 'Rainer Maria Rilke, The Book of Hours' } },
 ];
+const quotes = () => QUOTES_ALL.map((q) => q[LANG] || q.fr);
 
 /** Libellé court d'un élément de la boîte à outils */
 function tbLabel(it) {
   if (it.kind === 'citation') {
     const t = (it.text || '').trim();
-    return t ? '« ' + (t.length > 40 ? t.slice(0, 38) + '…' : t) + ' »' : 'Citation';
+    return t ? tr('« ', '“') + (t.length > 40 ? t.slice(0, 38) + '…' : t) + tr(' »', '”') : tr('Citation', 'Quote');
   }
-  if (it.kind === 'exercice') return exerciseById(it.ex)?.name || 'Exercice';
-  if (it.kind === 'album') return it.title || `Album (${(it.photos || []).length} photo${(it.photos || []).length > 1 ? 's' : ''})`;
-  return it.title || KINDS[it.kind].label;
+  if (it.kind === 'exercice') return exerciseById(it.ex)?.name || tr('Exercice', 'Exercise');
+  if (it.kind === 'album') { const n = (it.photos || []).length; return it.title || `${tr('Album', 'Album')} (${n} photo${n > 1 ? 's' : ''})`; }
+  return it.title || KINDS[it.kind].label();
 }
 const mediaURLs = new Map(); // id -> URL d'affichage (session)
 const embedLoaded = new Set(); // liens dont le lecteur intégré a été ouvert (session)
@@ -581,11 +619,11 @@ async function confirmEmbed(provider) {
   try { if (localStorage.getItem(EMBED_OK)) return true; } catch { /* stockage indisponible */ }
   let remember = false;
   const ok = await modal({
-    title: `Lire ici depuis ${provider} ?`,
-    body: `<p>Pour lire ce contenu dans Mon PCC, mon téléphone va se connecter à <strong>${esc(provider)}</strong>. Ce site recevra mon adresse IP et saura ce que je regarde ou j’écoute, comme si j’ouvrais le lien.</p>
-      <p class="small muted">Mon plan, lui, n’est jamais transmis.</p>
-      <label class="check"><input type="checkbox" id="embed-remember"> Ne plus me demander sur cet appareil</label>`,
-    ok: 'Lire ici',
+    title: tr(`Lire ici depuis ${provider} ?`, `Play here from ${provider}?`),
+    body: `<p>${tr(`Pour lire ce contenu dans Mon PCC, mon téléphone va se connecter à <strong>${esc(provider)}</strong>. Ce site recevra mon adresse IP et saura ce que je regarde ou j’écoute, comme si j’ouvrais le lien.`, `To play this content in Mon PCC, my phone will connect to <strong>${esc(provider)}</strong>. That site will receive my IP address and know what I watch or listen to, as if I opened the link.`)}</p>
+      <p class="small muted">${tr('Mon plan, lui, n’est jamais transmis.', 'My plan itself is never sent.')}</p>
+      <label class="check"><input type="checkbox" id="embed-remember"> ${tr('Ne plus me demander sur cet appareil', 'Don’t ask me again on this device')}</label>`,
+    ok: tr('Lire ici', 'Play here'),
   });
   remember = !!document.getElementById('embed-remember')?.checked;
   if (ok && remember) { try { localStorage.setItem(EMBED_OK, '1'); } catch { /* ignoré */ } }
@@ -600,11 +638,12 @@ function toolboxHomeHTML() {
 
 function toolboxTeaserHTML(href = '#/boite-outils/etape') {
   const items = plan.data.boiteOutils || [];
+  const n = items.length;
   return `<div class="tb-teaser">
-    <h3>🧰 Ma boîte à outils</h3>
-    <p class="muted small">J’y range ce qui m’aide à aller mieux : une photo qui m’apaise, une musique, une vidéo, un message que je me suis enregistré, une citation, un lien…</p>
-    ${items.length ? `<p class="small"><strong>${items.length} élément${items.length > 1 ? 's' : ''}</strong> : ${items.slice(0, 4).map((it) => esc(KINDS[it.kind].icon + ' ' + tbLabel(it))).join(' · ')}${items.length > 4 ? '…' : ''}</p>` : ''}
-    <a class="btn btn-secondary btn-sm" href="${href}">${items.length ? 'Ouvrir ma boîte à outils' : 'Créer ma boîte à outils'}</a>
+    <h3>🧰 ${tr('Ma boîte à outils', 'My toolbox')}</h3>
+    <p class="muted small">${tr('J’y range ce qui m’aide à aller mieux : une photo qui m’apaise, une musique, une vidéo, un message que je me suis enregistré, une citation, un lien…', 'I keep what helps me feel better here: a photo that calms me, music, a video, a message I recorded for myself, a quote, a link…')}</p>
+    ${n ? `<p class="small"><strong>${n} ${tr(plural(n, 'élément', 'éléments'), plural(n, 'item', 'items'))}</strong>${tr(' :', ':')} ${items.slice(0, 4).map((it) => esc(KINDS[it.kind].icon + ' ' + tbLabel(it))).join(' · ')}${n > 4 ? '…' : ''}</p>` : ''}
+    <a class="btn btn-secondary btn-sm" href="${href}">${n ? tr('Ouvrir ma boîte à outils', 'Open my toolbox') : tr('Créer ma boîte à outils', 'Create my toolbox')}</a>
   </div>`;
 }
 
@@ -612,25 +651,25 @@ function renderToolbox(fromStep) {
   const items = toolbox();
   const stepIdx = STEPS.findIndex((x) => x.id === 'strategies');
   app.innerHTML = `
-    <h1>🧰 Ma boîte à outils</h1>
-    <p class="lead">Ce qui m’aide quand ça ne va pas : une photo qui m’apaise, une musique, une vidéo, un message vocal que je me suis enregistré quand j’allais bien, une citation, un lien utile…</p>
-    ${items.length ? `<div class="kept-head"><h2 class="tb-mine">Mes éléments</h2>${editToggleHTML('toolbox', 'Modifier mes éléments')}</div>
-      ${editing.has('toolbox') ? `${foldersBarHTML()}<ol class="tb-list">${items.map((it, idx) => toolboxItemHTML(it, idx, items.length)).join('')}</ol>` : toolboxGridHTML(items)}` : '<p class="muted empty center">Ma boîte à outils est vide pour l’instant.</p>'}
+    <h1>🧰 ${tr('Ma boîte à outils', 'My toolbox')}</h1>
+    <p class="lead">${tr('Ce qui m’aide quand ça ne va pas : une photo qui m’apaise, une musique, une vidéo, un message vocal que je me suis enregistré quand j’allais bien, une citation, un lien utile…', 'What helps me when things are hard: a photo that calms me, music, a video, a voice message I recorded when I was feeling well, a quote, a useful link…')}</p>
+    ${items.length ? `<div class="kept-head"><h2 class="tb-mine">${tr('Mes éléments', 'My items')}</h2>${editToggleHTML('toolbox', tr('Modifier mes éléments', 'Edit my items'))}</div>
+      ${editing.has('toolbox') ? `${foldersBarHTML()}<ol class="tb-list">${items.map((it, idx) => toolboxItemHTML(it, idx, items.length)).join('')}</ol>` : toolboxGridHTML(items)}` : `<p class="muted empty center">${tr('Ma boîte à outils est vide pour l’instant.', 'My toolbox is empty for now.')}</p>`}
     <section class="card tb-add">
-      <h2>Ajouter</h2>
+      <h2>${tr('Ajouter', 'Add')}</h2>
       <div class="tb-add-grid">
-        ${['photo', 'video', 'audio'].map((k) => `<label class="btn btn-secondary tb-add-btn"><span aria-hidden="true">${KINDS[k].icon}</span> ${KINDS[k].label}<input type="file" accept="${KINDS[k].accept}" data-act="tb-file" data-kind="${k}" hidden></label>`).join('')}
-        <label class="btn btn-secondary tb-add-btn"><span aria-hidden="true">🖼</span> Album photo<input type="file" accept="image/*" multiple data-act="tb-album-new" hidden></label>
-        <button type="button" class="btn btn-secondary tb-add-btn" data-act="tb-link-new"><span aria-hidden="true">🔗</span> Lien</button>
-        <button type="button" class="btn btn-secondary tb-add-btn" data-act="tb-quote-new"><span aria-hidden="true">❝</span> Citation</button>
-        <button type="button" class="btn btn-secondary tb-add-btn" data-act="tb-exercises"><span aria-hidden="true">🧘</span> Exercice</button>
-        ${canRecord() ? `<button type="button" class="btn btn-secondary tb-add-btn" data-act="tb-record"><span aria-hidden="true">🎙</span> M’enregistrer</button>
-        <button type="button" class="btn btn-secondary tb-add-btn" data-act="tb-video"><span aria-hidden="true">🎥</span> Me filmer</button>` : ''}
+        ${['photo', 'video', 'audio'].map((k) => `<label class="btn btn-secondary tb-add-btn"><span aria-hidden="true">${KINDS[k].icon}</span> ${KINDS[k].label()}<input type="file" accept="${KINDS[k].accept}" data-act="tb-file" data-kind="${k}" hidden></label>`).join('')}
+        <label class="btn btn-secondary tb-add-btn"><span aria-hidden="true">🖼</span> ${tr('Album photo', 'Photo album')}<input type="file" accept="image/*" multiple data-act="tb-album-new" hidden></label>
+        <button type="button" class="btn btn-secondary tb-add-btn" data-act="tb-link-new"><span aria-hidden="true">🔗</span> ${tr('Lien', 'Link')}</button>
+        <button type="button" class="btn btn-secondary tb-add-btn" data-act="tb-quote-new"><span aria-hidden="true">❝</span> ${tr('Citation', 'Quote')}</button>
+        <button type="button" class="btn btn-secondary tb-add-btn" data-act="tb-exercises"><span aria-hidden="true">🧘</span> ${tr('Exercice', 'Exercise')}</button>
+        ${canRecord() ? `<button type="button" class="btn btn-secondary tb-add-btn" data-act="tb-record"><span aria-hidden="true">🎙</span> ${tr('M’enregistrer', 'Record myself')}</button>
+        <button type="button" class="btn btn-secondary tb-add-btn" data-act="tb-video"><span aria-hidden="true">🎥</span> ${tr('Me filmer', 'Film myself')}</button>` : ''}
       </div>
-      <p class="muted small">Tout reste sur ce téléphone${store.isProtected() ? ', chiffré avec mon code' : ''}. Dans le plan imprimé ou envoyé, seuls les titres, les liens et les citations apparaissent, jamais les photos, vidéos ou sons.</p>
+      <p class="muted small">${tr('Tout reste sur ce téléphone', 'Everything stays on this phone')}${store.isProtected() ? tr(', chiffré avec mon code', ', encrypted with my code') : ''}. ${tr('Dans le plan imprimé ou envoyé, seuls les titres, les liens et les citations apparaissent, jamais les photos, vidéos ou sons.', 'In the printed or sent plan, only titles, links and quotes appear, never photos, videos or sounds.')}</p>
     </section>
     <div class="nav-bottom">
-      ${fromStep ? `<a class="btn btn-ghost" href="#/etape/${stepIdx}">← Retour à l’étape 7</a>` : '<a class="btn btn-ghost" href="#/">← Accueil</a>'}
+      ${fromStep ? `<a class="btn btn-ghost" href="#/etape/${stepIdx}">${tr(`← Retour à l’étape ${stepIdx + 1}`, `← Back to step ${stepIdx + 1}`)}</a>` : `<a class="btn btn-ghost" href="#/">${tr('← Accueil', '← Home')}</a>`}
     </div>`;
   fillMedia();
 }
@@ -644,7 +683,7 @@ function toolboxGridHTML(items) {
     const inside = items.filter((it) => it.folder === d.id);
     h += `<details class="tb-folder" data-folder="${esc(d.id)}" ${openFolders.has(d.id) ? 'open' : ''}>
       <summary><span class="tbf-ico" aria-hidden="true">📁</span><span class="tbf-name">${esc(d.name)}</span><span class="tbf-count">${inside.length}</span></summary>
-      ${inside.length ? `<div class="tbv-grid">${inside.map(cell).join('')}</div>` : '<p class="muted small empty">Dossier vide. Je range des éléments ici avec ✏️.</p>'}
+      ${inside.length ? `<div class="tbv-grid">${inside.map(cell).join('')}</div>` : `<p class="muted small empty">${tr('Dossier vide. Je range des éléments ici avec ✏️.', 'Empty folder. I can put items here with ✏️.')}</p>`}
     </details>`;
   }
   return h;
@@ -653,11 +692,11 @@ function toolboxGridHTML(items) {
 /** Barre de gestion des dossiers (mode modification) */
 function foldersBarHTML() {
   return `<div class="tb-folders-bar">
-    <p class="kept-label">📁 Mes dossiers</p>
+    <p class="kept-label">📁 ${tr('Mes dossiers', 'My folders')}</p>
     <div class="chips">${dossiers().map((d) => `<span class="chip folder-chip">${esc(d.name)}
-      <button type="button" class="chip-x" data-act="folder-rename" data-id="${esc(d.id)}" aria-label="Renommer ${esc(d.name)}">✎</button>
-      <button type="button" class="chip-x" data-act="folder-del" data-id="${esc(d.id)}" aria-label="Supprimer ${esc(d.name)}">✕</button></span>`).join('')}
-      <button type="button" class="chip" data-act="folder-new" data-fk="folder-new">＋ Nouveau dossier</button></div>
+      <button type="button" class="chip-x" data-act="folder-rename" data-id="${esc(d.id)}" aria-label="${tr('Renommer', 'Rename')} ${esc(d.name)}">✎</button>
+      <button type="button" class="chip-x" data-act="folder-del" data-id="${esc(d.id)}" aria-label="${tr('Supprimer', 'Delete')} ${esc(d.name)}">✕</button></span>`).join('')}
+      <button type="button" class="chip" data-act="folder-new" data-fk="folder-new">＋ ${tr('Nouveau dossier', 'New folder')}</button></div>
   </div>`;
 }
 
@@ -665,7 +704,7 @@ function foldersBarHTML() {
 function toolboxViewHTML(it, idx) {
   const title = it.title ? `<p class="tbv-title" data-title-for="${idx}">${esc(it.title)}</p>` : `<p class="tbv-title" data-title-for="${idx}" hidden></p>`;
   if (it.kind === 'citation') {
-    return `<blockquote class="tbv tbv-quote"><p>« ${esc(it.text || '')} »</p>${it.author ? `<cite>— ${esc(it.author)}</cite>` : ''}</blockquote>`;
+    return `<blockquote class="tbv tbv-quote"><p>${tr('« ', '“')}${esc(it.text || '')}${tr(' »', '”')}</p>${it.author ? `<cite>— ${esc(it.author)}</cite>` : ''}</blockquote>`;
   }
   if (it.kind === 'exercice') {
     const e = exerciseById(it.ex);
@@ -680,19 +719,19 @@ function toolboxViewHTML(it, idx) {
     const max = it.size === 's' ? 4 : 6;
     return `<div class="tbv tbv-album">
       <p class="tbv-title">🖼 ${esc(tbLabel(it))}</p>
-      <div class="album-grid n${Math.min(ph.length, max)}">${ph.slice(0, max).map((p, k) => `<button type="button" class="album-th" data-act="lightbox" data-i="${idx}" data-k="${k}" aria-label="Voir la photo ${k + 1} sur ${ph.length}">
+      <div class="album-grid n${Math.min(ph.length, max)}">${ph.slice(0, max).map((p, k) => `<button type="button" class="album-th" data-act="lightbox" data-i="${idx}" data-k="${k}" aria-label="${tr(`Voir la photo ${k + 1} sur ${ph.length}`, `View photo ${k + 1} of ${ph.length}`)}">
         <img data-media="${esc(p.file)}" alt="">${k === max - 1 && ph.length > max ? `<span class="album-more">+${ph.length - max}</span>` : ''}</button>`).join('')}</div>
     </div>`;
   }
   if (it.kind === 'photo') {
-    return `<figure class="tbv tbv-photo"><button type="button" class="photo-open" data-act="lightbox" data-i="${idx}" data-k="0" aria-label="Agrandir la photo"><img data-media="${esc(it.file)}" alt="${esc(it.title || 'Photo')}"></button>${it.title ? `<figcaption>${esc(it.title)}</figcaption>` : ''}</figure>`;
+    return `<figure class="tbv tbv-photo"><button type="button" class="photo-open" data-act="lightbox" data-i="${idx}" data-k="0" aria-label="${tr('Agrandir la photo', 'Enlarge photo')}"><img data-media="${esc(it.file)}" alt="${esc(it.title || 'Photo')}"></button>${it.title ? `<figcaption>${esc(it.title)}</figcaption>` : ''}</figure>`;
   }
   if (it.kind === 'video') {
     return `<figure class="tbv tbv-video"><video data-media="${esc(it.file)}" controls playsinline preload="metadata"></video>${it.title ? `<figcaption>${esc(it.title)}</figcaption>` : ''}</figure>`;
   }
   if (it.kind === 'audio' || it.kind === 'voix') {
     return `<div class="tbv tbv-audio"><span class="tbv-ico" aria-hidden="true">${KINDS[it.kind].icon}</span><div class="tbv-col">
-      <p class="tbv-title">${esc(it.title || KINDS[it.kind].label)}</p><audio data-media="${esc(it.file)}" controls preload="metadata"></audio></div></div>`;
+      <p class="tbv-title">${esc(it.title || KINDS[it.kind].label())}</p><audio data-media="${esc(it.file)}" controls preload="metadata"></audio></div></div>`;
   }
   if (it.kind === 'lien') {
     let host = '';
@@ -700,12 +739,12 @@ function toolboxViewHTML(it, idx) {
     const e = parseEmbed(it.url);
     if (!e) {
       return `<a class="tbv tbv-link" href="${esc(it.url)}" target="_blank" rel="noopener noreferrer"><span class="tbv-ico" aria-hidden="true">🔗</span>
-        <span class="tbv-col"><span class="tbv-title">${esc(it.title || host || 'Lien')}</span><span class="muted small">${esc(host)} ↗</span></span></a>`;
+        <span class="tbv-col"><span class="tbv-title">${esc(it.title || host || tr('Lien', 'Link'))}</span><span class="muted small">${esc(host)} ↗</span></span></a>`;
     }
     const inner = embedLoaded.has(it.url)
       ? embedPlayerHTML(e, it.title)
       : `<button type="button" class="embed-ph compact" data-act="tb-embed" data-i="${idx}"><span class="embed-play" aria-hidden="true">▶</span>
-          <span class="embed-lbl">${esc(it.title || 'Lire ici')}</span><span class="embed-sub">${esc(e.provider)} · se connecte à ce site</span></button>`;
+          <span class="embed-lbl">${esc(it.title || tr('Lire ici', 'Play here'))}</span><span class="embed-sub">${esc(e.provider)} · ${tr('se connecte à ce site', 'connects to this site')}</span></button>`;
     return `<div class="tbv tbv-embed">${it.title && embedLoaded.has(it.url) ? title : ''}<div class="tb-body">${inner}</div></div>`;
   }
   return '';
@@ -714,13 +753,21 @@ function toolboxViewHTML(it, idx) {
 /** Réglages communs en mode modification : taille et dossier */
 function itemControlsHTML(it, idx) {
   return `<div class="tb-ctrl">
-    <div class="seg" role="group" aria-label="Taille d’affichage">${SIZES.map(([v, l]) => `<button type="button" class="seg-btn" data-act="tb-size" data-i="${idx}" data-s="${v}" aria-pressed="${(it.size || 'm') === v}">${l}</button>`).join('')}</div>
-    <label class="tb-folder-sel"><span class="sr-only">Dossier</span><select data-act="tb-folder" data-i="${idx}">
-      <option value="">📂 Hors dossier</option>
+    <div class="seg" role="group" aria-label="${tr('Taille d’affichage', 'Display size')}">${SIZES().map(([v, l]) => `<button type="button" class="seg-btn" data-act="tb-size" data-i="${idx}" data-s="${v}" aria-pressed="${(it.size || 'm') === v}">${l}</button>`).join('')}</div>
+    <label class="tb-folder-sel"><span class="sr-only">${tr('Dossier', 'Folder')}</span><select data-act="tb-folder" data-i="${idx}">
+      <option value="">📂 ${tr('Hors dossier', 'No folder')}</option>
       ${dossiers().map((d) => `<option value="${esc(d.id)}" ${it.folder === d.id ? 'selected' : ''}>📁 ${esc(d.name)}</option>`).join('')}
-      <option value="__new">＋ Nouveau dossier…</option>
+      <option value="__new">＋ ${tr('Nouveau dossier…', 'New folder…')}</option>
     </select></label>
   </div>`;
+}
+
+function itemToolsHTML(idx, n, delLabel = tr('Supprimer', 'Delete')) {
+  return `<div class="tb-tools">
+      <button type="button" class="icon" data-act="tb-up" data-i="${idx}" data-fk="tb-up:${idx}" aria-label="${tr('Monter', 'Move up')}" ${idx === 0 ? 'disabled' : ''}>↑</button>
+      <button type="button" class="icon" data-act="tb-down" data-i="${idx}" data-fk="tb-down:${idx}" aria-label="${tr('Descendre', 'Move down')}" ${idx === n - 1 ? 'disabled' : ''}>↓</button>
+      <button type="button" class="icon icon-del" data-act="tb-del" data-i="${idx}" aria-label="${esc(delLabel)}">✕</button>
+    </div>`;
 }
 
 function toolboxItemHTML(it, idx, n) {
@@ -729,13 +776,13 @@ function toolboxItemHTML(it, idx, n) {
   if (it.kind === 'album') {
     const others = toolbox().map((x, j) => [x, j]).filter(([x]) => x.kind === 'photo');
     body = `<div class="album-edit">${(it.photos || []).map((p, j) => `<div class="album-ed-th"><img data-media="${esc(p.file)}" alt="">
-        <button type="button" class="chip-x" data-act="album-out" data-i="${idx}" data-k="${j}" aria-label="Sortir cette photo de l’album">⤴</button>
-        <button type="button" class="chip-x danger" data-act="album-del" data-i="${idx}" data-k="${j}" aria-label="Supprimer cette photo">✕</button></div>`).join('')}</div>
-      <label class="btn btn-secondary btn-sm file-btn">＋ Ajouter des photos<input type="file" accept="image/*" multiple data-act="album-add" data-i="${idx}" hidden></label>
-      ${others.length ? `<p class="muted small">Ou y ranger une photo déjà dans ma boîte :</p><div class="album-pick">${others.map(([x, j]) => `<button type="button" class="album-pick-th" data-act="album-take" data-i="${idx}" data-j="${j}" aria-label="Ajouter ${esc(x.title || 'cette photo')} à l’album"><img data-media="${esc(x.file)}" alt=""><span>＋</span></button>`).join('')}</div>` : ''}`;
+        <button type="button" class="chip-x" data-act="album-out" data-i="${idx}" data-k="${j}" aria-label="${tr('Sortir cette photo de l’album', 'Take this photo out of the album')}">⤴</button>
+        <button type="button" class="chip-x danger" data-act="album-del" data-i="${idx}" data-k="${j}" aria-label="${tr('Supprimer cette photo', 'Delete this photo')}">✕</button></div>`).join('')}</div>
+      <label class="btn btn-secondary btn-sm file-btn">＋ ${tr('Ajouter des photos', 'Add photos')}<input type="file" accept="image/*" multiple data-act="album-add" data-i="${idx}" hidden></label>
+      ${others.length ? `<p class="muted small">${tr('Ou y ranger une photo déjà dans ma boîte :', 'Or move in a photo already in my toolbox:')}</p><div class="album-pick">${others.map(([x, j]) => `<button type="button" class="album-pick-th" data-act="album-take" data-i="${idx}" data-j="${j}" aria-label="${tr(`Ajouter ${esc(x.title || 'cette photo')} à l’album`, `Add ${esc(x.title || 'this photo')} to the album`)}"><img data-media="${esc(x.file)}" alt=""><span>＋</span></button>`).join('')}</div>` : ''}`;
   }
   if (it.kind === 'photo') body = `<img class="tb-media" data-media="${esc(it.file)}" alt="${esc(it.title || 'Photo')}">
-    <button type="button" class="btn btn-ghost btn-sm" data-act="album-from" data-i="${idx}">🖼 Créer un album avec cette photo</button>`;
+    <button type="button" class="btn btn-ghost btn-sm" data-act="album-from" data-i="${idx}">🖼 ${tr('Créer un album avec cette photo', 'Make an album with this photo')}</button>`;
   else if (it.kind === 'video') body = `<video class="tb-media" data-media="${esc(it.file)}" controls playsinline preload="metadata"></video>`;
   else if (it.kind === 'audio' || it.kind === 'voix') body = `<audio class="tb-audio" data-media="${esc(it.file)}" controls preload="metadata"></audio>`;
   else if (it.kind === 'lien') {
@@ -743,57 +790,45 @@ function toolboxItemHTML(it, idx, n) {
     try { host = new URL(it.url).hostname.replace(/^www\./, ''); } catch { /* lien invalide */ }
     const e = parseEmbed(it.url);
     if (e && embedLoaded.has(it.url)) {
-      body = `${embedPlayerHTML(e, it.title)}<a class="small tb-open-small" href="${esc(it.url)}" target="_blank" rel="noopener noreferrer">Ouvrir sur ${esc(e.provider)} ↗</a>`;
+      body = `${embedPlayerHTML(e, it.title)}<a class="small tb-open-small" href="${esc(it.url)}" target="_blank" rel="noopener noreferrer">${tr('Ouvrir sur', 'Open on')} ${esc(e.provider)} ↗</a>`;
     } else if (e) {
       body = `<button type="button" class="embed-ph" data-act="tb-embed" data-i="${idx}" ${e.ratio ? `style="aspect-ratio:${Math.max(e.ratio, 1.4).toFixed(4)}"` : ''}>
           <span class="embed-play" aria-hidden="true">▶</span>
-          <span class="embed-lbl">Lire ici</span>
-          <span class="embed-sub">${esc(e.provider)} · se connecte à ce site</span>
+          <span class="embed-lbl">${tr('Lire ici', 'Play here')}</span>
+          <span class="embed-sub">${esc(e.provider)} · ${tr('se connecte à ce site', 'connects to this site')}</span>
         </button>
-        <a class="small tb-open-small" href="${esc(it.url)}" target="_blank" rel="noopener noreferrer">Ouvrir sur ${esc(e.provider)} ↗</a>`;
+        <a class="small tb-open-small" href="${esc(it.url)}" target="_blank" rel="noopener noreferrer">${tr('Ouvrir sur', 'Open on')} ${esc(e.provider)} ↗</a>`;
     } else {
-      body = `<a class="btn btn-primary btn-sm tb-open" href="${esc(it.url)}" target="_blank" rel="noopener noreferrer">Ouvrir ${esc(host || 'le lien')} ↗</a>`;
+      body = `<a class="btn btn-primary btn-sm tb-open" href="${esc(it.url)}" target="_blank" rel="noopener noreferrer">${tr('Ouvrir', 'Open')} ${esc(host || tr('le lien', 'the link'))} ↗</a>`;
     }
   }
   if (it.kind === 'exercice') {
     const e = exerciseById(it.ex);
     return `<li class="card tb-item">
-    <div class="tb-head"><span class="tb-kind" aria-hidden="true">${e?.icon || '🧘'}</span><span class="tb-kind-label">${esc(e?.name || 'Exercice')}</span></div>
+    <div class="tb-head"><span class="tb-kind" aria-hidden="true">${e?.icon || '🧘'}</span><span class="tb-kind-label">${esc(e?.name || tr('Exercice', 'Exercise'))}</span></div>
     ${itemControlsHTML(it, idx)}
-    <div class="tb-tools">
-      <button type="button" class="icon" data-act="tb-up" data-i="${idx}" data-fk="tb-up:${idx}" aria-label="Monter" ${idx === 0 ? 'disabled' : ''}>↑</button>
-      <button type="button" class="icon" data-act="tb-down" data-i="${idx}" data-fk="tb-down:${idx}" aria-label="Descendre" ${idx === n - 1 ? 'disabled' : ''}>↓</button>
-      <button type="button" class="icon icon-del" data-act="tb-del" data-i="${idx}" aria-label="Retirer">✕</button>
-    </div>
+    ${itemToolsHTML(idx, n, tr('Retirer', 'Remove'))}
   </li>`;
   }
   if (it.kind === 'citation') {
     return `<li class="card tb-item tb-citation">
-    <div class="tb-head"><span class="tb-kind" aria-hidden="true">${k.icon}</span><span class="tb-kind-label">Citation</span></div>
-    <label class="sr-only" for="tb-q-${idx}">Texte de la citation</label>
+    <div class="tb-head"><span class="tb-kind" aria-hidden="true">${k.icon}</span><span class="tb-kind-label">${tr('Citation', 'Quote')}</span></div>
+    <label class="sr-only" for="tb-q-${idx}">${tr('Texte de la citation', 'Quote text')}</label>
     <textarea id="tb-q-${idx}" class="tb-quote-text" rows="2" data-tbf="text" data-i="${idx}" data-fk="tbq:${idx}">${esc(it.text || '')}</textarea>
-    <label class="field tb-quote-author"><span>— Auteur</span><input data-tbf="author" data-i="${idx}" data-fk="tba:${idx}" value="${esc(it.author || '')}" placeholder="facultatif"></label>
+    <label class="field tb-quote-author"><span>— ${tr('Auteur', 'Author')}</span><input data-tbf="author" data-i="${idx}" data-fk="tba:${idx}" value="${esc(it.author || '')}" placeholder="${tr('facultatif', 'optional')}"></label>
     ${itemControlsHTML(it, idx)}
-    <div class="tb-tools">
-      <button type="button" class="icon" data-act="tb-up" data-i="${idx}" data-fk="tb-up:${idx}" aria-label="Monter" ${idx === 0 ? 'disabled' : ''}>↑</button>
-      <button type="button" class="icon" data-act="tb-down" data-i="${idx}" data-fk="tb-down:${idx}" aria-label="Descendre" ${idx === n - 1 ? 'disabled' : ''}>↓</button>
-      <button type="button" class="icon icon-del" data-act="tb-del" data-i="${idx}" aria-label="Supprimer">✕</button>
-    </div>
+    ${itemToolsHTML(idx, n)}
   </li>`;
   }
   return `<li class="card tb-item">
     <div class="tb-head">
       <span class="tb-kind" aria-hidden="true">${k.icon}</span>
-      <label class="sr-only" for="tb-t-${idx}">Titre</label>
-      <input id="tb-t-${idx}" class="tb-title" data-tb="${idx}" data-fk="tb:${idx}" value="${esc(it.title || '')}" placeholder="${esc(k.label)} — donner un titre…">
+      <label class="sr-only" for="tb-t-${idx}">${tr('Titre', 'Title')}</label>
+      <input id="tb-t-${idx}" class="tb-title" data-tb="${idx}" data-fk="tb:${idx}" value="${esc(it.title || '')}" placeholder="${esc(k.label())} — ${tr('donner un titre…', 'add a title…')}">
     </div>
     <div class="tb-body">${body}</div>
     ${itemControlsHTML(it, idx)}
-    <div class="tb-tools">
-      <button type="button" class="icon" data-act="tb-up" data-i="${idx}" data-fk="tb-up:${idx}" aria-label="Monter" ${idx === 0 ? 'disabled' : ''}>↑</button>
-      <button type="button" class="icon" data-act="tb-down" data-i="${idx}" data-fk="tb-down:${idx}" aria-label="Descendre" ${idx === n - 1 ? 'disabled' : ''}>↓</button>
-      <button type="button" class="icon icon-del" data-act="tb-del" data-i="${idx}" aria-label="Supprimer">✕</button>
-    </div>
+    ${itemToolsHTML(idx, n)}
   </li>`;
 }
 
@@ -803,12 +838,12 @@ async function fillMedia() {
     try {
       if (!mediaURLs.has(id)) {
         const blob = await media.get(id);
-        if (!blob) { el.replaceWith(Object.assign(document.createElement('p'), { className: 'muted small', textContent: 'Fichier introuvable sur ce téléphone.' })); continue; }
+        if (!blob) { el.replaceWith(Object.assign(document.createElement('p'), { className: 'muted small', textContent: tr('Fichier introuvable sur ce téléphone.', 'File not found on this phone.') })); continue; }
         mediaURLs.set(id, URL.createObjectURL(blob));
       }
       el.src = mediaURLs.get(id);
     } catch {
-      el.replaceWith(Object.assign(document.createElement('p'), { className: 'muted small', textContent: 'Impossible d’afficher ce fichier.' }));
+      el.replaceWith(Object.assign(document.createElement('p'), { className: 'muted small', textContent: tr('Impossible d’afficher ce fichier.', 'This file cannot be displayed.') }));
     }
   }
 }
@@ -819,7 +854,7 @@ function forgetMediaURLs() {
 }
 
 async function addToolboxBlob(kind, blob, title = '') {
-  if (blob.size > media.MAX_BYTES) { toast('Fichier trop volumineux (150 Mo maximum).'); return; }
+  if (blob.size > media.MAX_BYTES) { toast(tr('Fichier trop volumineux (150 Mo maximum).', 'File too large (150 MB maximum).')); return; }
   try {
     const file = await media.put(blob);
     toolbox().push({ kind, file, title, added: new Date().toISOString() });
@@ -827,13 +862,12 @@ async function addToolboxBlob(kind, blob, title = '') {
     scheduleSave();
     rerender(() => renderToolbox(location.hash.endsWith('/etape')));
     app.querySelector(`[data-fk="tb:${toolbox().length - 1}"]`)?.focus();
-    toast('Ajouté. Je peux lui donner un titre.');
+    toast(tr('Ajouté. Je peux lui donner un titre.', 'Added. I can give it a title.'));
   } catch {
-    toast('Enregistrement impossible : la mémoire du téléphone est peut-être pleine.');
+    toast(tr('Enregistrement impossible : la mémoire du téléphone est peut-être pleine.', 'Could not save: the phone’s storage may be full.'));
   }
 }
 
-/* Enregistrement d'un message vocal */
 /* ---------- exercices de Ma boussole bien-être ---------- */
 
 function exercisePicker() {
@@ -841,14 +875,14 @@ function exercisePicker() {
   const render = () => {
     const have = new Set(toolbox().filter((x) => x.kind === 'exercice').map((x) => x.ex));
     d.innerHTML = `<div class="modal-inner">
-      <h2>🧘 Exercices</h2>
-      <p class="muted small">Des exercices de <strong>Ma boussole bien-être</strong>, à faire sans quitter Mon PCC. Je touche un exercice pour l’ajouter à ma boîte à outils.</p>
-      <ul class="ex-pick">${EXERCISES.map((e) => `<li><button type="button" class="ex-row" data-ex="${e.id}" aria-pressed="${have.has(e.id)}">
+      <h2>🧘 ${tr('Exercices', 'Exercises')}</h2>
+      <p class="muted small">${tr('Des exercices de <strong>Ma boussole bien-être</strong>, à faire sans quitter Mon PCC. Je touche un exercice pour l’ajouter à ma boîte à outils.', 'Exercises from <strong>Ma boussole bien-être</strong>, to do without leaving Mon PCC. I tap an exercise to add it to my toolbox.')}</p>
+      <ul class="ex-pick">${exercises().map((e) => `<li><button type="button" class="ex-row" data-ex="${e.id}" aria-pressed="${have.has(e.id)}">
         <span class="tbx-ico" aria-hidden="true">${e.icon}</span>
         <span class="tbv-col"><span class="tbv-title">${esc(e.name)}</span><span class="tbx-desc">${esc(e.desc)} · ${esc(e.duration)}</span></span>
         <span class="ex-state">${have.has(e.id) ? '✓' : '+'}</span></button></li>`).join('')}</ul>
-      <p class="muted small">Pour les utiliser sans connexion : Réglages › Exercices hors connexion.</p>
-      <div class="modal-actions"><button type="button" class="btn btn-primary" data-x="close">Terminé</button></div></div>`;
+      <p class="muted small">${tr('Pour les utiliser sans connexion : Réglages › Exercices hors connexion.', 'To use them offline: Settings › Offline exercises.')}</p>
+      <div class="modal-actions"><button type="button" class="btn btn-primary" data-x="close">${tr('Terminé', 'Done')}</button></div></div>`;
   };
   return new Promise((resolve) => {
     render();
@@ -874,14 +908,14 @@ function openExercise(id) {
   const e = exerciseById(id);
   if (!e) return;
   const el = $('#exercise');
-  el.innerHTML = `<div class="xp-top"><button type="button" class="btn btn-ghost btn-sm xp-back" data-xp="close">✕ Revenir à ma boîte à outils</button>
+  el.innerHTML = `<div class="xp-top"><button type="button" class="btn btn-ghost btn-sm xp-back" data-xp="close">✕ ${tr('Revenir à ma boîte à outils', 'Back to my toolbox')}</button>
       <span class="xp-title">${e.icon} ${esc(e.name)}</span></div>
     <iframe class="xp-frame" src="${esc(exerciseUrl(e))}" title="${esc(e.name)}" allow="autoplay; fullscreen; screen-wake-lock"></iframe>
-    <p class="xp-off" hidden>Cet exercice n’a pas pu s’ouvrir. Sans connexion, il faut d’abord le préparer dans Réglages › Exercices hors connexion.</p>`;
+    <p class="xp-off" hidden>${tr('Cet exercice n’a pas pu s’ouvrir. Sans connexion, il faut d’abord le préparer dans Réglages › Exercices hors connexion.', 'This exercise could not open. To use it offline, first prepare it in Settings › Offline exercises.')}</p>`;
   el.hidden = false;
   document.body.classList.add('no-scroll');
   const frame = el.querySelector('iframe');
-  if (!navigator.onLine) offlineStatus().then((st) => { if (!st.sw) el.querySelector('.xp-off').hidden = false; });
+  if (!navigator.onLine) offlineStatus().then((st) => { if (!st.sw || !st.pages) el.querySelector('.xp-off').hidden = false; });
   frame.addEventListener('load', () => frame.focus(), { once: true });
   el.querySelector('[data-xp="close"]').focus();
 }
@@ -895,12 +929,12 @@ document.getElementById('exercise')?.addEventListener('click', (e) => { if (e.ta
 
 /* ---------- dossiers, albums, visionneuse ---------- */
 
-function promptModal(title, value = '', ok = 'Valider') {
+function promptModal(title, value = '', ok = tr('Valider', 'OK')) {
   return new Promise((resolve) => {
     const d = $('#modal');
     d.innerHTML = `<form method="dialog" class="modal-inner"><h2>${esc(title)}</h2>
-      <label class="field"><span>Nom</span><input name="v" value="${esc(value)}" maxlength="40" autocomplete="off" required></label>
-      <div class="modal-actions"><button value="cancel" class="btn btn-ghost" formnovalidate>Annuler</button><button value="ok" class="btn btn-primary">${esc(ok)}</button></div></form>`;
+      <label class="field"><span>${tr('Nom', 'Name')}</span><input name="v" value="${esc(value)}" maxlength="40" autocomplete="off" required></label>
+      <div class="modal-actions"><button value="cancel" class="btn btn-ghost" formnovalidate>${tr('Annuler', 'Cancel')}</button><button value="ok" class="btn btn-primary">${esc(ok)}</button></div></form>`;
     const f = d.querySelector('form');
     d.addEventListener('close', () => resolve(d.returnValue === 'ok' ? f.v.value.trim() : null), { once: true });
     d.returnValue = '';
@@ -910,7 +944,7 @@ function promptModal(title, value = '', ok = 'Valider') {
 }
 
 async function newFolder() {
-  const name = await promptModal('Nouveau dossier', '', 'Créer');
+  const name = await promptModal(tr('Nouveau dossier', 'New folder'), '', tr('Créer', 'Create'));
   if (!name) return null;
   const d = { id: media.newId(), name };
   dossiers().push(d);
@@ -922,7 +956,7 @@ async function newFolder() {
 async function putFiles(files) {
   const out = [];
   for (const f of files) {
-    if (f.size > media.MAX_BYTES) { toast('Une photo est trop volumineuse (150 Mo maximum).'); continue; }
+    if (f.size > media.MAX_BYTES) { toast(tr('Une photo est trop volumineuse (150 Mo maximum).', 'A photo is too large (150 MB maximum).')); continue; }
     out.push({ file: await media.put(f) });
   }
   return out;
@@ -933,12 +967,12 @@ const tbRedraw = () => rerender(() => renderToolbox(location.hash.endsWith('/eta
 /** Fenêtre « Ajouter un lien » */
 async function linkDialog() {
   const p = modal({
-    title: '🔗 Ajouter un lien',
-    body: `<label class="field"><span>Adresse (vidéo, musique, podcast, site…)</span>
+    title: tr('🔗 Ajouter un lien', '🔗 Add a link'),
+    body: `<label class="field"><span>${tr('Adresse (vidéo, musique, podcast, site…)', 'Address (video, music, podcast, website…)')}</span>
         <input type="text" id="tb-url" inputmode="url" autocapitalize="off" spellcheck="false" placeholder="https://…" autocomplete="off"></label>
-      <p class="muted small">YouTube, Vimeo, Dailymotion, Spotify, Deezer, SoundCloud, Apple Music et Podcasts, TikTok, Instagram : le contenu pourra être lu directement ici, et son titre est demandé au site lors de l’ajout.</p>
-      <p class="error small" id="tb-url-err" hidden>Ce lien ne semble pas valide.</p>`,
-    ok: 'Ajouter le lien',
+      <p class="muted small">${tr('YouTube, Vimeo, Dailymotion, Spotify, Deezer, SoundCloud, Apple Music et Podcasts, TikTok, Instagram : le contenu pourra être lu directement ici, et son titre est demandé au site lors de l’ajout.', 'YouTube, Vimeo, Dailymotion, Spotify, Deezer, SoundCloud, Apple Music and Podcasts, TikTok, Instagram: the content can be played right here, and its title is requested from the site when it is added.')}</p>
+      <p class="error small" id="tb-url-err" hidden>${tr('Ce lien ne semble pas valide.', 'This link doesn’t seem valid.')}</p>`,
+    ok: tr('Ajouter le lien', 'Add link'),
   });
   const d = $('#modal');
   const input = $('#tb-url');
@@ -971,14 +1005,14 @@ function addLink(href) {
   toolbox().push(item);
   scheduleSave();
   tbRedraw();
-  toast('Lien ajouté.');
+  toast(tr('Lien ajouté.', 'Link added.'));
   const idx = toolbox().length - 1;
   const input = app.querySelector(`[data-fk="tb:${idx}"]`);
   if (parseEmbed(href)) {
-    if (input) input.placeholder = 'Recherche du titre…';
+    if (input) input.placeholder = tr('Recherche du titre…', 'Looking up the title…');
     fetchTitle(href).then((t) => {
       const el = app.querySelector(`[data-fk="tb:${toolbox().indexOf(item)}"]`);
-      if (el) el.placeholder = 'Lien — donner un titre…';
+      if (el) el.placeholder = `${KINDS.lien.label()} — ${tr('donner un titre…', 'add a title…')}`;
       if (t && !item.title) {
         item.title = t;
         if (el && !el.value) el.value = t;
@@ -993,20 +1027,22 @@ function addLink(href) {
 
 /** Fenêtre « Ajouter une citation », avec les exemples à la demande */
 async function quoteDialog() {
+  const Q = quotes();
+  const exLabel = () => tr('Exemples de citations', 'Example quotes');
   const p = modal({
-    title: '❝ Ajouter une citation',
-    body: `<label class="field"><span>Une citation, une phrase qui m’aide</span>
-        <textarea id="tb-qtext" rows="3" placeholder="Avec mes mots, ou une phrase que j’aime…"></textarea></label>
-      <label class="field"><span>Auteur (facultatif)</span><input id="tb-qauthor" autocomplete="off" placeholder="Ex. : ma grand-mère, un livre, une chanson…"></label>
-      <p class="error small" id="tb-q-err" hidden>J’écris d’abord la citation, ou j’en choisis une dans les exemples.</p>
+    title: tr('❝ Ajouter une citation', '❝ Add a quote'),
+    body: `<label class="field"><span>${tr('Une citation, une phrase qui m’aide', 'A quote, a phrase that helps me')}</span>
+        <textarea id="tb-qtext" rows="3" placeholder="${tr('Avec mes mots, ou une phrase que j’aime…', 'In my own words, or a phrase I like…')}"></textarea></label>
+      <label class="field"><span>${tr('Auteur (facultatif)', 'Author (optional)')}</span><input id="tb-qauthor" autocomplete="off" placeholder="${tr('Ex. : ma grand-mère, un livre, une chanson…', 'E.g. my grandmother, a book, a song…')}"></label>
+      <p class="error small" id="tb-q-err" hidden>${tr('J’écris d’abord la citation, ou j’en choisis une dans les exemples.', 'First write the quote, or choose one from the examples.')}</p>
       <div class="sugg">
-        <button type="button" class="btn btn-ghost btn-sm ex-btn" id="tb-qex" aria-expanded="false">Exemples de citations</button>
+        <button type="button" class="btn btn-ghost btn-sm ex-btn" id="tb-qex" aria-expanded="false">${exLabel()}</button>
         <div id="tb-qchips" hidden>
-          <p class="muted small">Je touche une citation pour la reprendre (je peux ensuite la modifier avant de l’ajouter).</p>
-          <div class="chips">${QUOTES.map((q, i) => `<button type="button" class="chip" data-q="${i}">« ${esc(q.text)} »${q.author ? ` <span class="muted">— ${esc(q.author)}</span>` : ''}</button>`).join('')}</div>
+          <p class="muted small">${tr('Je touche une citation pour la reprendre (je peux ensuite la modifier avant de l’ajouter).', 'I tap a quote to use it (I can then change it before adding it).')}</p>
+          <div class="chips">${Q.map((q, i) => `<button type="button" class="chip" data-q="${i}">${tr('« ', '“')}${esc(q.text)}${tr(' »', '”')}${q.author ? ` <span class="muted">— ${esc(q.author)}</span>` : ''}</button>`).join('')}</div>
         </div>
       </div>`,
-    ok: 'Ajouter la citation',
+    ok: tr('Ajouter la citation', 'Add quote'),
   });
   const d = $('#modal');
   const text = $('#tb-qtext');
@@ -1019,12 +1055,12 @@ async function quoteDialog() {
     const box = $('#tb-qchips');
     box.hidden = !box.hidden;
     ev.currentTarget.setAttribute('aria-expanded', String(!box.hidden));
-    ev.currentTarget.textContent = box.hidden ? 'Exemples de citations' : 'Masquer les exemples de citations';
+    ev.currentTarget.textContent = box.hidden ? exLabel() : tr('Masquer les exemples de citations', 'Hide example quotes');
   });
   $('#tb-qchips').addEventListener('click', (ev) => {
     const c = ev.target.closest('[data-q]');
     if (!c) return;
-    const q = QUOTES[+c.dataset.q];
+    const q = Q[+c.dataset.q];
     text.value = q.text;
     author.value = q.author || '';
     $('#tb-q-err').hidden = true;
@@ -1038,7 +1074,7 @@ async function quoteDialog() {
   toolbox().push({ kind: 'citation', text: t, author: author.value.trim(), added: new Date().toISOString() });
   scheduleSave();
   tbRedraw();
-  toast('Citation ajoutée.');
+  toast(tr('Citation ajoutée.', 'Quote added.'));
 }
 
 /* Visionneuse plein écran (photos et albums) */
@@ -1053,9 +1089,9 @@ async function showLightbox() {
   const ph = lbPhotos();
   lb.k = (lb.k + ph.length) % ph.length;
   el.innerHTML = `<div class="lb-top"><span class="lb-count">${ph.length > 1 ? `${lb.k + 1} / ${ph.length}` : ''}</span><span class="lb-title">${esc(it.title || '')}</span>
-    <button type="button" class="lb-btn" data-lb="close" aria-label="Fermer">✕</button></div>
+    <button type="button" class="lb-btn" data-lb="close" aria-label="${tr('Fermer', 'Close')}">✕</button></div>
     <div class="lb-stage"><img alt="${esc(it.title || 'Photo')}" data-media="${esc(ph[lb.k].file)}"></div>
-    ${ph.length > 1 ? '<button type="button" class="lb-btn lb-prev" data-lb="prev" aria-label="Photo précédente">‹</button><button type="button" class="lb-btn lb-next" data-lb="next" aria-label="Photo suivante">›</button>' : ''}`;
+    ${ph.length > 1 ? `<button type="button" class="lb-btn lb-prev" data-lb="prev" aria-label="${tr('Photo précédente', 'Previous photo')}">‹</button><button type="button" class="lb-btn lb-next" data-lb="next" aria-label="${tr('Photo suivante', 'Next photo')}">›</button>` : ''}`;
   el.hidden = false;
   document.body.classList.add('no-scroll');
   const img = el.querySelector('img');
@@ -1099,30 +1135,33 @@ async function permState(name) {
 
 /** Bloc d'aide quand le micro ou la caméra ne sont pas accessibles */
 function mediaHelpHTML(kind, errName) {
-  const what = kind === 'video' ? 'à la caméra et au micro' : 'au micro';
+  const video = kind === 'video';
   const site = esc(location.host || 'Mon PCC');
   let cause;
-  if (errName === 'NotFoundError' || errName === 'OverconstrainedError') cause = kind === 'video' ? 'Aucune caméra n’a été trouvée sur cet appareil.' : 'Aucun micro n’a été trouvé sur cet appareil.';
-  else if (errName === 'NotReadableError' || errName === 'AbortError') cause = 'Le micro ou la caméra est peut-être déjà utilisé par une autre application : je la ferme, puis je réessaie.';
-  else cause = `L’accès ${what} est bloqué pour Mon PCC.`;
+  if (errName === 'NotFoundError' || errName === 'OverconstrainedError') cause = video ? tr('Aucune caméra n’a été trouvée sur cet appareil.', 'No camera was found on this device.') : tr('Aucun micro n’a été trouvé sur cet appareil.', 'No microphone was found on this device.');
+  else if (errName === 'NotReadableError' || errName === 'AbortError') cause = tr('Le micro ou la caméra est peut-être déjà utilisé par une autre application : je la ferme, puis je réessaie.', 'The microphone or camera may already be in use by another app: I close it, then try again.');
+  else cause = video ? tr('L’accès à la caméra et au micro est bloqué pour Mon PCC.', 'Access to the camera and microphone is blocked for Mon PCC.') : tr('L’accès au micro est bloqué pour Mon PCC.', 'Access to the microphone is blocked for Mon PCC.');
   const blocked = !['NotFoundError', 'OverconstrainedError', 'NotReadableError', 'AbortError'].includes(errName);
-  const fallback = kind === 'video'
-    ? '<label class="btn btn-primary file-btn">🎥 Utiliser l’appareil photo du téléphone<input type="file" accept="video/*" capture="user" data-r-file hidden></label>'
-    : '<label class="btn btn-primary file-btn">🎙 Utiliser l’enregistreur du téléphone<input type="file" accept="audio/*" capture data-r-file hidden></label>';
+  const fallback = video
+    ? `<label class="btn btn-primary file-btn">🎥 ${tr('Utiliser l’appareil photo du téléphone', 'Use the phone’s camera app')}<input type="file" accept="video/*" capture="user" data-r-file hidden></label>`
+    : `<label class="btn btn-primary file-btn">🎙 ${tr('Utiliser l’enregistreur du téléphone', 'Use the phone’s voice recorder')}<input type="file" accept="audio/*" capture data-r-file hidden></label>`;
+  const mic = tr('Micro', 'Microphone');
+  const cam = tr('Caméra', 'Camera');
+  const retry = `<button type="button" class="btn btn-secondary btn-sm" data-r="retry">↻ ${tr('Réessayer', 'Try again')}</button>`;
   return `<div class="media-help" role="alert">
     <p><strong>${cause}</strong></p>
-    <p class="small">Solution simple : enregistrer avec l’application du téléphone, puis le fichier s’ajoute à ma boîte à outils.</p>
+    <p class="small">${tr('Solution simple : enregistrer avec l’application du téléphone, puis le fichier s’ajoute à ma boîte à outils.', 'Simple solution: record with the phone’s own app, and the file is added to my toolbox.')}</p>
     ${fallback}
-    ${blocked ? `<details class="more small"><summary>Autoriser l’accès dans Mon PCC</summary>
-      <p><strong>Sur Android</strong> (Brave, Chrome…), deux réglages comptent :</p>
+    ${blocked ? `<details class="more small"><summary>${tr('Autoriser l’accès dans Mon PCC', 'Allow access in Mon PCC')}</summary>
+      <p>${tr('<strong>Sur Android</strong> (Brave, Chrome…), deux réglages comptent :', '<strong>On Android</strong> (Brave, Chrome…), two settings matter:')}</p>
       <ol>
-        <li>Réglages du téléphone › Applications › <em>mon navigateur</em> (Brave, Chrome…) › Autorisations › <strong>Micro</strong>${kind === 'video' ? ' et <strong>Caméra</strong>' : ''} : Autoriser.</li>
-        <li>Dans le navigateur lui-même (en l’ouvrant normalement, pas depuis l’icône Mon PCC) : menu ⋮ › Paramètres › Paramètres des sites (ou Autorisations des sites) › <strong>Micro</strong>${kind === 'video' ? ' et <strong>Caméra</strong>' : ''} › ${site} : Autoriser.</li>
+        <li>${tr('Réglages du téléphone › Applications › <em>mon navigateur</em> (Brave, Chrome…) › Autorisations ›', 'Phone settings › Apps › <em>my browser</em> (Brave, Chrome…) › Permissions ›')} <strong>${mic}</strong>${video ? ` ${tr('et', 'and')} <strong>${cam}</strong>` : ''}${tr(' : Autoriser.', ': Allow.')}</li>
+        <li>${tr('Dans le navigateur lui-même (en l’ouvrant normalement, pas depuis l’icône Mon PCC) : menu ⋮ › Paramètres › Paramètres des sites (ou Autorisations des sites) ›', 'In the browser itself (opened normally, not from the Mon PCC icon): menu ⋮ › Settings › Site settings (or Site permissions) ›')} <strong>${mic}</strong>${video ? ` ${tr('et', 'and')} <strong>${cam}</strong>` : ''} › ${site}${tr(' : Autoriser.', ': Allow.')}</li>
       </ol>
-      <p><strong>Sur iPhone</strong> : Réglages › Safari › Microphone${kind === 'video' ? ' et Caméra' : ''} › Autoriser (ou Demander).</p>
-      <p>Puis je reviens ici et je touche « Réessayer ».</p>
-      <button type="button" class="btn btn-secondary btn-sm" data-r="retry">↻ Réessayer</button>
-    </details>` : '<button type="button" class="btn btn-secondary btn-sm" data-r="retry">↻ Réessayer</button>'}
+      <p>${tr('<strong>Sur iPhone</strong> : Réglages › Safari ›', '<strong>On iPhone</strong>: Settings › Safari ›')} ${tr('Microphone', 'Microphone')}${video ? ` ${tr('et Caméra', 'and Camera')}` : ''} › ${tr('Autoriser (ou Demander).', 'Allow (or Ask).')}</p>
+      <p>${tr('Puis je reviens ici et je touche « Réessayer ».', 'Then I come back here and tap “Try again”.')}</p>
+      ${retry}
+    </details>` : retry}
   </div>`;
 }
 
@@ -1139,19 +1178,20 @@ function recordVideo() {
     const d = $('#modal');
     let stream = null; let rec = null; let chunks = []; let timer = null; let t0 = 0; let result = null;
     let facing = 'user';
+    const startLbl = `● ${tr('Démarrer', 'Start')}`;
     d.innerHTML = `<div class="modal-inner">
-      <h2>🎥 Me filmer</h2>
-      <p class="muted small">Par exemple, un message que je m’adresse quand je vais bien, pour me le repasser dans les moments difficiles. 3 minutes maximum.</p>
+      <h2>🎥 ${tr('Me filmer', 'Film myself')}</h2>
+      <p class="muted small">${tr('Par exemple, un message que je m’adresse quand je vais bien, pour me le repasser dans les moments difficiles. 3 minutes maximum.', 'For example, a message I record for myself when I am feeling well, to play back in difficult moments. 3 minutes maximum.')}</p>
       <div class="vid-wrap"><video class="vid-live" playsinline muted autoplay></video><video class="vid-play" playsinline controls hidden></video>
         <span class="vid-rec" hidden>● REC</span></div>
       <p class="rec-time" aria-live="polite">0:00</p>
       <div class="media-error" hidden></div>
       <div class="modal-actions">
-        <button type="button" class="btn btn-ghost btn-sm" data-r="flip">🔄 Changer de caméra</button>
-        <button type="button" class="btn btn-ghost" data-r="cancel">Annuler</button>
-        <button type="button" class="btn btn-primary" data-r="start" disabled>● Démarrer</button>
-        <button type="button" class="btn btn-danger" data-r="stop" hidden>■ Arrêter</button>
-        <button type="button" class="btn btn-primary" data-r="keep" hidden>Garder</button>
+        <button type="button" class="btn btn-ghost btn-sm" data-r="flip">🔄 ${tr('Changer de caméra', 'Switch camera')}</button>
+        <button type="button" class="btn btn-ghost" data-r="cancel">${tr('Annuler', 'Cancel')}</button>
+        <button type="button" class="btn btn-primary" data-r="start" disabled>${startLbl}</button>
+        <button type="button" class="btn btn-danger" data-r="stop" hidden>■ ${tr('Arrêter', 'Stop')}</button>
+        <button type="button" class="btn btn-primary" data-r="keep" hidden>${tr('Garder', 'Keep')}</button>
       </div></div>`;
     const $r = (k) => d.querySelector(`[data-r="${k}"]`);
     const live = d.querySelector('.vid-live');
@@ -1194,7 +1234,7 @@ function recordVideo() {
         if (!stream) {
           // « Recommencer » : rouvrir la caméra, puis démarrer au prochain appui
           await openCam();
-          $r('start').textContent = '● Démarrer';
+          $r('start').textContent = startLbl;
           $r('keep').hidden = true;
           time.textContent = '0:00';
           return;
@@ -1209,7 +1249,7 @@ function recordVideo() {
           if (play.src) URL.revokeObjectURL(play.src);
           play.src = URL.createObjectURL(result);
           live.hidden = true; play.hidden = false;
-          $r('keep').hidden = false; $r('start').hidden = false; $r('start').textContent = '● Recommencer'; $r('flip').hidden = false;
+          $r('keep').hidden = false; $r('start').hidden = false; $r('start').textContent = `● ${tr('Recommencer', 'Start again')}`; $r('flip').hidden = false;
         };
         rec.start(1000); t0 = Date.now();
         timer = setInterval(() => {
@@ -1233,16 +1273,16 @@ function recordVoice() {
     const d = $('#modal');
     let rec = null; let stream = null; let chunks = []; let timer = null; let t0 = 0; let result = null;
     d.innerHTML = `<div class="modal-inner">
-      <h2>🎙 M’enregistrer</h2>
-      <p class="muted small">Par exemple, un message que je m’adresse quand je vais bien, pour me le faire écouter dans les moments difficiles.</p>
+      <h2>🎙 ${tr('M’enregistrer', 'Record myself')}</h2>
+      <p class="muted small">${tr('Par exemple, un message que je m’adresse quand je vais bien, pour me le faire écouter dans les moments difficiles.', 'For example, a message I record for myself when I am feeling well, to listen to in difficult moments.')}</p>
       <p class="rec-time" aria-live="polite">0:00</p>
       <audio class="tb-audio" controls hidden></audio>
       <div class="media-error" hidden></div>
       <div class="modal-actions">
-        <button type="button" class="btn btn-ghost" data-r="cancel">Annuler</button>
-        <button type="button" class="btn btn-primary" data-r="start">● Démarrer</button>
-        <button type="button" class="btn btn-danger" data-r="stop" hidden>■ Arrêter</button>
-        <button type="button" class="btn btn-primary" data-r="keep" hidden>Garder</button>
+        <button type="button" class="btn btn-ghost" data-r="cancel">${tr('Annuler', 'Cancel')}</button>
+        <button type="button" class="btn btn-primary" data-r="start">● ${tr('Démarrer', 'Start')}</button>
+        <button type="button" class="btn btn-danger" data-r="stop" hidden>■ ${tr('Arrêter', 'Stop')}</button>
+        <button type="button" class="btn btn-primary" data-r="keep" hidden>${tr('Garder', 'Keep')}</button>
       </div></div>`;
     const $r = (k) => d.querySelector(`[data-r="${k}"]`);
     const time = d.querySelector('.rec-time');
@@ -1265,7 +1305,7 @@ function recordVoice() {
           result = new Blob(chunks, { type: rec.mimeType || 'audio/webm' });
           stream.getTracks().forEach((t) => t.stop());
           player.src = URL.createObjectURL(result); player.hidden = false;
-          $r('keep').hidden = false; $r('start').hidden = false; $r('start').textContent = '● Recommencer';
+          $r('keep').hidden = false; $r('start').hidden = false; $r('start').textContent = `● ${tr('Recommencer', 'Start again')}`;
         };
         rec.start(); t0 = Date.now();
         timer = setInterval(() => { const s = Math.floor((Date.now() - t0) / 1000); time.textContent = `${Math.floor(s / 60)}:${String(s % 60).padStart(2, '0')}`; }, 250);
@@ -1281,7 +1321,7 @@ function recordVoice() {
 
 const usedMediaIds = () => (plan?.data.boiteOutils || []).flatMap((it) => [it.file, ...(it.photos || []).map((p) => p.file)]).filter(Boolean);
 
-/* ---------- Mon Espace Santé + carte de crise ---------- */
+/* ---------- dossier de santé (Mon Espace Santé en France) + carte de crise ---------- */
 
 const MES_URL = 'https://www.monespacesante.fr/';
 const MES_ANDROID = 'fr.assurancemaladie.monespacesante';
@@ -1289,6 +1329,18 @@ const MES_PLAY = `https://play.google.com/store/apps/details?id=${MES_ANDROID}`;
 const MES_APPSTORE = 'https://apps.apple.com/fr/app/id1589255019';
 const isAndroid = () => /Android/i.test(navigator.userAgent);
 const isIOS = () => /iPad|iPhone|iPod/.test(navigator.userAgent) || (/Macintosh/.test(navigator.userAgent) && navigator.maxTouchPoints > 1);
+
+/** Libellés de la page « dossier de santé » selon le pays */
+const hasMES = () => country().record === 'mes';
+const recordPageLabel = () => (hasMES()
+  ? tr('🏥 Mon Espace Santé et carte de crise', '🏥 Mon Espace Santé and crisis card')
+  : tr('🏥 Dossier de santé et carte de crise', '🏥 Health record and crisis card'));
+const recordButtonLabel = () => (hasMES()
+  ? tr('🏥 Ajouter à Mon Espace Santé', '🏥 Add to Mon Espace Santé')
+  : tr('🏥 Ajouter à mon dossier de santé', '🏥 Add to my health record'));
+const defaultCardWhere = () => (hasMES()
+  ? tr('Dans Mon Espace Santé', 'In Mon Espace Santé (French health record)')
+  : tr('Auprès de mon équipe de soins', 'With my care team'));
 
 let cardTimer = null;
 let cardPreviewUrl = '';
@@ -1302,13 +1354,13 @@ function carte() {
       const info = (plan.data.information || []).find((r) => r.qui) || {};
       const tel = (info.comment || '').match(/(\+?\d[\d .-]{7,}\d)/);
       proche = { nom: info.qui || '', lien: '', tel: tel ? tel[1] : '' };
-      const p2 = (plan.data.partenaires || []).find((r) => /infirm|psych|médecin|medecin|éduc|educ|référent|referent|CMP/i.test(r.role || '')) || {};
+      const p2 = (plan.data.partenaires || []).find((r) => /infirm|psych|médecin|medecin|éduc|educ|référent|referent|CMP|nurse|doctor|social worker|key worker|GP/i.test(r.role || '')) || {};
       pro = { nom: p2.nom || '', lien: p2.role || '', tel: '' };
     }
     const id = plan.data.coordonnees || {};
     plan.data.carte = {
       nom: [id.prenom, id.nom].filter(Boolean).join(' '),
-      ou: 'Dans Mon Espace Santé',
+      ou: defaultCardWhere(),
       contactNom: proche.nom || '', contactLien: proche.lien || '', contactTel: proche.tel || '',
       soignantNom: [pro.nom, pro.lien].filter(Boolean).join(', '), soignantTel: pro.tel || '',
     };
@@ -1322,7 +1374,7 @@ async function refreshCardPreview() {
   const blob = await toJpeg(renderCrisisCard(carte()));
   if (cardPreviewUrl) URL.revokeObjectURL(cardPreviewUrl);
   cardPreviewUrl = URL.createObjectURL(blob);
-  box.innerHTML = `<img src="${cardPreviewUrl}" alt="Aperçu de ma carte de crise">`;
+  box.innerHTML = `<img src="${cardPreviewUrl}" alt="${tr('Aperçu de ma carte de crise', 'Preview of my crisis card')}">`;
 }
 
 /** Âge d'après la date de naissance de l'étape 1 (null si inconnue) */
@@ -1336,73 +1388,115 @@ function ageFromBirth() {
   return age;
 }
 
-/** Message « moins de 18 ans » : jamais si la personne est majeure ou l'a masqué ;
+/** Message « moins de 18 ans » (Mon Espace Santé) : jamais si la personne est majeure ou l'a masqué ;
     affiché si elle est mineure, ou en version ado quand la date de naissance n'est pas renseignée */
 function showMinorNote() {
-  if (plan.data.masquerNoteMineur) return false;
+  if (!hasMES() || plan.data.masquerNoteMineur) return false;
   const age = ageFromBirth();
   if (age !== null) return age < 18;
   return isAdo();
 }
 
-function renderMES() {
+/** Bloc « Télécharger mon plan en PDF » commun aux deux variantes de la page */
+function recordPdfHTML(intro) {
+  return `<section class="card">
+      <h2>${tr('1. Télécharger mon plan en PDF', '1. Download my plan as a PDF')}</h2>
+      <p class="muted small">${intro}</p>
+      ${modifiedAfterSigning() ? `<p class="warn small">${tr('Certaines signatures sont antérieures à la dernière modification : elles ne figureront pas dans le PDF.', 'Some signatures are older than the latest change: they will not appear in the PDF.')} <a href="#/etape/${STEPS.length - 1}">${tr('Signer à nouveau', 'Sign again')}</a></p>` : ''}
+      <button type="button" class="btn btn-primary" data-act="mes-pdf">📄 ${tr('Télécharger le PDF', 'Download the PDF')}</button>
+    </section>`;
+}
+
+function crisisCardHTML() {
   const c = carte();
   const f = (k, label, ph, type = 'text') => `<label class="field"><span>${label}</span><input ${type === 'tel' ? 'inputmode="tel"' : ''} data-card="${k}" data-fk="card:${k}" value="${esc(c[k] || '')}" placeholder="${esc(ph)}"></label>`;
+  return `<section class="card">
+      <h2>${tr('3. Ma carte de crise', '3. My crisis card')}</h2>
+      <p class="muted small">${hasMES()
+        ? tr('Une carte au format carte bancaire, à garder dans mon portefeuille à côté de ma carte Vitale. Elle indique seulement que j’ai un plan de crise conjoint, où le trouver et qui prévenir : aucune information sur ma santé.', 'A bank-card-sized card to keep in my wallet next to my health insurance card. It only says that I have a joint crisis plan, where to find it and who to contact: no information about my health.')
+        : tr('Une carte au format carte bancaire, à garder dans mon portefeuille. Elle indique seulement que j’ai un plan de crise conjoint, où le trouver et qui prévenir : aucune information sur ma santé.', 'A bank-card-sized card to keep in my wallet. It only says that I have a joint crisis plan, where to find it and who to contact: no information about my health.')}</p>
+      <div class="card-preview" id="crisis-preview"><span class="muted">${tr('Préparation…', 'Preparing…')}</span></div>
+      <div class="form-grid">
+        ${f('nom', tr('Mon nom', 'My name'), tr('Prénom Nom', 'First name Last name'))}
+        ${f('ou', tr('Où trouver mon plan', 'Where to find my plan'), hasMES() ? tr('Ex. : Dans Mon Espace Santé', 'E.g. In Mon Espace Santé') : tr('Ex. : auprès de mon équipe de soins', 'E.g. with my care team'))}
+        ${f('contactNom', tr('Personne à prévenir', 'Person to contact'), tr('Ex. : Julie Durand', 'E.g. Julie Smith'))}
+        ${f('contactLien', tr('Lien', 'Relationship'), tr('Ex. : ma sœur', 'E.g. my sister'))}
+        ${f('contactTel', tr('Son téléphone', 'Their phone'), isFrance() ? '06 …' : '…', 'tel')}
+        ${f('soignantNom', tr('Mon soignant référent (facultatif)', 'My key professional (optional)'), tr('Ex. : Mme Martin, CMP', 'E.g. Sarah Jones, care coordinator'))}
+        ${f('soignantTel', tr('Son téléphone (facultatif)', 'Their phone (optional)'), isFrance() ? '02 …' : '…', 'tel')}
+      </div>
+      <div class="stack">
+        <button type="button" class="btn btn-primary" data-act="card-print">🖨 ${tr('Imprimer la carte (PDF)', 'Print the card (PDF)')}</button>
+        <button type="button" class="btn btn-secondary" data-act="card-img">🖼 ${tr('Enregistrer l’image', 'Save the image')}</button>
+      </div>
+      <p class="muted small">${tr('Je vérifie avec la personne à prévenir qu’elle est d’accord pour figurer sur ma carte.', 'I check with the person to contact that they agree to be on my card.')}</p>
+    </section>`;
+}
+
+function renderMES() {
+  if (!hasMES()) { renderHealthRecord(); return; }
   app.innerHTML = `
-    <h1>🏥 Ajouter à Mon Espace Santé</h1>
-    <p class="lead">Déposer mon plan dans Mon Espace Santé permet aux soignant·es que j’autorise de le consulter, y compris en cas d’hospitalisation ou d’urgence. Ma carte de crise signale qu’il existe.</p>
+    <h1>🏥 ${tr('Ajouter à Mon Espace Santé', 'Add to Mon Espace Santé')}</h1>
+    <p class="lead">${tr('Déposer mon plan dans Mon Espace Santé permet aux soignant·es que j’autorise de le consulter, y compris en cas d’hospitalisation ou d’urgence. Ma carte de crise signale qu’il existe.', 'Mon Espace Santé is the French national digital health record. Adding my plan to it lets the health professionals I authorise read it, including in hospital or in an emergency. My crisis card shows that it exists.')}</p>
 
-    ${showMinorNote() ? `<div class="note small note-x" role="note"><button type="button" class="icon note-close" data-act="mes-minor-hide" aria-label="Masquer ce message" title="Masquer ce message">✕</button><strong>Si j’ai moins de 18 ans :</strong> mon espace Mon Espace Santé est géré par mon ou mes représentant·es légaux (selon ma situation : parents, tuteur·rice, service de l’aide sociale à l’enfance…). Je ne peux pas y déposer mon plan seul·e : je le fais <strong>avec mon ou ma représentant·e légal·e</strong>, ou je demande à un·e <strong>professionnel·le qui me suit</strong> de l’y déposer. À mes 18 ans, j’accède moi-même à mon espace et j’y retrouve mes documents.</div>` : ''}
-    <section class="card">
-      <h2>1. Télécharger mon plan en PDF</h2>
-      <p class="muted small">Sans code : Mon Espace Santé est déjà un espace sécurisé, et un code empêcherait les soignant·es de lire le document.</p>
-      ${modifiedAfterSigning() ? '<p class="warn small">Certaines signatures sont antérieures à la dernière modification : elles ne figureront pas dans le PDF. <a href="#/etape/' + (STEPS.length - 1) + '">Signer à nouveau</a></p>' : ''}
-      <button type="button" class="btn btn-primary" data-act="mes-pdf">📄 Télécharger le PDF</button>
-    </section>
+    ${showMinorNote() ? `<div class="note small note-x" role="note"><button type="button" class="icon note-close" data-act="mes-minor-hide" aria-label="${tr('Masquer ce message', 'Hide this message')}" title="${tr('Masquer ce message', 'Hide this message')}">✕</button>${tr('<strong>Si j’ai moins de 18 ans :</strong> mon espace Mon Espace Santé est géré par mon ou mes représentant·es légaux (selon ma situation : parents, tuteur·rice, service de l’aide sociale à l’enfance…). Je ne peux pas y déposer mon plan seul·e : je le fais <strong>avec mon ou ma représentant·e légal·e</strong>, ou je demande à un·e <strong>professionnel·le qui me suit</strong> de l’y déposer. À mes 18 ans, j’accède moi-même à mon espace et j’y retrouve mes documents.', '<strong>If I am under 18:</strong> my Mon Espace Santé account is managed by my legal guardian(s) (depending on my situation: parents, guardian, child welfare services…). I cannot add my plan on my own: I do it <strong>with my legal guardian</strong>, or I ask a <strong>professional who supports me</strong> to add it. When I turn 18, I manage my account myself and find my documents there.')}</div>` : ''}
+    ${recordPdfHTML(tr('Sans code : Mon Espace Santé est déjà un espace sécurisé, et un code empêcherait les soignant·es de lire le document.', 'Without a code: Mon Espace Santé is already secure, and a code would stop health professionals from reading the document.'))}
 
     <section class="card">
-      <h2>2. Le déposer dans Mon Espace Santé</h2>
+      <h2>${tr('2. Le déposer dans Mon Espace Santé', '2. Add it to Mon Espace Santé')}</h2>
       <ol class="mes-steps">
-        <li>J’ouvre l’application <strong>Mon Espace Santé</strong> ou le site monespacesante.fr, et je me connecte.</li>
-        <li>Dans <strong>Documents</strong>, je touche <strong>« Ajouter un document »</strong> et je choisis le PDF téléchargé.</li>
-        <li>Je lui donne un titre clair : <strong>« Plan de crise conjoint »</strong>, avec la date.</li>
-        <li>Je vérifie qu’il <strong>n’est pas masqué</strong> aux professionnel·les qui me suivent.</li>
-        <li>Dans les <strong>paramètres de confidentialité</strong>, je peux autoriser l’<strong>accès en cas d’urgence</strong> (médecin du SAMU-Centre 15, soignant·es face à un risque immédiat pour ma santé). C’est ce qui rend mon plan utile en situation de crise.</li>
-        <li>À chaque mise à jour de mon plan, je dépose la nouvelle version et je supprime l’ancienne.</li>
+        <li>${tr('J’ouvre l’application <strong>Mon Espace Santé</strong> ou le site monespacesante.fr, et je me connecte.', 'I open the <strong>Mon Espace Santé</strong> app or the monespacesante.fr website, and log in.')}</li>
+        <li>${tr('Dans <strong>Documents</strong>, je touche <strong>« Ajouter un document »</strong> et je choisis le PDF téléchargé.', 'In <strong>Documents</strong>, I tap <strong>“Ajouter un document”</strong> (add a document) and choose the downloaded PDF.')}</li>
+        <li>${tr('Je lui donne un titre clair : <strong>« Plan de crise conjoint »</strong>, avec la date.', 'I give it a clear title: <strong>“Joint crisis plan”</strong>, with the date.')}</li>
+        <li>${tr('Je vérifie qu’il <strong>n’est pas masqué</strong> aux professionnel·les qui me suivent.', 'I check that it is <strong>not hidden</strong> from the professionals who support me.')}</li>
+        <li>${tr('Dans les <strong>paramètres de confidentialité</strong>, je peux autoriser l’<strong>accès en cas d’urgence</strong> (médecin du SAMU-Centre 15, soignant·es face à un risque immédiat pour ma santé). C’est ce qui rend mon plan utile en situation de crise.', 'In the <strong>privacy settings</strong>, I can allow <strong>emergency access</strong> (SAMU-Centre 15 doctors, professionals facing an immediate risk to my health). This is what makes my plan useful in a crisis.')}</li>
+        <li>${tr('À chaque mise à jour de mon plan, je dépose la nouvelle version et je supprime l’ancienne.', 'Each time I update my plan, I add the new version and delete the old one.')}</li>
       </ol>
-      <p class="small"><strong>Si l’application Mon Espace Santé est installée</strong>, je l’ouvre directement depuis l’écran d’accueil de mon téléphone : elle ne peut pas être lancée depuis Mon PCC. Sinon, j’utilise le site :</p>
-      <a class="btn btn-secondary" href="${MES_URL}" target="_blank" rel="noopener noreferrer">Ouvrir le site Mon Espace Santé ↗</a>
-      <p class="muted small">Pas encore l’application ? ${isIOS() ? `<a href="${MES_APPSTORE}" target="_blank" rel="noopener noreferrer">App Store</a>` : isAndroid() ? `<a href="${MES_PLAY}" target="_blank" rel="noopener noreferrer">Google Play</a>` : `<a href="${MES_PLAY}" target="_blank" rel="noopener noreferrer">Google Play</a> · <a href="${MES_APPSTORE}" target="_blank" rel="noopener noreferrer">App Store</a>`}</p>
+      <p class="small">${tr('<strong>Si l’application Mon Espace Santé est installée</strong>, je l’ouvre directement depuis l’écran d’accueil de mon téléphone : elle ne peut pas être lancée depuis Mon PCC. Sinon, j’utilise le site :', '<strong>If the Mon Espace Santé app is installed</strong>, I open it directly from my phone’s home screen: it cannot be launched from Mon PCC. Otherwise, I use the website:')}</p>
+      <a class="btn btn-secondary" href="${MES_URL}" target="_blank" rel="noopener noreferrer">${tr('Ouvrir le site Mon Espace Santé ↗', 'Open the Mon Espace Santé website ↗')}</a>
+      <p class="muted small">${tr('Pas encore l’application ?', 'Don’t have the app yet?')} ${isIOS() ? `<a href="${MES_APPSTORE}" target="_blank" rel="noopener noreferrer">App Store</a>` : isAndroid() ? `<a href="${MES_PLAY}" target="_blank" rel="noopener noreferrer">Google Play</a>` : `<a href="${MES_PLAY}" target="_blank" rel="noopener noreferrer">Google Play</a> · <a href="${MES_APPSTORE}" target="_blank" rel="noopener noreferrer">App Store</a>`}</p>
       <details class="more">
-        <summary>Si je suis hospitalisé·e</summary>
+        <summary>${tr('Si je suis hospitalisé·e', 'If I am in hospital')}</summary>
         <ul class="small">
-          <li>Si le logiciel de l’hôpital est relié à Mon Espace Santé, les soignant·es que j’autorise peuvent consulter mon plan.</li>
-          <li>Je peux aussi le remettre à l’équipe à mon arrivée (PDF ou version imprimée), pour qu’il soit ajouté à mon dossier.</li>
-          <li>Le ou la soignant·e qui m’accompagne peut l’envoyer à l’hôpital par la messagerie sécurisée de santé (MSSanté).</li>
+          <li>${tr('Si le logiciel de l’hôpital est relié à Mon Espace Santé, les soignant·es que j’autorise peuvent consulter mon plan.', 'If the hospital’s software is connected to Mon Espace Santé, the professionals I authorise can read my plan.')}</li>
+          <li>${tr('Je peux aussi le remettre à l’équipe à mon arrivée (PDF ou version imprimée), pour qu’il soit ajouté à mon dossier.', 'I can also give it to the team when I arrive (PDF or printed copy), so that it is added to my records.')}</li>
+          <li>${tr('Le ou la soignant·e qui m’accompagne peut l’envoyer à l’hôpital par la messagerie sécurisée de santé (MSSanté).', 'The professional who supports me can send it to the hospital through the secure health messaging service (MSSanté).')}</li>
         </ul>
       </details>
     </section>
 
+    ${crisisCardHTML()}
+    <div class="nav-bottom"><a class="btn btn-ghost" href="#/plan">${tr('← Mon plan', '← My plan')}</a></div>`;
+  refreshCardPreview();
+}
+
+/** Pays sans Mon Espace Santé : conseils pour faire ajouter le plan au dossier de soins */
+function renderHealthRecord() {
+  const us = country().record === 'us';
+  app.innerHTML = `
+    <h1>🏥 ${tr('Ajouter à mon dossier de santé', 'Add to my health record')}</h1>
+    <p class="lead">${tr('Pour que mon plan soit utile en situation de crise, les soignant·es doivent pouvoir le trouver. Ma carte de crise signale qu’il existe.', 'For my plan to be useful in a crisis, the professionals caring for me need to be able to find it. My crisis card shows that it exists.')}</p>
+    ${recordPdfHTML(tr('Sans code, pour que les soignant·es puissent le lire et l’ajouter à mon dossier.', 'Without a code, so that professionals can read it and add it to my records.'))}
     <section class="card">
-      <h2>3. Ma carte de crise</h2>
-      <p class="muted small">Une carte au format carte bancaire, à garder dans mon portefeuille à côté de ma carte Vitale. Elle indique seulement que j’ai un plan de crise conjoint, où le trouver et qui prévenir : aucune information sur ma santé.</p>
-      <div class="card-preview" id="crisis-preview"><span class="muted">Préparation…</span></div>
-      <div class="form-grid">
-        ${f('nom', 'Mon nom', 'Prénom Nom')}
-        ${f('ou', 'Où trouver mon plan', 'Ex. : Dans Mon Espace Santé')}
-        ${f('contactNom', 'Personne à prévenir', 'Ex. : Julie Durand')}
-        ${f('contactLien', 'Lien', 'Ex. : ma sœur')}
-        ${f('contactTel', 'Son téléphone', '06 …', 'tel')}
-        ${f('soignantNom', 'Mon soignant référent (facultatif)', 'Ex. : Mme Martin, CMP')}
-        ${f('soignantTel', 'Son téléphone (facultatif)', '02 …', 'tel')}
-      </div>
-      <div class="stack">
-        <button type="button" class="btn btn-primary" data-act="card-print">🖨 Imprimer la carte (PDF)</button>
-        <button type="button" class="btn btn-secondary" data-act="card-img">🖼 Enregistrer l’image</button>
-      </div>
-      <p class="muted small">Je vérifie avec la personne à prévenir qu’elle est d’accord pour figurer sur ma carte.</p>
+      <h2>${tr('2. Le faire ajouter à mon dossier', '2. Have it added to my records')}</h2>
+      <ol class="mes-steps">
+        <li>${tr('Je remets mon plan (PDF ou version imprimée) à l’équipe qui me suit et à mon médecin généraliste, et je leur demande de l’<strong>ajouter à mon dossier</strong>.', 'I give my plan (PDF or printed copy) to the team that supports me and to my GP / family doctor, and ask them to <strong>add it to my records</strong>.')}</li>
+        <li>${tr('Je demande comment il sera <strong>visible en cas de crise</strong> (urgences, équipe de crise, hospitalisation).', 'I ask how it will be <strong>visible in a crisis</strong> (emergency department, crisis team, hospital stay).')}</li>
+        <li>${tr('Si mon service de santé propose un espace patient en ligne qui accepte les documents, je peux aussi l’y déposer.', 'If my health service has an online patient portal that accepts documents, I can also upload it there.')}</li>
+        <li>${tr('À chaque mise à jour de mon plan, je transmets la nouvelle version et je demande que l’ancienne soit retirée.', 'Each time I update my plan, I share the new version and ask for the old one to be removed.')}</li>
+      </ol>
+      ${us ? `<p class="small">${tr('Aux États-Unis, un plan de crise peut accompagner une <strong>directive anticipée psychiatrique</strong> (PAD), dont les règles varient selon les États : je peux en parler avec l’équipe qui me suit.', 'In the United States, a crisis plan can go alongside a <strong>psychiatric advance directive</strong> (PAD), whose rules vary from state to state: I can talk about it with the team that supports me.')}</p>` : ''}
+      <details class="more">
+        <summary>${tr('Si je suis hospitalisé·e', 'If I am in hospital')}</summary>
+        <ul class="small">
+          <li>${tr('Je remets mon plan à l’équipe à mon arrivée, ou je demande à un·e proche de l’apporter.', 'I give my plan to the team when I arrive, or ask someone close to me to bring it.')}</li>
+          <li>${tr('Le ou la professionnel·le qui me suit peut le transmettre à l’hôpital par un moyen sécurisé.', 'The professional who supports me can send it to the hospital securely.')}</li>
+        </ul>
+      </details>
+      <p class="muted small">${tr('Mon pays :', 'My country:')} ${country().flag} ${esc(L(country().name))} · <a href="#/reglages/langue">${tr('changer', 'change')}</a></p>
     </section>
-    <div class="nav-bottom"><a class="btn btn-ghost" href="#/plan">← Mon plan</a></div>`;
+    ${crisisCardHTML()}
+    <div class="nav-bottom"><a class="btn btn-ghost" href="#/plan">${tr('← Mon plan', '← My plan')}</a></div>`;
   refreshCardPreview();
 }
 
@@ -1413,58 +1507,79 @@ async function changeVersion(v) {
   const masked = hiddenSteps(v).filter((st) => stepIsFilled(st, plan.data));
   const signed = (plan.data.signature?.signataires || []).some((r) => r.sig);
   const ok = !hasData() || await modal({
-    title: v === 'ado' ? 'Passer à la version ado ?' : 'Passer à la version adulte ?',
-    body: `<p>Mes réponses communes aux deux versions sont gardées.</p>
-      ${masked.length ? `<p>Ces rubriques seront <strong>masquées</strong> (gardées sur ce téléphone, elles réapparaîtront si je reviens à l’autre version) :</p><ul>${masked.map((st) => `<li>${esc(st.title)}</li>`).join('')}</ul>` : ''}
-      ${signed ? '<p class="small"><strong>Le plan change de contenu</strong> : les signatures déjà faites ne figureront plus sur l’impression ni sur le PDF. Il faudra signer à nouveau.</p>' : ''}`,
-    ok: 'Changer de version',
+    title: v === 'ado' ? tr('Passer à la version ado ?', 'Switch to the teen version?') : tr('Passer à la version adulte ?', 'Switch to the adult version?'),
+    body: `<p>${tr('Mes réponses communes aux deux versions sont gardées.', 'My answers common to both versions are kept.')}</p>
+      ${masked.length ? `<p>${tr('Ces rubriques seront <strong>masquées</strong> (gardées sur ce téléphone, elles réapparaîtront si je reviens à l’autre version) :', 'These sections will be <strong>hidden</strong> (kept on this phone; they will come back if I return to the other version):')}</p><ul>${masked.map((st) => `<li>${esc(st.title)}</li>`).join('')}</ul>` : ''}
+      ${signed ? `<p class="small">${tr('<strong>Le plan change de contenu</strong> : les signatures déjà faites ne figureront plus sur l’impression ni sur le PDF. Il faudra signer à nouveau.', '<strong>The plan’s content changes</strong>: existing signatures will no longer appear on the printout or the PDF. You will need to sign again.')}</p>` : ''}`,
+    ok: tr('Changer de version', 'Switch version'),
   });
   if (!ok) { rerender(renderSettings); return; }
   plan.data.version = v;
   applyVersion();
   scheduleSave();
-  toast(v === 'ado' ? 'Version ado activée.' : 'Version adulte activée.');
+  toast(v === 'ado' ? tr('Version ado activée.', 'Teen version on.') : tr('Version adulte activée.', 'Adult version on.'));
+  rerender(() => route());
+}
+
+/* ---------- langue et pays ---------- */
+
+/** Applique la langue et le pays choisis à toute l'application, sans recharger */
+function applyLocale() {
+  applyVersion();
+  shareCache = null;
+  renderChrome();
+  saveState.textContent = saveState.textContent ? savedLabel() : '';
+  if (!$('#install-banner').hidden) showInstallBanner();
   rerender(() => route());
 }
 
 /* ---------- ressources ---------- */
 
 const telHref = (t) => 'tel:' + t.replace(/[^\d+]/g, '');
+const smsHref = (n, body) => `sms:${n.replace(/[^\d+]/g, '')}${body ? `?&body=${encodeURIComponent(body)}` : ''}`;
+/** Comment joindre un service (numéro, ou SMS avec un mot-clé) */
+const reachText = (it) => (it.tel ? it.tel : tr(`SMS « ${it.smsBody} » au ${it.sms}`, `text ${it.smsBody} to ${it.sms}`));
 
 function resourcesOrdered() {
-  if (!isAdo()) return RESOURCES;
-  const first = RESOURCES.filter((c) => c.id === 'urgence' || c.id === 'jeunes');
-  return [...first, ...RESOURCES.filter((c) => !first.includes(c))];
+  const cats = country().cats;
+  if (!isAdo()) return cats;
+  const first = cats.filter((c) => (country().youthFirst || []).includes(c.id));
+  return [...first, ...cats.filter((c) => !first.includes(c))];
 }
 
 function renderResources() {
+  const c0 = country();
   const digits = (t) => String(t || '').replace(/\D/g, '');
+  const num = (it) => it.tel || it.sms;
   const inPlan = (it) => (isAdo()
-    ? (plan?.data.strategies?.pros || []).some((t) => digits(t).includes(digits(it.tel)))
-    : (plan?.data.aide?.garde || []).some((r) => r.tel && digits(r.tel) === digits(it.tel)));
+    ? (plan?.data.strategies?.pros || []).some((t) => digits(t).includes(digits(num(it))))
+    : (plan?.data.aide?.garde || []).some((r) => r.tel && digits(r.tel) === digits(num(it))));
+  const where = isAdo() ? tr('Ce qui me fait du bien › L’aide de professionnel·les', 'What helps me › Help from professionals') : tr('À qui demander de l’aide', 'Who I can ask for help');
   app.innerHTML = `
-    <h1>📞 Ressources</h1>
-    <p class="lead">Des lignes d’écoute et des sites fiables, en France. Je peux ajouter un numéro à mon plan, dans « ${isAdo() ? 'Ce qui me fait du bien › L’aide de professionnel·les' : 'À qui demander de l’aide'} ».</p>
-    <nav class="res-jump" aria-label="Catégories">${resourcesOrdered().map((c) => `<a class="chip" href="#res-${c.id}" data-act="res-jump" data-id="${c.id}">${c.icon} ${esc(c.title)}</a>`).join('')}</nav>
+    <h1>📞 ${tr('Ressources', 'Resources')}</h1>
+    <p class="lead">${tr(`Des lignes d’écoute et des sites fiables, ${esc(L(c0.inName))}. Je peux ajouter un numéro à mon plan, dans « ${where} ».`, `Helplines and reliable websites ${esc(L(c0.inName))}. I can add a number to my plan, under “${where}”.`)}</p>
+    <p class="small country-line">${c0.flag} ${tr('Pays :', 'Country:')} <strong>${esc(L(c0.name))}</strong> · <a href="#/reglages/langue">${tr('changer', 'change')}</a></p>
+    <nav class="res-jump" aria-label="${tr('Catégories', 'Categories')}">${resourcesOrdered().map((c) => `<a class="chip" href="#res-${c.id}" data-act="res-jump" data-id="${c.id}">${c.icon} ${esc(L(c.title))}</a>`).join('')}</nav>
     ${resourcesOrdered().map((c) => `
       <section class="card res-cat" id="res-${c.id}">
-        <h2>${c.icon} ${esc(c.title)}</h2>
-        ${c.intro ? `<p class="muted small">${esc(c.intro)}</p>` : ''}
+        <h2>${c.icon} ${esc(L(c.title))}</h2>
+        ${c.intro ? `<p class="muted small">${esc(L(c.intro))}</p>` : ''}
         <ul class="res-list">${c.items.map((it, k) => `
           <li class="res-item">
-            <p class="res-name">${esc(it.name)}</p>
-            ${it.hours ? `<p class="res-hours">🕑 ${esc(it.hours)}</p>` : ''}
-            <p class="res-desc">${esc(it.desc)}</p>
+            <p class="res-name">${esc(L(it.name))}</p>
+            ${it.hours ? `<p class="res-hours">🕑 ${esc(L(it.hours))}</p>` : ''}
+            <p class="res-desc">${esc(L(it.desc))}</p>
             <div class="res-actions">
               ${it.tel ? `<a class="btn btn-primary btn-sm" href="${telHref(it.tel)}">☎ ${esc(it.tel)}</a>` : ''}
-              ${it.url ? `<a class="btn btn-secondary btn-sm" href="${esc(it.url)}" target="_blank" rel="noopener noreferrer">Site ↗</a>` : ''}
-              ${it.tel && plan ? (inPlan(it)
-                ? '<span class="res-added">✓ Dans mon plan</span>'
-                : `<button type="button" class="btn btn-ghost btn-sm" data-act="res-add" data-c="${c.id}" data-k="${k}" data-fk="res:${c.id}:${k}">+ Ajouter à mon plan</button>`) : ''}
+              ${it.sms ? `<a class="btn btn-primary btn-sm" href="${smsHref(it.sms, it.smsBody)}">💬 ${tr('SMS', 'Text')} ${esc(it.sms)}</a>` : ''}
+              ${it.url ? `<a class="btn btn-secondary btn-sm" href="${esc(it.url)}" target="_blank" rel="noopener noreferrer">${tr('Site ↗', 'Website ↗')}</a>` : ''}
+              ${num(it) && plan ? (inPlan(it)
+                ? `<span class="res-added">✓ ${tr('Dans mon plan', 'In my plan')}</span>`
+                : `<button type="button" class="btn btn-ghost btn-sm" data-act="res-add" data-c="${c.id}" data-k="${k}" data-fk="res:${c.id}:${k}">${tr('+ Ajouter à mon plan', '+ Add to my plan')}</button>`) : ''}
             </div>
           </li>`).join('')}</ul>
       </section>`).join('')}
-    <p class="muted small center">Informations vérifiées le ${CHECKED}. Les horaires peuvent évoluer : en cas de doute, consulter le site du service.</p>`;
+    <p class="muted small center">${tr(`Informations vérifiées le ${L(c0.checked)}. Les horaires peuvent évoluer : en cas de doute, consulter le site du service.`, `Information checked on ${L(c0.checked)}. Opening hours may change: if in doubt, check the service’s website.`)}</p>`;
 }
 
 /* ---------- plan complet et partage ---------- */
@@ -1474,27 +1589,27 @@ function renderPlan() {
   const alt = (plan.data.alternatives || []).some((x) => x.trim());
   const canShare = !!navigator.share;
   app.innerHTML = `
-    <h1>Mon plan</h1>
-    ${refused && !alt ? '<div class="warn" role="status"><strong>À compléter :</strong> j’ai indiqué des soins à éviter sans proposer d’alternative. <a href="#/etape/' + STEPS.findIndex((s) => s.id === 'alternatives') + '">Compléter les alternatives</a></div>' : ''}
-    ${modifiedAfterSigning() ? '<div class="warn no-print" role="status"><strong>Le plan a été modifié après certaines signatures</strong> : elles ne figurent plus sur l’impression ni sur le PDF. <a href="#/etape/' + (STEPS.length - 1) + '">Signer à nouveau</a></div>' : ''}
+    <h1>${tr('Mon plan', 'My plan')}</h1>
+    ${refused && !alt ? `<div class="warn" role="status"><strong>${tr('À compléter :', 'To complete:')}</strong> ${tr('j’ai indiqué des soins à éviter sans proposer d’alternative.', 'I have listed care to avoid without suggesting an alternative.')} <a href="#/etape/${STEPS.findIndex((s) => s.id === 'alternatives')}">${tr('Compléter les alternatives', 'Add alternatives')}</a></div>` : ''}
+    ${modifiedAfterSigning() ? `<div class="warn no-print" role="status"><strong>${tr('Le plan a été modifié après certaines signatures', 'The plan was changed after some signatures')}</strong>${tr(' : elles ne figurent plus sur l’impression ni sur le PDF.', ': they no longer appear on the printout or the PDF.')} <a href="#/etape/${STEPS.length - 1}">${tr('Signer à nouveau', 'Sign again')}</a></div>` : ''}
     <section class="card actions no-print">
-      <h2>Imprimer, enregistrer, envoyer</h2>
-      <p class="muted">Rien ne part sans mon accord. Je choisis à qui j’envoie mon plan et par quel moyen.</p>
+      <h2>${tr('Imprimer, enregistrer, envoyer', 'Print, save, send')}</h2>
+      <p class="muted">${tr('Rien ne part sans mon accord. Je choisis à qui j’envoie mon plan et par quel moyen.', 'Nothing is sent without my consent. I choose who I send my plan to, and how.')}</p>
       <div class="stack">
-        <button class="btn btn-secondary" data-act="print">🖨 Imprimer</button>
-        <button class="btn btn-secondary" data-act="pdf-save">📄 Enregistrer en PDF</button>
-        <button class="btn btn-primary" data-act="pdf-send">📤 Envoyer le PDF</button>
-        <a class="btn btn-secondary" href="#/mon-espace-sante">🏥 Ajouter à Mon Espace Santé</a>
+        <button class="btn btn-secondary" data-act="print">🖨 ${tr('Imprimer', 'Print')}</button>
+        <button class="btn btn-secondary" data-act="pdf-save">📄 ${tr('Enregistrer en PDF', 'Save as PDF')}</button>
+        <button class="btn btn-primary" data-act="pdf-send">📤 ${tr('Envoyer le PDF', 'Send the PDF')}</button>
+        <a class="btn btn-secondary" href="#/mon-espace-sante">${recordButtonLabel()}</a>
       </div>
-      <p class="muted small">À l’enregistrement, je peux <strong>protéger le PDF par un code</strong>. Pour un envoi, je privilégie un moyen sûr et un PDF sans code, que le destinataire pourra ouvrir en cas de crise.</p>
+      <p class="muted small">${tr('À l’enregistrement, je peux <strong>protéger le PDF par un code</strong>. Pour un envoi, je privilégie un moyen sûr et un PDF sans code, que le destinataire pourra ouvrir en cas de crise.', 'When saving, I can <strong>protect the PDF with a code</strong>. To send it, I prefer a secure channel and a PDF without a code, which the recipient can open in a crisis.')}</p>
       <details class="more">
-        <summary>Autre option : envoyer en texte</summary>
-        <p class="muted small">Le texte se colle dans un message. Il <strong>ne peut pas être protégé</strong> par un code : préférez le PDF protégé pour un envoi.</p>
-        <button class="btn btn-ghost btn-sm" data-act="share-text">${canShare ? 'Envoyer en texte (non protégé)' : 'Copier le texte (non protégé)'}</button>
+        <summary>${tr('Autre option : envoyer en texte', 'Other option: send as text')}</summary>
+        <p class="muted small">${tr('Le texte se colle dans un message. Il <strong>ne peut pas être protégé</strong> par un code : préférez le PDF protégé pour un envoi.', 'The text can be pasted into a message. It <strong>cannot be protected</strong> with a code: prefer the protected PDF for sending.')}</p>
+        <button class="btn btn-ghost btn-sm" data-act="share-text">${canShare ? tr('Envoyer en texte (non protégé)', 'Send as text (not protected)') : tr('Copier le texte (non protégé)', 'Copy the text (not protected)')}</button>
       </details>
     </section>
     <article class="doc">${documentHTML(plan)}</article>
-    <div class="nav-bottom no-print"><a class="btn btn-ghost" href="#/etape/${STEPS.length - 1}">← Modifier</a><a class="btn btn-ghost" href="#/">Accueil</a></div>`;
+    <div class="nav-bottom no-print"><a class="btn btn-ghost" href="#/etape/${STEPS.length - 1}">${tr('← Modifier', '← Edit')}</a><a class="btn btn-ghost" href="#/">${tr('Accueil', 'Home')}</a></div>`;
 }
 
 /* ---------- contacts du téléphone (API Contact Picker, Android/Chrome) ---------- */
@@ -1514,17 +1629,17 @@ function contactsEnabled(step, g) {
 }
 function contactsNoteHTML(step, g) {
   if (!contactsWanted(step, g) || contactsSupported() || !isBrave() || !/Android/i.test(navigator.userAgent)) return '';
-  return '<p class="muted small contacts-note">Pour choisir directement dans mes contacts, j’ouvre Mon PCC dans <strong>Chrome</strong> : le navigateur Brave ne le permet pas encore.</p>';
+  return `<p class="muted small contacts-note">${tr('Pour choisir directement dans mes contacts, j’ouvre Mon PCC dans <strong>Chrome</strong> : le navigateur Brave ne le permet pas encore.', 'To choose directly from my contacts, I open Mon PCC in <strong>Chrome</strong>: the Brave browser does not support this yet.')}</p>`;
 }
 
 async function confirmContacts() {
   if (sessionStorage.getItem('monpcc.contactsOk')) return true;
   const ok = await modal({
-    title: 'Accéder à mes contacts',
-    body: `<p>Mon téléphone va afficher sa liste de contacts. <strong>Seuls les contacts que je coche</strong> seront ajoutés à mon plan (nom et numéro). Mon PCC n’a pas accès au reste de mon carnet.</p>
-      <ul><li>Les contacts choisis restent enregistrés sur ce téléphone, comme le reste de mon plan.</li>
-      <li>Je vérifie avec chaque personne qu’elle est d’accord pour figurer dans mon plan et pour être contactée.</li></ul>`,
-    ok: 'Ouvrir mes contacts',
+    title: tr('Accéder à mes contacts', 'Access my contacts'),
+    body: `<p>${tr('Mon téléphone va afficher sa liste de contacts. <strong>Seuls les contacts que je coche</strong> seront ajoutés à mon plan (nom et numéro). Mon PCC n’a pas accès au reste de mon carnet.', 'My phone will show its contact list. <strong>Only the contacts I tick</strong> will be added to my plan (name and number). Mon PCC cannot access the rest of my address book.')}</p>
+      <ul><li>${tr('Les contacts choisis restent enregistrés sur ce téléphone, comme le reste de mon plan.', 'The chosen contacts stay saved on this phone, like the rest of my plan.')}</li>
+      <li>${tr('Je vérifie avec chaque personne qu’elle est d’accord pour figurer dans mon plan et pour être contactée.', 'I check with each person that they agree to be in my plan and to be contacted.')}</li></ul>`,
+    ok: tr('Ouvrir mes contacts', 'Open my contacts'),
   });
   if (ok) sessionStorage.setItem('monpcc.contactsOk', '1');
   return ok;
@@ -1538,7 +1653,7 @@ async function pickContacts(step, gid) {
   try {
     picked = await navigator.contacts.select(props, { multiple: true });
   } catch {
-    toast('Impossible d’ouvrir les contacts sur cet appareil.');
+    toast(tr('Impossible d’ouvrir les contacts sur cet appareil.', 'Contacts cannot be opened on this device.'));
     return;
   }
   if (!picked || !picked.length) return;
@@ -1555,18 +1670,33 @@ async function pickContacts(step, gid) {
   }
   scheduleSave();
   rerender(() => renderStep(STEPS.indexOf(step)));
-  toast(added ? `${added} contact${added > 1 ? 's' : ''} ajouté${added > 1 ? 's' : ''}. Pensez à préciser le lien ou le rôle.` : 'Ces contacts figurent déjà dans la liste.');
+  toast(added
+    ? tr(`${added} contact${added > 1 ? 's' : ''} ajouté${added > 1 ? 's' : ''}. Pensez à préciser le lien ou le rôle.`, `${added} contact${added > 1 ? 's' : ''} added. Remember to add the relationship or role.`)
+    : tr('Ces contacts figurent déjà dans la liste.', 'These contacts are already in the list.'));
+}
+
+/** Moyens d'envoi sûrs, selon le pays */
+function safeWaysHTML() {
+  return hasMES()
+    ? `<ul><li>${tr('remise en main propre ou version imprimée ;', 'handing it over in person or as a printed copy;')}</li>
+        <li>${tr('messagerie chiffrée (Signal, WhatsApp…) ;', 'an encrypted messaging app (Signal, WhatsApp…);')}</li>
+        <li>${tr('dépôt dans Mon Espace Santé ;', 'adding it to Mon Espace Santé;')}</li>
+        <li>${tr('envoi par mon soignant via la messagerie sécurisée de santé (MSSanté).', 'sending by my health professional through the secure health messaging service (MSSanté).')}</li></ul>`
+    : `<ul><li>${tr('remise en main propre ou version imprimée ;', 'handing it over in person or as a printed copy;')}</li>
+        <li>${tr('messagerie chiffrée (Signal, WhatsApp…) ;', 'an encrypted messaging app (Signal, WhatsApp…);')}</li>
+        <li>${tr('remise à mon équipe de soins, pour qu’elle l’ajoute à mon dossier ;', 'giving it to my care team, so they can add it to my records;')}</li>
+        <li>${tr('envoi par mon soignant via une messagerie sécurisée de santé.', 'sending by my health professional through secure health messaging.')}</li></ul>`;
 }
 
 async function confirmShare() {
   if (sessionStorage.getItem('monpcc.shareOk')) return true;
   const ok = await modal({
-    title: 'Avant d’envoyer',
-    body: `<p>Mon plan contient des <strong>informations de santé</strong>. Une fois envoyé, il quitte ce téléphone et je n’en ai plus le contrôle.</p>
-      <ul><li>Je l’envoie seulement à des personnes de confiance ou aux professionnel·les qui m’accompagnent.</li>
-      <li>Je privilégie un moyen sûr : remise en main propre, messagerie sécurisée de santé, application chiffrée.</li>
-      <li>Je vérifie le destinataire avant d’envoyer.</li></ul>`,
-    ok: 'J’ai compris, continuer',
+    title: tr('Avant d’envoyer', 'Before sending'),
+    body: `<p>${tr('Mon plan contient des <strong>informations de santé</strong>. Une fois envoyé, il quitte ce téléphone et je n’en ai plus le contrôle.', 'My plan contains <strong>health information</strong>. Once sent, it leaves this phone and I no longer control it.')}</p>
+      <ul><li>${tr('Je l’envoie seulement à des personnes de confiance ou aux professionnel·les qui m’accompagnent.', 'I only send it to people I trust or to the professionals who support me.')}</li>
+      <li>${tr('Je privilégie un moyen sûr : remise en main propre, messagerie sécurisée de santé, application chiffrée.', 'I prefer a secure channel: in person, secure health messaging, an encrypted app.')}</li>
+      <li>${tr('Je vérifie le destinataire avant d’envoyer.', 'I check the recipient before sending.')}</li></ul>`,
+    ok: tr('J’ai compris, continuer', 'I understand, continue'),
   });
   if (ok) sessionStorage.setItem('monpcc.shareOk', '1');
   return ok;
@@ -1587,36 +1717,33 @@ function pdfDialog(mode) {
     const d = $('#modal');
     const send = mode === 'send';
     d.innerHTML = `<form method="dialog" class="modal-inner pdf-dlg">
-      <h2>${send ? '📤 Envoyer mon plan en PDF' : '📄 Enregistrer mon plan en PDF'}</h2>
-      ${send ? `<p class="small">Mon plan contient des <strong>informations de santé</strong>. Une fois envoyé, il quitte ce téléphone : je l’envoie seulement à des personnes de confiance ou aux professionnel·les qui m’accompagnent, et je vérifie le destinataire.</p>
-      <div class="safe-ways small"><strong>Je choisis un moyen d’envoi sûr :</strong>
-        <ul><li>remise en main propre ou version imprimée ;</li>
-        <li>messagerie chiffrée (Signal, WhatsApp…) ;</li>
-        <li>dépôt dans Mon Espace Santé ;</li>
-        <li>envoi par mon soignant via la messagerie sécurisée de santé (MSSanté).</li></ul>
-        J’évite, si possible, un simple e-mail.
-        <button value="mes" class="btn btn-secondary btn-sm mes-btn" formnovalidate>🏥 Déposer dans Mon Espace Santé</button></div>` : ''}
+      <h2>${send ? tr('📤 Envoyer mon plan en PDF', '📤 Send my plan as a PDF') : tr('📄 Enregistrer mon plan en PDF', '📄 Save my plan as a PDF')}</h2>
+      ${send ? `<p class="small">${tr('Mon plan contient des <strong>informations de santé</strong>. Une fois envoyé, il quitte ce téléphone : je l’envoie seulement à des personnes de confiance ou aux professionnel·les qui m’accompagnent, et je vérifie le destinataire.', 'My plan contains <strong>health information</strong>. Once sent, it leaves this phone: I only send it to people I trust or to the professionals who support me, and I check the recipient.')}</p>
+      <div class="safe-ways small"><strong>${tr('Je choisis un moyen d’envoi sûr :', 'I choose a secure way to send it:')}</strong>
+        ${safeWaysHTML()}
+        ${tr('J’évite, si possible, un simple e-mail.', 'If possible, I avoid plain email.')}
+        <button value="mes" class="btn btn-secondary btn-sm mes-btn" formnovalidate>${hasMES() ? tr('🏥 Déposer dans Mon Espace Santé', '🏥 Add to Mon Espace Santé') : tr('🏥 Ajouter à mon dossier de santé', '🏥 Add to my health record')}</button></div>` : ''}
       <fieldset class="choice">
-        <legend class="sr-only">Protection</legend>
-        ${send ? `<label class="radio"><input type="radio" name="mode" value="none" checked> <span><strong>Sans code</strong> (conseillé pour un envoi)<br><span class="muted small">Le destinataire pourra ouvrir mon plan immédiatement, y compris en situation de crise.</span></span></label>` : ''}
-        <label class="radio"><input type="radio" name="mode" value="code" ${send ? '' : 'checked'}> <span><strong>Protéger par un code</strong> ${send ? '<br><span class="muted small">Seulement si le destinataire peut recevoir le code par un autre moyen.</span>' : '(recommandé)<br><span class="muted small">Le code sera demandé pour ouvrir le PDF.</span>'}</span></label>
+        <legend class="sr-only">${tr('Protection', 'Protection')}</legend>
+        ${send ? `<label class="radio"><input type="radio" name="mode" value="none" checked> <span><strong>${tr('Sans code', 'No code')}</strong> ${tr('(conseillé pour un envoi)', '(recommended for sending)')}<br><span class="muted small">${tr('Le destinataire pourra ouvrir mon plan immédiatement, y compris en situation de crise.', 'The recipient can open my plan straight away, including in a crisis.')}</span></span></label>` : ''}
+        <label class="radio"><input type="radio" name="mode" value="code" ${send ? '' : 'checked'}> <span><strong>${tr('Protéger par un code', 'Protect with a code')}</strong> ${send ? `<br><span class="muted small">${tr('Seulement si le destinataire peut recevoir le code par un autre moyen.', 'Only if the recipient can receive the code another way.')}</span>` : `${tr('(recommandé)', '(recommended)')}<br><span class="muted small">${tr('Le code sera demandé pour ouvrir le PDF.', 'The code will be needed to open the PDF.')}</span>`}</span></label>
         <div class="code-box">
-          <label class="field"><span>Code (6 caractères minimum)</span>
+          <label class="field"><span>${tr('Code (6 caractères minimum)', 'Code (at least 6 characters)')}</span>
             <input name="code" autocomplete="off" autocapitalize="characters" spellcheck="false"></label>
-          <button type="button" class="btn btn-ghost btn-sm" data-gen>Générer un code</button>
+          <button type="button" class="btn btn-ghost btn-sm" data-gen>${tr('Générer un code', 'Generate a code')}</button>
           ${send
-            ? `<div class="warn small" role="note"><strong>⚠ Attention aux risques d’un envoi avec code :</strong>
-                <ul><li>sans le code, le destinataire <strong>ne pourra pas lire mon plan</strong>, y compris en situation de crise, quand il est le plus utile ;</li>
-                <li>un fichier protégé <strong>ne peut pas être intégré</strong> à mon dossier à l’hôpital ni à Mon Espace Santé sans le code ;</li>
-                <li>je transmets le code <strong>par un autre moyen</strong> (de vive voix, par SMS séparé…), jamais dans le même message que le fichier.</li></ul></div>`
-            : '<p class="muted small">Je note ce code : sans lui, le fichier ne pourra pas être ouvert. Mon PCC ne le garde pas.</p>'}
+            ? `<div class="warn small" role="note"><strong>${tr('⚠ Attention aux risques d’un envoi avec code :', '⚠ Be aware of the risks of sending with a code:')}</strong>
+                <ul><li>${tr('sans le code, le destinataire <strong>ne pourra pas lire mon plan</strong>, y compris en situation de crise, quand il est le plus utile ;', 'without the code, the recipient <strong>will not be able to read my plan</strong>, including in a crisis, when it matters most;')}</li>
+                <li>${hasMES() ? tr('un fichier protégé <strong>ne peut pas être intégré</strong> à mon dossier à l’hôpital ni à Mon Espace Santé sans le code ;', 'a protected file <strong>cannot be added</strong> to my hospital records or to Mon Espace Santé without the code;') : tr('un fichier protégé <strong>ne peut pas être intégré</strong> à mon dossier de soins sans le code ;', 'a protected file <strong>cannot be added</strong> to my health records without the code;')}</li>
+                <li>${tr('je transmets le code <strong>par un autre moyen</strong> (de vive voix, par SMS séparé…), jamais dans le même message que le fichier.', 'I share the code <strong>another way</strong> (in person, by a separate text…), never in the same message as the file.')}</li></ul></div>`
+            : `<p class="muted small">${tr('Je note ce code : sans lui, le fichier ne pourra pas être ouvert. Mon PCC ne le garde pas.', 'I write this code down: without it, the file cannot be opened. Mon PCC does not keep it.')}</p>`}
         </div>
-        ${send ? '' : '<label class="radio"><input type="radio" name="mode" value="none"> <span>Sans code</span></label>'}
+        ${send ? '' : `<label class="radio"><input type="radio" name="mode" value="none"> <span>${tr('Sans code', 'No code')}</span></label>`}
       </fieldset>
       <p class="error" role="alert" hidden></p>
       <div class="modal-actions">
-        <button value="cancel" class="btn btn-ghost" formnovalidate>Annuler</button>
-        <button value="ok" class="btn btn-primary">${send ? 'Préparer l’envoi' : 'Enregistrer'}</button>
+        <button value="cancel" class="btn btn-ghost" formnovalidate>${tr('Annuler', 'Cancel')}</button>
+        <button value="ok" class="btn btn-primary">${send ? tr('Préparer l’envoi', 'Prepare to send') : tr('Enregistrer', 'Save')}</button>
       </div></form>`;
     const f = d.querySelector('form');
     const box = d.querySelector('.code-box');
@@ -1628,7 +1755,7 @@ function pdfDialog(mode) {
       if (e.submitter?.value !== 'ok') return;
       if (f.mode.value === 'code' && f.code.value.trim().length < 6) {
         e.preventDefault();
-        err.textContent = 'Le code doit comporter au moins 6 caractères.';
+        err.textContent = tr('Le code doit comporter au moins 6 caractères.', 'The code must be at least 6 characters long.');
         err.hidden = false;
         f.code.focus();
       }
@@ -1645,14 +1772,16 @@ function pdfDialog(mode) {
 }
 
 async function makePlanPdf(password) {
-  saveState.textContent = 'Préparation du PDF…';
+  saveState.textContent = tr('Préparation du PDF…', 'Preparing the PDF…');
   try {
     const blob = await buildPlanPdf(plan, password);
-    return new File([blob], fileBaseName(plan) + (password ? '-protege' : '') + '.pdf', { type: 'application/pdf' });
+    return new File([blob], fileBaseName(plan) + (password ? tr('-protege', '-protected') : '') + '.pdf', { type: 'application/pdf' });
   } finally {
-    saveState.textContent = 'Enregistré sur ce téléphone';
+    saveState.textContent = savedLabel();
   }
 }
+
+const pdfFail = () => toast(tr('Impossible de créer le PDF sur cet appareil.', 'The PDF cannot be created on this device.'));
 
 async function pdfSave() {
   const opt = await pdfDialog('save');
@@ -1660,9 +1789,9 @@ async function pdfSave() {
   try {
     const file = await makePlanPdf(opt.password);
     download(file, file.name);
-    toast(opt.password ? 'PDF protégé enregistré. Gardez le code en lieu sûr.' : 'PDF enregistré.');
+    toast(opt.password ? tr('PDF protégé enregistré. Gardez le code en lieu sûr.', 'Protected PDF saved. Keep the code somewhere safe.') : tr('PDF enregistré.', 'PDF saved.'));
   } catch {
-    toast('Impossible de créer le PDF sur cet appareil.');
+    pdfFail();
   }
 }
 
@@ -1670,30 +1799,30 @@ async function pdfSend() {
   const opt = await pdfDialog('send');
   if (!opt) return;
   let file;
-  try { file = await makePlanPdf(opt.password); } catch { toast('Impossible de créer le PDF sur cet appareil.'); return; }
-  const share = () => navigator.share({ files: [file], title: 'Mon plan de crise conjoint' });
+  try { file = await makePlanPdf(opt.password); } catch { pdfFail(); return; }
+  const share = () => navigator.share({ files: [file], title: tr('Mon plan de crise conjoint', 'My joint crisis plan') });
   if (navigator.canShare && navigator.canShare({ files: [file] })) {
     try { await share(); return; } catch (e) {
       if (e.name === 'AbortError') return;
       // Certains navigateurs exigent un nouveau geste après la préparation
       if (e.name === 'NotAllowedError') {
-        if (await modal({ title: 'Le PDF est prêt', body: `<p>${opt.password ? 'Le fichier est protégé par le code choisi.' : 'Le fichier n’est pas protégé.'}</p>`, ok: 'Envoyer' })) {
+        if (await modal({ title: tr('Le PDF est prêt', 'The PDF is ready'), body: `<p>${opt.password ? tr('Le fichier est protégé par le code choisi.', 'The file is protected with the chosen code.') : tr('Le fichier n’est pas protégé.', 'The file is not protected.')}</p>`, ok: tr('Envoyer', 'Send') })) {
           try { await share(); return; } catch (e2) { if (e2.name === 'AbortError') return; }
         } else return;
       }
     }
   }
   download(file, file.name);
-  toast('Envoi direct indisponible : le PDF a été téléchargé, je peux le joindre à un message.');
+  toast(tr('Envoi direct indisponible : le PDF a été téléchargé, je peux le joindre à un message.', 'Direct sending is not available: the PDF has been downloaded, and I can attach it to a message.'));
 }
 
 async function shareText() {
   if (!(await confirmShare())) return;
   const text = planText(plan);
   if (navigator.share) {
-    try { await navigator.share({ title: 'Mon plan de crise conjoint', text }); return; } catch (e) { if (e.name === 'AbortError') return; }
+    try { await navigator.share({ title: tr('Mon plan de crise conjoint', 'My joint crisis plan'), text }); return; } catch (e) { if (e.name === 'AbortError') return; }
   }
-  try { await navigator.clipboard.writeText(text); toast('Texte copié : collez-le dans le message de votre choix.'); } catch { toast('Copie impossible sur cet appareil.'); }
+  try { await navigator.clipboard.writeText(text); toast(tr('Texte copié : collez-le dans le message de votre choix.', 'Text copied: paste it into the message of your choice.')); } catch { toast(tr('Copie impossible sur cet appareil.', 'Copying is not possible on this device.')); }
 }
 
 /* ---------- réglages ---------- */
@@ -1704,9 +1833,9 @@ async function renderOfflineStatus() {
   const st = await offlineStatus();
   const btn = app.querySelector('[data-act="ex-offline"]');
   if (st.sw && st.pages) {
-    box.innerHTML = `✓ <strong>Prêts hors connexion</strong> : ${st.pages} fichiers de pages${st.audios ? ` et ${st.audios} sons` : ''}.`;
-    if (btn) btn.textContent = '↻ Mettre à jour les exercices hors connexion';
-  } else box.textContent = 'Pas encore téléchargés sur ce téléphone.';
+    box.innerHTML = `✓ <strong>${tr('Prêts hors connexion', 'Ready offline')}</strong>${tr(' :', ':')} ${tr(`${st.pages} fichiers de pages`, `${st.pages} page files`)}${st.audios ? tr(` et ${st.audios} sons`, ` and ${st.audios} sounds`) : ''}.`;
+    if (btn) btn.textContent = tr('↻ Mettre à jour les exercices hors connexion', '↻ Update offline exercises');
+  } else box.textContent = tr('Pas encore téléchargés sur ce téléphone.', 'Not downloaded on this phone yet.');
 }
 
 /** Avertissements que la personne a masqués (libellés lisibles) */
@@ -1714,11 +1843,11 @@ function hiddenWarnings() {
   const h = [];
   const ls = (k) => { try { return localStorage.getItem(k); } catch { return null; } };
   const ss = (k) => { try { return sessionStorage.getItem(k); } catch { return null; } };
-  if (ls(EMBED_OK)) h.push('Avertissement avant de lire une vidéo ou une musique d’un autre site');
-  if (plan?.data?.masquerNoteMineur) h.push('Message « Si j’ai moins de 18 ans » (Mon Espace Santé)');
-  if (installPref() && !isStandalone()) h.push('Bandeau proposant d’installer l’application');
-  if (ss('monpcc.contactsOk')) h.push('Information avant d’ouvrir mes contacts');
-  if (ss('monpcc.shareOk')) h.push('Avertissement avant d’envoyer mon plan');
+  if (ls(EMBED_OK)) h.push(tr('Avertissement avant de lire une vidéo ou une musique d’un autre site', 'Warning before playing a video or music from another site'));
+  if (plan?.data?.masquerNoteMineur) h.push(tr('Message « Si j’ai moins de 18 ans » (Mon Espace Santé)', '“If I am under 18” message (Mon Espace Santé)'));
+  if (installPref() && !isStandalone()) h.push(tr('Bandeau proposant d’installer l’application', 'Banner offering to install the app'));
+  if (ss('monpcc.contactsOk')) h.push(tr('Information avant d’ouvrir mes contacts', 'Information before opening my contacts'));
+  if (ss('monpcc.shareOk')) h.push(tr('Avertissement avant d’envoyer mon plan', 'Warning before sending my plan'));
   return h;
 }
 
@@ -1729,141 +1858,167 @@ function resetWarnings() {
   setInstallPref(null);
 }
 
+function localeSectionHTML() {
+  const lp = langPref();
+  const cp = countryPref();
+  const autoLang = LANGS[deviceLang()];
+  const autoCountry = L(COUNTRIES[deviceCountry()].name);
+  return `<section class="card" id="langue">
+      <h2>🌐 ${tr('Langue et pays', 'Language and country')}</h2>
+      <fieldset class="choice"><legend class="small"><strong>${tr('Langue', 'Language')}</strong></legend>
+        <label class="radio"><input type="radio" name="lang" value="" data-act="lang" ${lp ? '' : 'checked'}> <span>${tr('Automatique', 'Automatic')} <span class="muted small">(${tr('langue du téléphone :', 'phone language:')} ${esc(autoLang)})</span></span></label>
+        ${Object.entries(LANGS).map(([k, v]) => `<label class="radio"><input type="radio" name="lang" value="${k}" data-act="lang" ${lp === k ? 'checked' : ''} lang="${k}"> <span>${esc(v)}</span></label>`).join('')}
+      </fieldset>
+      <label class="field"><span><strong>${tr('Pays', 'Country')}</strong> <span class="muted small">${tr('(numéros d’urgence, ressources d’aide, dossier de santé)', '(emergency numbers, help resources, health record)')}</span></span>
+        <select data-act="country">
+          <option value="" ${cp ? '' : 'selected'}>${tr('Automatique', 'Automatic')} (${esc(autoCountry)})</option>
+          ${COUNTRY_CODES.map((c) => `<option value="${c}" ${cp === c ? 'selected' : ''}>${COUNTRIES[c].flag} ${esc(L(COUNTRIES[c].name))}</option>`).join('')}
+        </select></label>
+      <p class="muted small">${tr('Mes réponses ne sont pas traduites : elles restent telles que je les ai écrites. Les questions, conseils et exemples suivent la langue choisie.', 'My answers are not translated: they stay as I wrote them. Questions, tips and examples follow the chosen language.')}</p>
+      ${LANG === 'en' ? '<p class="muted small">The adult questions come from the official English version of the joint crisis plan. There is no official English teen version yet: the teen questions are an unofficial translation by Mon PCC.</p>' : ''}
+    </section>`;
+}
+
 function renderSettings() {
   const prot = store.isProtected();
   app.innerHTML = `
-    <h1>Réglages</h1>
+    <h1>${tr('Réglages', 'Settings')}</h1>
+    ${localeSectionHTML()}
     <section class="card" id="version">
-      <h2>Version du plan</h2>
-      <p class="muted small">Je peux changer de version à tout moment. Les réponses communes sont gardées ; les rubriques propres à l’autre version sont conservées mais masquées.</p>
+      <h2>${tr('Version du plan', 'Plan version')}</h2>
+      <p class="muted small">${tr('Je peux changer de version à tout moment. Les réponses communes sont gardées ; les rubriques propres à l’autre version sont conservées mais masquées.', 'I can switch versions at any time. Shared answers are kept; sections specific to the other version are kept but hidden.')}</p>
       <div class="choice">
         ${Object.entries(VERSIONS).map(([v, c]) => `<label class="radio"><input type="radio" name="version" value="${v}" data-act="version" ${VERSION === v ? 'checked' : ''}>
-          <span><strong>${v === 'ado' ? 'Version ado' : 'Version adulte'}</strong> (${c.steps.length} étapes)<br><span class="muted small">${v === 'ado'
-            ? 'Questions adaptées aux adolescent·es. Version en phase de test sur le site officiel du PCC.'
-            : 'La version de référence, avec les soins souhaités, à éviter et les démarches à déléguer.'}</span></span></label>`).join('')}
+          <span><strong>${v === 'ado' ? tr('Version ado', 'Teen version') : tr('Version adulte', 'Adult version')}</strong> (${c.steps.length} ${tr('étapes', 'steps')})<br><span class="muted small">${v === 'ado'
+            ? tr('Questions adaptées aux adolescent·es. Version en phase de test sur le site officiel du PCC.', 'Questions adapted for teenagers. Test version on the official JCP website; unofficial English translation by Mon PCC.')
+            : tr('La version de référence, avec les soins souhaités, à éviter et les démarches à déléguer.', 'The reference version, including care I want, care to avoid and practical arrangements.')}</span></span></label>`).join('')}
       </div>
     </section>
     <section class="card">
-      <h2>Protéger par un code</h2>
-      <p>${prot ? 'Mon plan est <strong>chiffré</strong> sur ce téléphone. Le code est demandé à chaque ouverture.' : 'Je peux chiffrer mon plan avec un code personnel. Il sera demandé à chaque ouverture de l’application.'}</p>
+      <h2>${tr('Protéger par un code', 'Protect with a code')}</h2>
+      <p>${prot ? tr('Mon plan est <strong>chiffré</strong> sur ce téléphone. Le code est demandé à chaque ouverture.', 'My plan is <strong>encrypted</strong> on this phone. The code is needed each time I open the app.') : tr('Je peux chiffrer mon plan avec un code personnel. Il sera demandé à chaque ouverture de l’application.', 'I can encrypt my plan with a personal code. It will be needed each time I open the app.')}</p>
       ${prot
-        ? `<div class="stack"><button class="btn btn-secondary" data-act="lock-now">Verrouiller maintenant</button><button class="btn btn-ghost" data-act="unprotect">Retirer le code</button></div>`
+        ? `<div class="stack"><button class="btn btn-secondary" data-act="lock-now">${tr('Verrouiller maintenant', 'Lock now')}</button><button class="btn btn-ghost" data-act="unprotect">${tr('Retirer le code', 'Remove the code')}</button></div>`
         : `<form class="stack" data-act="protect">
-            <label class="field"><span>Code (6 caractères minimum)</span><input type="password" name="c1" minlength="6" required autocomplete="new-password"></label>
-            <label class="field"><span>Confirmer le code</span><input type="password" name="c2" minlength="6" required autocomplete="new-password"></label>
-            <p class="muted small">Attention : si j’oublie ce code, personne ne pourra récupérer mon plan, pas même les créateurs de l’application.</p>
-            <button class="btn btn-primary">Activer la protection</button></form>`}
+            <label class="field"><span>${tr('Code (6 caractères minimum)', 'Code (at least 6 characters)')}</span><input type="password" name="c1" minlength="6" required autocomplete="new-password"></label>
+            <label class="field"><span>${tr('Confirmer le code', 'Confirm the code')}</span><input type="password" name="c2" minlength="6" required autocomplete="new-password"></label>
+            <p class="muted small">${tr('Attention : si j’oublie ce code, personne ne pourra récupérer mon plan, pas même les créateurs de l’application.', 'Warning: if I forget this code, nobody can recover my plan, not even the app’s creators.')}</p>
+            <button class="btn btn-primary">${tr('Activer la protection', 'Turn on protection')}</button></form>`}
     </section>
     <section class="card" id="exercices-hors-connexion">
-      <h2>Exercices hors connexion</h2>
-      <p>Les exercices de Ma boussole bien-être s’ouvrent dans Mon PCC. Pour pouvoir les faire <strong>sans connexion</strong>, je les télécharge une fois sur ce téléphone (pages et sons, environ 20 Mo).</p>
-      <p class="small" id="ex-off-status">Vérification…</p>
-      <button type="button" class="btn btn-secondary" data-act="ex-offline">⬇ Préparer les exercices hors connexion</button>
-      <p class="muted small">À refaire de temps en temps pour avoir les dernières versions. Rien n’est envoyé : il s’agit seulement de télécharger les exercices.</p>
+      <h2>${tr('Exercices hors connexion', 'Offline exercises')}</h2>
+      <p>${tr('Les exercices de Ma boussole bien-être s’ouvrent dans Mon PCC. Pour pouvoir les faire <strong>sans connexion</strong>, je les télécharge une fois sur ce téléphone (pages et sons, environ 20 Mo).', 'The Ma boussole bien-être exercises open inside Mon PCC. To do them <strong>offline</strong>, I download them once to this phone (pages and sounds, about 20 MB).')}</p>
+      <p class="small" id="ex-off-status">${tr('Vérification…', 'Checking…')}</p>
+      <button type="button" class="btn btn-secondary" data-act="ex-offline">⬇ ${tr('Préparer les exercices hors connexion', 'Prepare offline exercises')}</button>
+      <p class="muted small">${tr('À refaire de temps en temps pour avoir les dernières versions. Rien n’est envoyé : il s’agit seulement de télécharger les exercices.', 'Repeat from time to time to get the latest versions. Nothing is sent: it only downloads the exercises.')}${LANG === 'en' ? ' The download covers the exercises in English.' : ''}</p>
     </section>
     <section class="card" id="avertissements">
-      <h2>Messages et avertissements</h2>
+      <h2>${tr('Messages et avertissements', 'Messages and warnings')}</h2>
       ${(() => { const h = hiddenWarnings(); return h.length
-        ? `<p>Messages que j’ai masqués ou choisi de ne plus voir :</p><ul class="small">${h.map((x) => `<li>${esc(x)}</li>`).join('')}</ul>`
-        : '<p class="muted">Aucun message masqué pour l’instant.</p>'; })()}
-      <button class="btn btn-secondary" data-act="warnings-reset">Réafficher tous les avertissements</button>
-      <p class="muted small">Les demandes d’accord (contacts, partage du plan, lecture de vidéos ou de musique) seront de nouveau posées, et les messages d’information masqués réapparaîtront.</p>
+        ? `<p>${tr('Messages que j’ai masqués ou choisi de ne plus voir :', 'Messages I have hidden or chosen not to see again:')}</p><ul class="small">${h.map((x) => `<li>${esc(x)}</li>`).join('')}</ul>`
+        : `<p class="muted">${tr('Aucun message masqué pour l’instant.', 'No hidden messages for now.')}</p>`; })()}
+      <button class="btn btn-secondary" data-act="warnings-reset">${tr('Réafficher tous les avertissements', 'Show all warnings again')}</button>
+      <p class="muted small">${tr('Les demandes d’accord (contacts, partage du plan, lecture de vidéos ou de musique) seront de nouveau posées, et les messages d’information masqués réapparaîtront.', 'Consent requests (contacts, sharing the plan, playing videos or music) will be asked again, and hidden information messages will come back.')}</p>
     </section>
     <section class="card">
-      <h2>Sauvegarde</h2>
-      <p>Pour changer de téléphone ou garder une copie, j’exporte un fichier de sauvegarde que je pourrai réimporter dans Mon PCC.</p>
+      <h2>${tr('Sauvegarde', 'Backup')}</h2>
+      <p>${tr('Pour changer de téléphone ou garder une copie, j’exporte un fichier de sauvegarde que je pourrai réimporter dans Mon PCC.', 'To change phones or keep a copy, I export a backup file that I can import back into Mon PCC.')}</p>
       <div class="stack">
-        <button class="btn btn-secondary" data-act="export">Exporter une sauvegarde</button>
-        <label class="btn btn-ghost file-btn">Importer une sauvegarde<input type="file" accept="application/json,.json" data-act="import" hidden></label>
+        <button class="btn btn-secondary" data-act="export">${tr('Exporter une sauvegarde', 'Export a backup')}</button>
+        <label class="btn btn-ghost file-btn">${tr('Importer une sauvegarde', 'Import a backup')}<input type="file" accept="application/json,.json" data-act="import" hidden></label>
       </div>
-      <p class="muted small">Le fichier de sauvegarde contient aussi ma boîte à outils (photos, vidéos, sons) et n’est pas chiffré : je le garde en lieu sûr.</p>
+      <p class="muted small">${tr('Le fichier de sauvegarde contient aussi ma boîte à outils (photos, vidéos, sons) et n’est pas chiffré : je le garde en lieu sûr.', 'The backup file also contains my toolbox (photos, videos, sounds) and is not encrypted: I keep it somewhere safe.')}</p>
     </section>
     <section class="card">
-      <h2>Installer l’application</h2>
-      ${isStandalone() ? '<p>✓ Mon PCC est installé sur cet appareil.</p>' : `<button class="btn btn-primary" data-act="install-open">Installer Mon PCC</button>
-      <label class="check"><input type="checkbox" data-act="ib-toggle" ${installPref() === 'never' ? '' : 'checked'}> Proposer l’installation par un bandeau</label>`}
-      <p class="muted small">Une fois installée, l’application fonctionne même sans connexion.</p>
+      <h2>${tr('Installer l’application', 'Install the app')}</h2>
+      ${isStandalone() ? `<p>${tr('✓ Mon PCC est installé sur cet appareil.', '✓ Mon PCC is installed on this device.')}</p>` : `<button class="btn btn-primary" data-act="install-open">${tr('Installer Mon PCC', 'Install Mon PCC')}</button>
+      <label class="check"><input type="checkbox" data-act="ib-toggle" ${installPref() === 'never' ? '' : 'checked'}> ${tr('Proposer l’installation par un bandeau', 'Offer installation with a banner')}</label>`}
+      <p class="muted small">${tr('Une fois installée, l’application fonctionne même sans connexion.', 'Once installed, the app works even offline.')}</p>
     </section>
     <section class="card">
-      <h2>Partager l’application</h2>
-      <p>Lien, QR code, carte ou planche de cartes à imprimer.</p>
-      <a class="btn btn-secondary" href="#/partager">📤 Partager Mon PCC</a>
+      <h2>${tr('Partager l’application', 'Share the app')}</h2>
+      <p>${tr('Lien, QR code, carte ou planche de cartes à imprimer.', 'Link, QR code, card or a sheet of cards to print.')}</p>
+      <a class="btn btn-secondary" href="#/partager">📤 ${tr('Partager Mon PCC', 'Share Mon PCC')}</a>
     </section>
     <section class="card card-danger">
-      <h2>Effacer mes données</h2>
-      <p>Supprime définitivement mon plan de ce téléphone.</p>
-      <button class="btn btn-danger" data-act="wipe">Tout effacer</button>
+      <h2>${tr('Effacer mes données', 'Delete my data')}</h2>
+      <p>${tr('Supprime définitivement mon plan de ce téléphone.', 'Permanently deletes my plan from this phone.')}</p>
+      <button class="btn btn-danger" data-act="wipe">${tr('Tout effacer', 'Delete everything')}</button>
     </section>`;
   renderOfflineStatus();
 }
 
 /* ---------- pages d'information ---------- */
 
+const BOUSSOLE_LINK = () => (LANG === 'en' ? '../ma-boussole-bien-etre/en/' : '../ma-boussole-bien-etre/');
+
 function renderAbout() {
+  const fr = LANG !== 'en';
   app.innerHTML = `
-    <h1>À propos</h1>
+    <h1>${tr('À propos', 'About')}</h1>
     <section class="card">
       <h2>Mon PCC</h2>
-      <p>Mon PCC est un outil <strong>gratuit, sans publicité et sans inscription</strong> pour préparer son plan de crise conjoint sur son téléphone.</p>
-      <p>Il ne remplace ni l’accompagnement par un·e professionnel·le, ni un avis médical. Le plan de crise conjoint se construit <em>avec</em> son réseau de soutien : Mon PCC aide à préparer et mettre en forme ce travail.</p>
+      <p>${tr('Mon PCC est un outil <strong>gratuit, sans publicité et sans inscription</strong> pour préparer son plan de crise conjoint sur son téléphone.', 'Mon PCC is a <strong>free tool, with no ads and no sign-up</strong>, for preparing a joint crisis plan on your phone.')}</p>
+      <p>${tr('Il ne remplace ni l’accompagnement par un·e professionnel·le, ni un avis médical. Le plan de crise conjoint se construit <em>avec</em> son réseau de soutien : Mon PCC aide à préparer et mettre en forme ce travail.', 'It does not replace support from a professional or medical advice. A joint crisis plan is built <em>with</em> your support network: Mon PCC helps you prepare and lay out that work.')}</p>
     </section>
     <section class="card">
-      <h2>Crédits</h2>
-      <p>Conception et réalisation : <strong>Roddy Ricart</strong>.</p>
-      <p>Mon PCC est un projet libre : son code source est consultable, et chacun·e peut proposer une amélioration ou signaler un problème.</p>
-      <a class="btn btn-secondary" href="https://github.com/rodtrip2/mon-pcc" target="_blank" rel="noopener noreferrer">Voir le projet sur GitHub ↗</a>
+      <h2>${tr('Crédits', 'Credits')}</h2>
+      <p>${tr('Conception et réalisation :', 'Design and development:')} <strong>Roddy Ricart</strong>.</p>
+      <p>${tr('Mon PCC est un projet libre : son code source est consultable, et chacun·e peut proposer une amélioration ou signaler un problème.', 'Mon PCC is an open project: its source code is public, and anyone can suggest an improvement or report a problem.')}</p>
+      <a class="btn btn-secondary" href="https://github.com/rodtrip2/mon-pcc" target="_blank" rel="noopener noreferrer">${tr('Voir le projet sur GitHub ↗', 'See the project on GitHub ↗')}</a>
     </section>
     <section class="card">
-      <h2>Le plan de crise conjoint</h2>
-      <p>Le PCC est une forme de déclaration anticipée en santé mentale. Il résulte d’une décision partagée entre la personne concernée, un·e professionnel·le et, si elle le souhaite, ses proches. Ses bénéfices ont été étudiés : meilleure alliance thérapeutique, moins d’hospitalisations sous contrainte, meilleure qualité de vie.</p>
-      <p>Pour en savoir plus, se former gratuitement (e-learning) ou télécharger le formulaire officiel : <a href="${SOURCE.url}" target="_blank" rel="noopener">plandecriseconjoint.ch</a>.</p>
+      <h2>${tr('Le plan de crise conjoint', 'The joint crisis plan')}</h2>
+      <p>${tr('Le PCC est une forme de déclaration anticipée en santé mentale. Il résulte d’une décision partagée entre la personne concernée, un·e professionnel·le et, si elle le souhaite, ses proches. Ses bénéfices ont été étudiés : meilleure alliance thérapeutique, moins d’hospitalisations sous contrainte, meilleure qualité de vie.', 'A joint crisis plan is a form of advance statement in mental health. It is the result of a shared decision between the person concerned, a professional and, if they wish, the people close to them. Its benefits have been studied: a better therapeutic relationship, fewer compulsory admissions, better quality of life.')}</p>
+      <p>${tr('Pour en savoir plus, se former gratuitement (e-learning) ou télécharger le formulaire officiel :', 'To find out more, take free online training (in French) or download the official form:')} <a href="${SOURCE.url}" target="_blank" rel="noopener">plandecriseconjoint.ch</a>.</p>
     </section>
     <section class="card">
-      <h2>Sources et droits d’auteur</h2>
-      <p>Les questions de Mon PCC reprennent les supports officiels :</p>
+      <h2>${tr('Sources et droits d’auteur', 'Sources and copyright')}</h2>
+      <p>${tr('Les questions de Mon PCC reprennent les supports officiels :', 'Mon PCC’s questions come from the official forms:')}</p>
       <ul class="small">${Object.values(VERSIONS).map((c) => `<li><em>${esc(c.source.citation)}</em> (${c.label.toLowerCase()})</li>`).join('')}</ul>
       <p><a href="${SOURCE.url}" target="_blank" rel="noopener">${SOURCE.url}</a> — © ${esc(SOURCE.holder)}.</p>
-      <p>Ce support est diffusé sous licence <a href="${SOURCE.licenseUrl}" target="_blank" rel="noopener">Creative Commons BY-NC-SA</a> (attribution, pas d’utilisation commerciale, partage dans les mêmes conditions). Mon PCC respecte ces conditions : il cite la source, reste gratuit et non commercial, et ses contenus sont partagés sous la même licence.</p>
-      <p class="small">La version ado est publiée comme « phase test » sur le site officiel ; sa licence n’y est pas précisée séparément. Elle est reprise ici dans les mêmes conditions que le reste du site (CC BY-NC-SA).</p>
-      <p><strong>Modifications apportées</strong> : découpage en étapes, conseils de rédaction, suggestions et exemples ajoutés, numéros d’urgence adaptés à la France, mise en page.</p>
-      <p>Mon PCC est un projet indépendant, <strong>non affilié</strong> à la Haute École de la Santé La Source ni aux auteur·es du PCC, qui ne l’ont pas validé.</p>
-      <p>Les exercices de la boîte à outils sont ceux de <a href="../ma-boussole-bien-etre/" target="_blank" rel="noopener">Ma boussole bien-être</a>, un projet distinct (licence GPL-3), affichés dans Mon PCC sans en copier le code.</p>
-      <p>Code source libre : <a href="https://github.com/rodtrip2/mon-pcc" target="_blank" rel="noopener noreferrer">dépôt GitHub du projet</a> (fichier LICENSE). Le QR code est généré par la bibliothèque <em>qrcode-generator</em> de Kazuhiko Arase (licence MIT).</p>
+      <p>${tr(`Ce support est diffusé sous licence <a href="${SOURCE.licenseUrl}" target="_blank" rel="noopener">Creative Commons BY-NC-SA</a> (attribution, pas d’utilisation commerciale, partage dans les mêmes conditions). Mon PCC respecte ces conditions : il cite la source, reste gratuit et non commercial, et ses contenus sont partagés sous la même licence.`, `This material is published under the <a href="${SOURCE.licenseUrl}" target="_blank" rel="noopener">Creative Commons BY-NC-SA</a> licence (attribution, non-commercial, share alike). Mon PCC follows these terms: it credits the source, stays free and non-commercial, and its content is shared under the same licence.`)}</p>
+      <p class="small">${tr('La version ado est publiée comme « phase test » sur le site officiel ; sa licence n’y est pas précisée séparément. Elle est reprise ici dans les mêmes conditions que le reste du site (CC BY-NC-SA).', 'The teen version is published as a “test phase” on the official website; its licence is not stated separately there. It is used here under the same terms as the rest of the site (CC BY-NC-SA).')}</p>
+      ${fr ? '' : '<p class="small"><strong>English version:</strong> the adult questions are quoted from the official English form (V5). There is no official English teen form: the teen questions are Mon PCC’s own translation of the French V1 test version, not reviewed by the authors.</p>'}
+      <p><strong>${tr('Modifications apportées', 'Changes made')}</strong>${tr(' : découpage en étapes, conseils de rédaction, suggestions et exemples ajoutés, numéros d’aide selon le pays, mise en page.', ': split into steps, writing tips, added suggestions and examples, help numbers by country, layout.')}${fr ? '' : ' Teen version: unofficial English translation.'}</p>
+      <p>${tr('Mon PCC est un projet indépendant, <strong>non affilié</strong> à la Haute École de la Santé La Source ni aux auteur·es du PCC, qui ne l’ont pas validé.', 'Mon PCC is an independent project, <strong>not affiliated</strong> with Haute École de la Santé La Source or the authors of the joint crisis plan, who have not reviewed it.')}</p>
+      <p>${tr(`Les exercices de la boîte à outils sont ceux de <a href="${BOUSSOLE_LINK()}" target="_blank" rel="noopener">Ma boussole bien-être</a>, un projet distinct (licence GPL-3), affichés dans Mon PCC sans en copier le code.`, `The toolbox exercises come from <a href="${BOUSSOLE_LINK()}" target="_blank" rel="noopener">Ma boussole bien-être</a>, a separate project (GPL-3 licence), shown inside Mon PCC without copying its code.`)}</p>
+      <p>${tr('Code source libre :', 'Open source code:')} <a href="https://github.com/rodtrip2/mon-pcc" target="_blank" rel="noopener noreferrer">${tr('dépôt GitHub du projet', 'the project’s GitHub repository')}</a> ${tr('(fichier LICENSE). Le QR code est généré par la bibliothèque <em>qrcode-generator</em> de Kazuhiko Arase (licence MIT).', '(LICENSE file). The QR code is generated by Kazuhiko Arase’s <em>qrcode-generator</em> library (MIT licence).')}</p>
     </section>
-    <p class="center"><a href="#/confidentialite">Confidentialité</a></p>`;
+    <p class="center"><a href="#/confidentialite">${tr('Confidentialité', 'Privacy')}</a></p>`;
 }
 
 function renderPrivacy() {
   app.innerHTML = `
-    <h1>Confidentialité</h1>
+    <h1>${tr('Confidentialité', 'Privacy')}</h1>
     <section class="card">
-      <h2>En résumé</h2>
+      <h2>${tr('En résumé', 'In short')}</h2>
       <ul>
-        <li><strong>Aucune donnée n’est collectée</strong> par Mon PCC : pas de compte, pas de serveur, pas de base de données.</li>
-        <li>Mes réponses sont enregistrées <strong>uniquement dans le navigateur de ce téléphone</strong>.</li>
-        <li>Aucun cookie, aucune mesure d’audience, aucune publicité, aucune police ou ressource chargée depuis un autre site (sauf les vidéos et musiques que je choisis de lire, voir ci-dessous).</li>
-        <li>Quand j’enregistre ou j’envoie mon plan en PDF, je peux le <strong>protéger par un code</strong> (chiffrement AES-256) : sans ce code, le fichier ne peut pas être ouvert. Mon PCC ne conserve pas ce code.</li>
-        <li>Si j’ajoute à ma boîte à outils un lien vers une vidéo ou une musique (YouTube, Spotify…), Mon PCC demande son <strong>titre</strong> au site concerné lors de l’ajout. Le contenu n’est lu dans l’application que si je touche « Lire ici », après un avertissement : mon téléphone se connecte alors à ce site, comme si j’ouvrais le lien. Mon plan n’est jamais transmis.</li>
-        <li>Les <strong>exercices</strong> de la boîte à outils viennent de Ma boussole bien-être, hébergée sur le même site que Mon PCC : aucun autre site n’est contacté, et rien de mon plan n’est transmis. Je peux les télécharger pour les utiliser sans connexion (Réglages).</li>
-        <li>Les photos, vidéos et sons de ma <strong>boîte à outils</strong> restent sur ce téléphone (chiffrés si j’ai mis un code). Ils ne figurent jamais dans le plan imprimé ou envoyé : seuls leurs titres et les liens y apparaissent.</li>
-        <li>Si mon téléphone le permet, je peux <strong>choisir des contacts</strong> dans mon carnet : seuls ceux que je coche sont ajoutés (nom et numéro), le reste de mon carnet n’est jamais lu.</li>
-        <li>Je peux <strong>protéger</strong> mon plan par un code (chiffrement AES-256) et <strong>tout effacer</strong> à tout moment dans les Réglages.</li>
+        <li>${tr('<strong>Aucune donnée n’est collectée</strong> par Mon PCC : pas de compte, pas de serveur, pas de base de données.', '<strong>No data is collected</strong> by Mon PCC: no account, no server, no database.')}</li>
+        <li>${tr('Mes réponses sont enregistrées <strong>uniquement dans le navigateur de ce téléphone</strong>.', 'My answers are saved <strong>only in this phone’s browser</strong>.')}</li>
+        <li>${tr('Aucun cookie, aucune mesure d’audience, aucune publicité, aucune police ou ressource chargée depuis un autre site (sauf les vidéos et musiques que je choisis de lire, voir ci-dessous).', 'No cookies, no analytics, no ads, no fonts or resources loaded from other sites (except videos and music I choose to play, see below).')}</li>
+        <li>${tr('Quand j’enregistre ou j’envoie mon plan en PDF, je peux le <strong>protéger par un code</strong> (chiffrement AES-256) : sans ce code, le fichier ne peut pas être ouvert. Mon PCC ne conserve pas ce code.', 'When I save or send my plan as a PDF, I can <strong>protect it with a code</strong> (AES-256 encryption): without the code, the file cannot be opened. Mon PCC does not keep the code.')}</li>
+        <li>${tr('Si j’ajoute à ma boîte à outils un lien vers une vidéo ou une musique (YouTube, Spotify…), Mon PCC demande son <strong>titre</strong> au site concerné lors de l’ajout. Le contenu n’est lu dans l’application que si je touche « Lire ici », après un avertissement : mon téléphone se connecte alors à ce site, comme si j’ouvrais le lien. Mon plan n’est jamais transmis.', 'If I add a link to a video or music (YouTube, Spotify…) to my toolbox, Mon PCC asks that site for its <strong>title</strong> when it is added. The content only plays in the app if I tap “Play here”, after a warning: my phone then connects to that site, as if I opened the link. My plan is never sent.')}</li>
+        <li>${tr('Les <strong>exercices</strong> de la boîte à outils viennent de Ma boussole bien-être, hébergée sur le même site que Mon PCC : aucun autre site n’est contacté, et rien de mon plan n’est transmis. Je peux les télécharger pour les utiliser sans connexion (Réglages).', 'The toolbox <strong>exercises</strong> come from Ma boussole bien-être, hosted on the same site as Mon PCC: no other site is contacted, and nothing from my plan is sent. I can download them to use offline (Settings).')}</li>
+        <li>${tr('Les photos, vidéos et sons de ma <strong>boîte à outils</strong> restent sur ce téléphone (chiffrés si j’ai mis un code). Ils ne figurent jamais dans le plan imprimé ou envoyé : seuls leurs titres et les liens y apparaissent.', 'The photos, videos and sounds in my <strong>toolbox</strong> stay on this phone (encrypted if I set a code). They never appear in the printed or sent plan: only their titles and links do.')}</li>
+        <li>${tr('Si mon téléphone le permet, je peux <strong>choisir des contacts</strong> dans mon carnet : seuls ceux que je coche sont ajoutés (nom et numéro), le reste de mon carnet n’est jamais lu.', 'If my phone allows it, I can <strong>choose contacts</strong> from my address book: only the ones I tick are added (name and number); the rest of my address book is never read.')}</li>
+        <li>${tr('Je peux <strong>protéger</strong> mon plan par un code (chiffrement AES-256) et <strong>tout effacer</strong> à tout moment dans les Réglages.', 'I can <strong>protect</strong> my plan with a code (AES-256 encryption) and <strong>delete everything</strong> at any time in Settings.')}</li>
       </ul>
     </section>
     <section class="card">
-      <h2>Mes données de santé</h2>
-      <p>Mon plan contient des données de santé, protégées par le RGPD. Comme elles ne quittent jamais mon appareil sans action de ma part, l’éditeur de Mon PCC n’y a pas accès et ne les traite pas.</p>
-      <p>Quand je choisis d’envoyer mon plan (PDF, document ou texte), il passe par l’application que je sélectionne (messagerie, e-mail…) et devient accessible à son destinataire. Je choisis des personnes de confiance et un moyen sûr. Les professionnel·les de santé qui le reçoivent sont tenu·es au secret professionnel.</p>
+      <h2>${tr('Mes données de santé', 'My health data')}</h2>
+      <p>${tr('Mon plan contient des données de santé, protégées par le RGPD. Comme elles ne quittent jamais mon appareil sans action de ma part, l’éditeur de Mon PCC n’y a pas accès et ne les traite pas.', 'My plan contains health data, which is protected by data protection law (such as the GDPR in Europe). Because it never leaves my device unless I act, the publisher of Mon PCC has no access to it and does not process it.')}</p>
+      <p>${tr('Quand je choisis d’envoyer mon plan (PDF, document ou texte), il passe par l’application que je sélectionne (messagerie, e-mail…) et devient accessible à son destinataire. Je choisis des personnes de confiance et un moyen sûr. Les professionnel·les de santé qui le reçoivent sont tenu·es au secret professionnel.', 'When I choose to send my plan (PDF, document or text), it goes through the app I select (messaging, email…) and becomes available to the recipient. I choose people I trust and a secure channel. Health professionals who receive it are bound by professional confidentiality.')}</p>
     </section>
     <section class="card">
-      <h2>Hébergement</h2>
-      <p>Les fichiers de l’application sont hébergés par GitHub Pages (GitHub Inc.). Comme pour tout site, l’hébergeur peut enregistrer des données techniques de connexion (adresse IP) lors du téléchargement de l’application, indépendamment de Mon PCC. Ces journaux ne contiennent jamais le contenu de mon plan. Voir la <a href="https://docs.github.com/fr/site-policy/privacy-policies/github-general-privacy-statement" target="_blank" rel="noopener">déclaration de confidentialité de GitHub</a>.</p>
-      <p>Une fois installée, l’application fonctionne hors connexion.</p>
+      <h2>${tr('Hébergement', 'Hosting')}</h2>
+      <p>${tr('Les fichiers de l’application sont hébergés par GitHub Pages (GitHub Inc.). Comme pour tout site, l’hébergeur peut enregistrer des données techniques de connexion (adresse IP) lors du téléchargement de l’application, indépendamment de Mon PCC. Ces journaux ne contiennent jamais le contenu de mon plan. Voir la', 'The app’s files are hosted by GitHub Pages (GitHub Inc.). As with any website, the host may log technical connection data (IP address) when the app is downloaded, independently of Mon PCC. These logs never contain the content of my plan. See')} <a href="${tr('https://docs.github.com/fr/site-policy/privacy-policies/github-general-privacy-statement', 'https://docs.github.com/en/site-policy/privacy-policies/github-general-privacy-statement')}" target="_blank" rel="noopener">${tr('déclaration de confidentialité de GitHub', 'GitHub’s privacy statement')}</a>.</p>
+      <p>${tr('Une fois installée, l’application fonctionne hors connexion.', 'Once installed, the app works offline.')}</p>
     </section>
     <section class="card">
-      <h2>Mes droits</h2>
-      <p>Mes données sont sous mon seul contrôle : je peux les consulter, les modifier, les exporter (Réglages › Sauvegarde) et les effacer (Réglages › Tout effacer). Désinstaller l’application ou effacer les données du site dans mon navigateur les supprime aussi.</p>
-      <p>Pour toute question sur Mon PCC : <a href="https://github.com/rodtrip2/mon-pcc/issues" target="_blank" rel="noopener noreferrer">ouvrir un ticket sur le dépôt GitHub du projet</a>. Je peux aussi m’adresser à la <a href="https://www.cnil.fr" target="_blank" rel="noopener">CNIL</a>.</p>
+      <h2>${tr('Mes droits', 'My rights')}</h2>
+      <p>${tr('Mes données sont sous mon seul contrôle : je peux les consulter, les modifier, les exporter (Réglages › Sauvegarde) et les effacer (Réglages › Tout effacer). Désinstaller l’application ou effacer les données du site dans mon navigateur les supprime aussi.', 'My data is under my control alone: I can view, change, export (Settings › Backup) and delete it (Settings › Delete everything). Uninstalling the app or clearing the site’s data in my browser also deletes it.')}</p>
+      <p>${tr('Pour toute question sur Mon PCC :', 'For any question about Mon PCC:')} <a href="https://github.com/rodtrip2/mon-pcc/issues" target="_blank" rel="noopener noreferrer">${tr('ouvrir un ticket sur le dépôt GitHub du projet', 'open an issue on the project’s GitHub repository')}</a>. ${tr('Je peux aussi m’adresser à la', 'I can also contact the')} <a href="https://www.cnil.fr" target="_blank" rel="noopener">CNIL</a>${tr('.', ' (French data protection authority), or the data protection authority in my country.')}</p>
     </section>`;
 }
 
@@ -1872,18 +2027,16 @@ function renderLock() {
   app.innerHTML = `
     <section class="hero">
       <div class="hero-logo" aria-hidden="true">${logoSVG()}</div>
-      <h1>Mon PCC est protégé</h1>
+      <h1>${tr('Mon PCC est protégé', 'Mon PCC is protected')}</h1>
       <form class="card stack" data-act="unlock">
-        <label class="field"><span>Mon code</span><input type="password" name="code" required autocomplete="current-password" autofocus></label>
-        <button class="btn btn-primary">Ouvrir</button>
+        <label class="field"><span>${tr('Mon code', 'My code')}</span><input type="password" name="code" required autocomplete="current-password" autofocus></label>
+        <button class="btn btn-primary">${tr('Ouvrir', 'Open')}</button>
         <p class="error" role="alert" hidden></p>
       </form>
-      <p><button class="link" data-act="forgot">Code oublié ?</button></p>
+      <p><button class="link" data-act="forgot">${tr('Code oublié ?', 'Forgotten code?')}</button></p>
     </section>
     ${emergencyNote()}`;
 }
-
-/* ---------- installation ---------- */
 
 /* ---------- installation (bandeau désactivable) ---------- */
 
@@ -1913,33 +2066,33 @@ function bannerAllowed() {
 function installStepsHTML() {
   if (canPrompt()) return '';
   if (env.isIos) {
-    return `<ol class="ib-steps"><li>Touchez le bouton <strong>Partager</strong> <span aria-hidden="true">⎋</span> en bas de l’écran (sur iPad, en haut).</li>
-      <li>Faites défiler et touchez <strong>« Sur l’écran d’accueil »</strong>.</li><li>Touchez <strong>« Ajouter »</strong>.</li></ol>
-      <p class="muted small">Avec Safari. Sur un autre navigateur, ouvrez d’abord Mon PCC dans Safari.</p>`;
+    return `<ol class="ib-steps"><li>${tr('Touchez le bouton <strong>Partager</strong> <span aria-hidden="true">⎋</span> en bas de l’écran (sur iPad, en haut).', 'Tap the <strong>Share</strong> button <span aria-hidden="true">⎋</span> at the bottom of the screen (at the top on iPad).')}</li>
+      <li>${tr('Faites défiler et touchez <strong>« Sur l’écran d’accueil »</strong>.', 'Scroll down and tap <strong>“Add to Home Screen”</strong>.')}</li><li>${tr('Touchez <strong>« Ajouter »</strong>.', 'Tap <strong>“Add”</strong>.')}</li></ol>
+      <p class="muted small">${tr('Avec Safari. Sur un autre navigateur, ouvrez d’abord Mon PCC dans Safari.', 'In Safari. In another browser, first open Mon PCC in Safari.')}</p>`;
   }
-  return `<ol class="ib-steps"><li>Ouvrez le menu du navigateur (<strong>⋮</strong> en haut à droite, ou <strong>≡</strong> en bas).</li>
-    <li>Touchez <strong>« Installer l’application »</strong> ou <strong>« Ajouter à l’écran d’accueil »</strong>.</li><li>Confirmez : l’icône Mon PCC apparaît sur l’écran d’accueil.</li></ol>`;
+  return `<ol class="ib-steps"><li>${tr('Ouvrez le menu du navigateur (<strong>⋮</strong> en haut à droite, ou <strong>≡</strong> en bas).', 'Open the browser menu (<strong>⋮</strong> at the top right, or <strong>≡</strong> at the bottom).')}</li>
+    <li>${tr('Touchez <strong>« Installer l’application »</strong> ou <strong>« Ajouter à l’écran d’accueil »</strong>.', 'Tap <strong>“Install app”</strong> or <strong>“Add to Home screen”</strong>.')}</li><li>${tr('Confirmez : l’icône Mon PCC apparaît sur l’écran d’accueil.', 'Confirm: the Mon PCC icon appears on your home screen.')}</li></ol>`;
 }
 
 function showInstallBanner(manual = false) {
   const b = $('#install-banner');
   if (isStandalone()) {
-    if (manual) toast('Mon PCC est déjà installé sur cet appareil.');
+    if (manual) toast(tr('Mon PCC est déjà installé sur cet appareil.', 'Mon PCC is already installed on this device.'));
     return;
   }
   b.innerHTML = `<div class="ib-inner">
     <img src="icons/icon-192.png" alt="" class="ib-icon" width="48" height="48">
     <div class="ib-text">
-      <p id="ib-title" class="ib-title">${canPrompt() ? 'Installer Mon PCC' : env.isIos ? 'Ajouter Mon PCC à l’écran d’accueil' : 'Installer Mon PCC sur mon téléphone'}</p>
-      <p class="muted small">Pour l’ouvrir comme une application, même sans connexion. Rien n’est envoyé : mon plan reste sur ce téléphone.</p>
+      <p id="ib-title" class="ib-title">${canPrompt() ? tr('Installer Mon PCC', 'Install Mon PCC') : env.isIos ? tr('Ajouter Mon PCC à l’écran d’accueil', 'Add Mon PCC to your home screen') : tr('Installer Mon PCC sur mon téléphone', 'Install Mon PCC on my phone')}</p>
+      <p class="muted small">${tr('Pour l’ouvrir comme une application, même sans connexion. Rien n’est envoyé : mon plan reste sur ce téléphone.', 'To open it like an app, even offline. Nothing is sent: my plan stays on this phone.')}</p>
       ${installStepsHTML()}
       <div class="ib-actions">
-        ${canPrompt() ? '<button type="button" class="btn btn-primary btn-sm" data-act="install">Installer</button>' : ''}
-        <button type="button" class="btn btn-ghost btn-sm" data-act="ib-later">Plus tard</button>
-        <button type="button" class="link small" data-act="ib-never">Ne plus proposer</button>
+        ${canPrompt() ? `<button type="button" class="btn btn-primary btn-sm" data-act="install">${tr('Installer', 'Install')}</button>` : ''}
+        <button type="button" class="btn btn-ghost btn-sm" data-act="ib-later">${tr('Plus tard', 'Later')}</button>
+        <button type="button" class="link small" data-act="ib-never">${tr('Ne plus proposer', 'Don’t offer again')}</button>
       </div>
     </div>
-    <button type="button" class="icon ib-close" data-act="ib-later" aria-label="Fermer">✕</button>
+    <button type="button" class="icon ib-close" data-act="ib-later" aria-label="${tr('Fermer', 'Close')}">✕</button>
   </div>`;
   b.hidden = false;
   if (manual) b.querySelector('button')?.focus();
@@ -1966,61 +2119,63 @@ async function prepareShare() {
   shareCache = { url, qr, canvas, blob, preview: URL.createObjectURL(blob) };
   return shareCache;
 }
+const cardFileName = () => tr('carte-mon-pcc.jpg', 'mon-pcc-card.jpg');
+const shareBlurb = () => tr('Mon PCC : préparer son plan de crise conjoint pas à pas.', 'Mon PCC: prepare your joint crisis plan step by step.');
 
 function renderShare() {
   const url = appUrl();
   app.innerHTML = `
-    <h1>📤 Partager l’application</h1>
-    <p class="lead">Faire connaître Mon PCC : gratuit, sans inscription, sans publicité. Seule l’adresse de l’application est partagée, jamais mon plan.</p>
+    <h1>📤 ${tr('Partager l’application', 'Share the app')}</h1>
+    <p class="lead">${tr('Faire connaître Mon PCC : gratuit, sans inscription, sans publicité. Seule l’adresse de l’application est partagée, jamais mon plan.', 'Spread the word about Mon PCC: free, no sign-up, no ads. Only the app’s address is shared, never my plan.')}</p>
     <section class="card">
-      <h2>🔗 Le lien</h2>
-      <div class="share-link"><span>${esc(displayUrl(url))}</span><button type="button" class="btn btn-ghost btn-sm" data-act="share-copy">Copier</button></div>
-      ${navigator.share ? '<button type="button" class="btn btn-primary" data-act="share-app">Partager le lien</button>' : ''}
+      <h2>🔗 ${tr('Le lien', 'The link')}</h2>
+      <div class="share-link"><span>${esc(displayUrl(url))}</span><button type="button" class="btn btn-ghost btn-sm" data-act="share-copy">${tr('Copier', 'Copy')}</button></div>
+      ${navigator.share ? `<button type="button" class="btn btn-primary" data-act="share-app">${tr('Partager le lien', 'Share the link')}</button>` : ''}
     </section>
     <section class="card">
-      <h2>▦ QR code en plein écran</h2>
-      <p class="muted">À montrer pour qu’une personne ouvre Mon PCC en le scannant avec son téléphone.</p>
-      <button type="button" class="btn btn-secondary" data-act="qr-open">Afficher le QR code</button>
+      <h2>▦ ${tr('QR code en plein écran', 'Full-screen QR code')}</h2>
+      <p class="muted">${tr('À montrer pour qu’une personne ouvre Mon PCC en le scannant avec son téléphone.', 'Show it so someone can open Mon PCC by scanning it with their phone.')}</p>
+      <button type="button" class="btn btn-secondary" data-act="qr-open">${tr('Afficher le QR code', 'Show the QR code')}</button>
     </section>
     <section class="card">
-      <h2>🖼 Carte à partager (JPG)</h2>
-      <p class="muted">Une image avec le QR code, à envoyer par message, publier ou imprimer.</p>
-      <div class="card-preview" id="card-preview"><span class="muted">Préparation…</span></div>
+      <h2>🖼 ${tr('Carte à partager (JPG)', 'Card to share (JPG)')}</h2>
+      <p class="muted">${tr('Une image avec le QR code, à envoyer par message, publier ou imprimer.', 'An image with the QR code, to send by message, post or print.')}</p>
+      <div class="card-preview" id="card-preview"><span class="muted">${tr('Préparation…', 'Preparing…')}</span></div>
       <div class="stack">
-        ${navigator.canShare ? '<button type="button" class="btn btn-primary" data-act="card-share" hidden>Partager l’image</button>' : ''}
-        <button type="button" class="btn btn-secondary" data-act="card-download">Télécharger le JPG</button>
+        ${navigator.canShare ? `<button type="button" class="btn btn-primary" data-act="card-share" hidden>${tr('Partager l’image', 'Share the image')}</button>` : ''}
+        <button type="button" class="btn btn-secondary" data-act="card-download">${tr('Télécharger le JPG', 'Download the JPG')}</button>
       </div>
     </section>
     <section class="card">
-      <h2>🖨 Planche de cartes (PDF)</h2>
-      <p class="muted">10 cartes au format carte de visite (85 × 55 mm) sur une page A4, à imprimer à 100 % (taille réelle) puis découper. Idéal pour un service, une salle d’attente ou un groupe d’entraide.</p>
-      <button type="button" class="btn btn-secondary" data-act="sheet-download">Télécharger le PDF</button>
+      <h2>🖨 ${tr('Planche de cartes (PDF)', 'Sheet of cards (PDF)')}</h2>
+      <p class="muted">${tr('10 cartes au format carte de visite (85 × 55 mm) sur une page A4, à imprimer à 100 % (taille réelle) puis découper. Idéal pour un service, une salle d’attente ou un groupe d’entraide.', '10 business-card-sized cards (85 × 55 mm) on an A4 page, to print at 100% (actual size) and cut out. Ideal for a service, a waiting room or a support group.')}</p>
+      <button type="button" class="btn btn-secondary" data-act="sheet-download">${tr('Télécharger le PDF', 'Download the PDF')}</button>
     </section>`;
   prepareShare().then((c) => {
     const box = $('#card-preview');
     if (!box) return;
-    box.innerHTML = `<img src="${c.preview}" alt="Aperçu de la carte Mon PCC avec QR code">`;
+    box.innerHTML = `<img src="${c.preview}" alt="${tr('Aperçu de la carte Mon PCC avec QR code', 'Preview of the Mon PCC card with QR code')}">`;
     try {
-      const f = new File([c.blob], 'carte-mon-pcc.jpg', { type: 'image/jpeg' });
+      const f = new File([c.blob], cardFileName(), { type: 'image/jpeg' });
       const btn = app.querySelector('[data-act="card-share"]');
       if (btn && navigator.canShare({ files: [f] })) btn.hidden = false;
     } catch { /* partage de fichier indisponible */ }
   }).catch(() => {
     const box = $('#card-preview');
-    if (box) box.innerHTML = '<p class="error">Impossible de préparer la carte sur ce navigateur.</p>';
+    if (box) box.innerHTML = `<p class="error">${tr('Impossible de préparer la carte sur ce navigateur.', 'The card cannot be prepared in this browser.')}</p>`;
   });
 }
 
 let wakeLock = null;
 async function openQrFull() {
   let c;
-  try { c = await prepareShare(); } catch { toast('QR code indisponible.'); return; }
+  try { c = await prepareShare(); } catch { toast(tr('QR code indisponible.', 'QR code unavailable.')); return; }
   const el = $('#qr-full');
   el.innerHTML = `<div class="qr-head"><img src="icons/icon-192.png" alt="" width="44" height="44"><p>Mon PCC</p></div>
-    ${qrSvg(c.qr, 'Scannez pour ouvrir Mon PCC')}
-    <p class="qr-scan">Scannez pour ouvrir l’application</p>
+    ${qrSvg(c.qr, tr('Scannez pour ouvrir Mon PCC', 'Scan to open Mon PCC'))}
+    <p class="qr-scan">${tr('Scannez pour ouvrir l’application', 'Scan to open the app')}</p>
     <p class="qr-url">${esc(displayUrl(c.url))}</p>
-    <button type="button" class="btn btn-ghost" data-act="qr-close">✕ Fermer</button>`;
+    <button type="button" class="btn btn-ghost" data-act="qr-close">✕ ${tr('Fermer', 'Close')}</button>`;
   el.hidden = false;
   el.querySelector('button').focus();
   try { await el.requestFullscreen?.(); } catch { /* indisponible (iPhone) */ }
@@ -2049,6 +2204,44 @@ async function copyText(text) {
 
 function logoSVG() {
   return `<svg viewBox="0 0 64 64" width="64" height="64"><rect width="64" height="64" rx="16" fill="var(--brand)"/><circle cx="25" cy="32" r="12" fill="none" stroke="#fff" stroke-width="5"/><circle cx="39" cy="32" r="12" fill="none" stroke="#fff" stroke-width="5" opacity=".85"/></svg>`;
+}
+
+/* ---------- menu et éléments fixes de la page (traduits) ---------- */
+
+function renderChrome() {
+  document.title = tr('Mon PCC — mon plan de crise conjoint', 'Mon PCC — my joint crisis plan');
+  $('meta[name="description"]')?.setAttribute('content', tr('Préparer son plan de crise conjoint pas à pas, gratuitement. Les réponses restent sur votre téléphone.', 'Prepare your joint crisis plan step by step, for free. Your answers stay on your phone.'));
+  const skip = $('.skip'); if (skip) skip.textContent = tr('Aller au contenu', 'Skip to content');
+  $('.brand')?.setAttribute('aria-label', tr('Mon PCC, accueil', 'Mon PCC, home'));
+  $('#menu')?.setAttribute('aria-label', tr('Sommaire', 'Contents'));
+  const other = LANG === 'en' ? 'fr' : 'en';
+  $('.menu-panel').innerHTML = `
+      <div class="menu-head">
+        <strong>${tr('Sommaire', 'Contents')}</strong>
+        <button id="menu-close" class="icon" data-act="menu-close" aria-label="${tr('Fermer le menu', 'Close menu')}">✕</button>
+      </div>
+      <a class="menu-link" href="#/">${tr('Accueil', 'Home')}</a>
+      <a class="menu-link" href="#/demarche">${tr('La démarche', 'How it works')}</a>
+      <div id="menu-steps"></div>
+      <a class="menu-link" href="#/plan">📄 ${tr('Mon plan : imprimer, enregistrer, envoyer', 'My plan: print, save, send')}</a>
+      <a class="menu-link tb-link-menu" href="#/boite-outils">🧰 ${tr('Ma boîte à outils', 'My toolbox')}</a>
+      <a class="menu-link" href="#/ressources">📞 ${tr('Ressources d’aide', 'Help resources')}</a>
+      <a class="menu-link" href="#/mon-espace-sante">${recordPageLabel()}</a>
+      <button type="button" class="menu-link menu-btn-link" data-act="install-open" id="menu-install">📲 ${tr('Installer l’application', 'Install the app')}</button>
+      <a class="menu-link" href="#/partager">📤 ${tr('Partager l’application', 'Share the app')}</a>
+      <a class="menu-link" href="#/reglages">${tr('Réglages et sauvegarde', 'Settings and backup')}</a>
+      <a class="menu-link" href="#/apropos">${tr('À propos et sources', 'About and sources')}</a>
+      <a class="menu-link" href="#/confidentialite">${tr('Confidentialité', 'Privacy')}</a>
+      <button type="button" class="menu-link menu-btn-link" data-act="lang-switch" data-l="${other}" lang="${other}">🌐 ${LANGS[other]}</button>`;
+  const mb = $('#menu-btn .sr-only'); if (mb) mb.textContent = 'Menu';
+  $('.footer').innerHTML = `
+    <p>${tr('D’après le', 'Based on the')} <a href="https://plandecriseconjoint.ch/" target="_blank" rel="noopener">${tr('Plan de Crise Conjoint', 'Joint Crisis Plan')}</a> (Ferrari, Suter, Martino, 2026) © Haute École de la Santé La Source — <a href="${tr('https://creativecommons.org/licenses/by-nc-sa/4.0/deed.fr', 'https://creativecommons.org/licenses/by-nc-sa/4.0/deed.en')}" target="_blank" rel="noopener">CC BY-NC-SA</a>. ${tr('Projet indépendant, gratuit et non commercial.', 'Independent, free and non-commercial project.')}</p>
+    <p><a href="#/apropos">${tr('À propos', 'About')}</a> · <a href="#/confidentialite">${tr('Confidentialité', 'Privacy')}</a> · <a href="https://github.com/rodtrip2/mon-pcc" target="_blank" rel="noopener noreferrer">GitHub</a></p>`;
+  $('#exercise')?.setAttribute('aria-label', tr('Exercice', 'Exercise'));
+  $('#qr-full')?.setAttribute('aria-label', tr('QR code de Mon PCC', 'Mon PCC QR code'));
+  $('#sigpad')?.setAttribute('aria-label', 'Signature');
+  editFloat.textContent = tr('✓ Terminé', '✓ Done');
+  refreshInstallUI();
 }
 
 /* ---------- menu ---------- */
@@ -2133,16 +2326,16 @@ app.addEventListener('submit', async (e) => {
       media.prune(usedMediaIds()).catch(() => {});
       route();
     } catch {
-      err.textContent = 'Code incorrect.';
+      err.textContent = tr('Code incorrect.', 'Incorrect code.');
       err.hidden = false;
     }
   } else if (act === 'protect') {
-    if (form.c1.value !== form.c2.value) return toast('Les deux codes ne sont pas identiques.');
+    if (form.c1.value !== form.c2.value) return toast(tr('Les deux codes ne sont pas identiques.', 'The two codes do not match.'));
     const files = await media.loadAll().catch(() => []);
     await store.protect(plan, form.c1.value);
     await media.saveAll(files);
     forgetMediaURLs();
-    toast('Protection activée.');
+    toast(tr('Protection activée.', 'Protection turned on.'));
     renderSettings();
   }
 });
@@ -2156,7 +2349,7 @@ app.addEventListener('change', async (e) => {
     toolbox().push(photos.length === 1 ? { kind: 'photo', file: photos[0].file, title: '', added: new Date().toISOString() } : { kind: 'album', photos, title: '', added: new Date().toISOString() });
     editing.add('toolbox');
     scheduleSave(); tbRedraw();
-    toast(photos.length > 1 ? `Album créé avec ${photos.length} photos. Je peux lui donner un titre.` : 'Photo ajoutée.');
+    toast(photos.length > 1 ? tr(`Album créé avec ${photos.length} photos. Je peux lui donner un titre.`, `Album created with ${photos.length} photos. I can give it a title.`) : tr('Photo ajoutée.', 'Photo added.'));
     return;
   }
   if (el.dataset.act === 'album-add' && el.files.length) {
@@ -2185,17 +2378,17 @@ app.addEventListener('change', async (e) => {
   try {
     const obj = JSON.parse(await el.files[0].text());
     if (!obj || obj.app !== 'mon-pcc' || typeof obj.plan?.data !== 'object') throw new Error();
-    if (hasData() && !(await modal({ title: 'Remplacer mon plan ?', body: '<p>Le plan actuellement enregistré sur ce téléphone sera remplacé par la sauvegarde.</p>', ok: 'Remplacer', danger: true }))) return;
+    if (hasData() && !(await modal({ title: tr('Remplacer mon plan ?', 'Replace my plan?'), body: `<p>${tr('Le plan actuellement enregistré sur ce téléphone sera remplacé par la sauvegarde.', 'The plan currently saved on this phone will be replaced by the backup.')}</p>`, ok: tr('Remplacer', 'Replace'), danger: true }))) return;
     plan = obj.plan;
     applyVersion();
     await media.clear();
     forgetMediaURLs();
     for (const m of obj.media || []) await media.put(media.dataURLToBlob(m.data), m.id);
     await store.save(plan);
-    toast('Sauvegarde importée.');
+    toast(tr('Sauvegarde importée.', 'Backup imported.'));
     location.hash = '#/';
   } catch {
-    toast('Ce fichier n’est pas une sauvegarde Mon PCC valide.');
+    toast(tr('Ce fichier n’est pas une sauvegarde Mon PCC valide.', 'This file is not a valid Mon PCC backup.'));
   } finally {
     el.value = '';
   }
@@ -2204,7 +2397,7 @@ app.addEventListener('change', async (e) => {
 document.addEventListener('click', async (e) => {
   if (e.target.closest('#menu a')) closeMenu();
   const btn = e.target.closest('[data-act]');
-  if (!btn || btn.tagName === 'FORM' || btn.tagName === 'INPUT') return;
+  if (!btn || btn.tagName === 'FORM' || btn.tagName === 'INPUT' || btn.tagName === 'SELECT') return;
   const act = btn.dataset.act;
   const stepEl = btn.closest('[data-step]');
   const step = stepEl ? STEPS[+stepEl.dataset.step] : null;
@@ -2215,7 +2408,7 @@ document.addEventListener('click', async (e) => {
   switch (act) {
     case 'chip': {
       const grp = groupsOf(step).find((x) => x.id === g);
-      const s = grp.suggestions[+btn.dataset.si];
+      const s = groupSuggestions(grp)[+btn.dataset.si];
       const arr = getArr(step, g);
       if (step.type === 'list') {
         const at = arr.indexOf(s);
@@ -2241,7 +2434,7 @@ document.addEventListener('click', async (e) => {
       const nonEmpty = typeof v === 'string' ? v.trim() : Object.values(v || {}).some((x) => x && String(x).trim());
       arr.splice(i, 1);
       redraw();
-      if (nonEmpty) toast('Ligne supprimée.');
+      if (nonEmpty) toast(tr('Ligne supprimée.', 'Line deleted.'));
       break;
     }
     case 'up': case 'down': {
@@ -2258,7 +2451,7 @@ document.addEventListener('click', async (e) => {
     case 'contacts': await pickContacts(step, g); break;
     case 'tb-video': {
       const blob = await recordVideo();
-      if (blob) await addToolboxBlob('video', blob, 'Ma vidéo');
+      if (blob) await addToolboxBlob('video', blob, tr('Ma vidéo', 'My video'));
       break;
     }
     case 'tb-embed': {
@@ -2270,7 +2463,7 @@ document.addEventListener('click', async (e) => {
       const body = btn.closest('.tb-body');
       if (body) {
         const inView = !!body.closest('.tbv-embed');
-        body.innerHTML = `${inView && it.title ? `<p class="tbv-title">${esc(it.title)}</p>` : ''}${embedPlayerHTML(e, it.title)}${inView ? '' : `<a class="small tb-open-small" href="${esc(it.url)}" target="_blank" rel="noopener noreferrer">Ouvrir sur ${esc(e.provider)} ↗</a>`}`;
+        body.innerHTML = `${inView && it.title ? `<p class="tbv-title">${esc(it.title)}</p>` : ''}${embedPlayerHTML(e, it.title)}${inView ? '' : `<a class="small tb-open-small" href="${esc(it.url)}" target="_blank" rel="noopener noreferrer">${tr('Ouvrir sur', 'Open on')} ${esc(e.provider)} ↗</a>`}`;
       }
       break;
     }
@@ -2278,7 +2471,7 @@ document.addEventListener('click', async (e) => {
     case 'tb-quote-new': await quoteDialog(); break;
     case 'tb-record': {
       const blob = await recordVoice();
-      if (blob) await addToolboxBlob('voix', blob, 'Mon message');
+      if (blob) await addToolboxBlob('voix', blob, tr('Mon message', 'My message'));
       break;
     }
     case 'tb-size':
@@ -2288,13 +2481,13 @@ document.addEventListener('click', async (e) => {
     case 'folder-new': { if (await newFolder()) tbRedraw(); break; }
     case 'folder-rename': {
       const d = dossiers().find((x) => x.id === btn.dataset.id);
-      const name = d && await promptModal('Renommer le dossier', d.name, 'Renommer');
+      const name = d && await promptModal(tr('Renommer le dossier', 'Rename folder'), d.name, tr('Renommer', 'Rename'));
       if (name) { d.name = name; scheduleSave(); tbRedraw(); }
       break;
     }
     case 'folder-del': {
       const d = dossiers().find((x) => x.id === btn.dataset.id);
-      if (!d || !(await modal({ title: 'Supprimer ce dossier ?', body: `<p>Le dossier « ${esc(d.name)} » sera supprimé. Son contenu n’est pas effacé : il revient hors dossier.</p>`, ok: 'Supprimer le dossier', danger: true }))) break;
+      if (!d || !(await modal({ title: tr('Supprimer ce dossier ?', 'Delete this folder?'), body: `<p>${tr(`Le dossier « ${esc(d.name)} » sera supprimé. Son contenu n’est pas effacé : il revient hors dossier.`, `The folder “${esc(d.name)}” will be deleted. Its content is not erased: it goes back out of the folder.`)}</p>`, ok: tr('Supprimer le dossier', 'Delete folder'), danger: true }))) break;
       toolbox().forEach((it) => { if (it.folder === d.id) delete it.folder; });
       plan.data.dossiers = dossiers().filter((x) => x.id !== d.id);
       scheduleSave(); tbRedraw();
@@ -2304,7 +2497,7 @@ document.addEventListener('click', async (e) => {
       const it = toolbox()[i];
       toolbox()[i] = { kind: 'album', title: it.title || '', photos: [{ file: it.file }], size: it.size, folder: it.folder, added: it.added };
       scheduleSave(); tbRedraw();
-      toast('Album créé : j’y ajoute d’autres photos.');
+      toast(tr('Album créé : j’y ajoute d’autres photos.', 'Album created: I can add more photos to it.'));
       break;
     }
     case 'album-take': {
@@ -2326,7 +2519,7 @@ document.addEventListener('click', async (e) => {
     }
     case 'album-del': {
       const album = toolbox()[i];
-      if (!(await modal({ title: 'Supprimer cette photo ?', body: '<p>Elle sera effacée de ce téléphone.</p>', ok: 'Supprimer', danger: true }))) break;
+      if (!(await modal({ title: tr('Supprimer cette photo ?', 'Delete this photo?'), body: `<p>${tr('Elle sera effacée de ce téléphone.', 'It will be erased from this phone.')}</p>`, ok: tr('Supprimer', 'Delete'), danger: true }))) break;
       const [p] = album.photos.splice(+btn.dataset.k, 1);
       await media.remove(p.file).catch(() => {});
       if (!album.photos.length) toolbox().splice(i, 1);
@@ -2344,11 +2537,11 @@ document.addEventListener('click', async (e) => {
       try {
         const n = await prepareOffline((p) => {
           if (!box) return;
-          box.textContent = p.step === 'pages' ? 'Téléchargement des pages…' : `Téléchargement des sons : ${p.done} / ${p.total}`;
+          box.textContent = p.step === 'pages' ? tr('Téléchargement des pages…', 'Downloading pages…') : tr(`Téléchargement des sons : ${p.done} / ${p.total}`, `Downloading sounds: ${p.done} / ${p.total}`);
         });
-        toast(`Exercices prêts hors connexion (${n} sons).`);
+        toast(tr(`Exercices prêts hors connexion (${n} sons).`, `Exercises ready offline (${n} sounds).`));
       } catch {
-        toast('Préparation impossible : vérifiez la connexion, puis réessayez.');
+        toast(tr('Préparation impossible : vérifiez la connexion, puis réessayez.', 'Could not prepare: check your connection, then try again.'));
       }
       btn.disabled = false;
       renderOfflineStatus();
@@ -2372,7 +2565,7 @@ document.addEventListener('click', async (e) => {
     }
     case 'tb-del': {
       const it = toolbox()[i];
-      if (!(await modal({ title: 'Retirer de ma boîte à outils ?', body: `<p>${esc(tbLabel(it))} sera supprimé de ce téléphone.</p>`, ok: 'Supprimer', danger: true }))) return;
+      if (!(await modal({ title: tr('Retirer de ma boîte à outils ?', 'Remove from my toolbox?'), body: `<p>${tr(`${esc(tbLabel(it))} sera supprimé de ce téléphone.`, `${esc(tbLabel(it))} will be deleted from this phone.`)}</p>`, ok: tr('Supprimer', 'Delete'), danger: true }))) return;
       toolbox().splice(i, 1);
       for (const f of [it.file, ...(it.photos || []).map((p) => p.file)].filter(Boolean)) {
         await media.remove(f).catch(() => {}); const u = mediaURLs.get(f); if (u) URL.revokeObjectURL(u); mediaURLs.delete(f);
@@ -2386,7 +2579,7 @@ document.addEventListener('click', async (e) => {
       if (location.hash.startsWith('#/boite-outils')) rerender(() => renderToolbox(location.hash.endsWith('/etape')));
       else if (location.hash.startsWith('#/etape/')) rerender(() => renderStep(parseInt(location.hash.split('/')[2], 10) || 0));
       else route();
-      toast('Modifications terminées.');
+      toast(tr('Modifications terminées.', 'Changes done.'));
       break;
     }
     case 'edit-toggle': {
@@ -2413,9 +2606,9 @@ document.addEventListener('click', async (e) => {
     }
     case 'sign': {
       const r = getArr(step)[i];
-      const who = [r.nom, r.role].filter(Boolean).join(' — ') || 'Signataire';
+      const who = [r.nom, r.role].filter(Boolean).join(' — ') || tr('Signataire', 'Signatory');
       const img = await signaturePad(who);
-      if (img) { r.sig = img; r.signedAt = new Date().toISOString(); scheduleSave(false); rerender(() => renderStep(STEPS.indexOf(step))); toast('Signature enregistrée.'); }
+      if (img) { r.sig = img; r.signedAt = new Date().toISOString(); scheduleSave(false); rerender(() => renderStep(STEPS.indexOf(step))); toast(tr('Signature enregistrée.', 'Signature saved.')); }
       break;
     }
     case 'unsign': {
@@ -2431,7 +2624,7 @@ document.addEventListener('click', async (e) => {
       break;
     case 'me': {
       const id = plan.data.coordonnees || {};
-      getArr(step).push({ nom: [id.prenom, id.nom].filter(Boolean).join(' ') || 'Moi-même', role: isAdo() ? 'Moi' : 'Usager·ère' });
+      getArr(step).push({ nom: [id.prenom, id.nom].filter(Boolean).join(' ') || tr('Moi-même', 'Me'), role: isAdo() ? tr('Moi', 'Me') : tr('Usager·ère', 'Service user') });
       redraw();
       break;
     }
@@ -2457,45 +2650,47 @@ document.addEventListener('click', async (e) => {
       break;
     }
     case 'res-add': {
-      const cat = RESOURCES.find((c) => c.id === btn.dataset.c);
+      const cat = country().cats.find((c) => c.id === btn.dataset.c);
       const it = cat.items[+btn.dataset.k];
+      const name = L(it.name);
       if (isAdo()) {
         plan.data.strategies ??= {};
         plan.data.strategies.pros ??= [];
-        plan.data.strategies.pros.push(`J’appelle ${it.name} (${it.tel})`);
+        plan.data.strategies.pros.push(it.tel ? tr(`J’appelle ${name} (${it.tel})`, `I call ${name} (${it.tel})`) : tr(`J’écris à ${name} (${reachText(it)})`, `I message ${name} (${reachText(it)})`));
       } else {
         plan.data.aide ??= {};
         plan.data.aide.garde ??= [];
-        plan.data.aide.garde.push({ nom: it.name, lien: [cat.title, it.hours].filter(Boolean).join(' · '), tel: it.tel });
+        plan.data.aide.garde.push({ nom: name, lien: [L(cat.title), L(it.hours)].filter(Boolean).join(' · ') + (it.tel ? '' : ` · ${reachText(it)}`), tel: it.tel || it.sms });
       }
       scheduleSave();
       rerender(renderResources);
-      toast(isAdo() ? 'Ajouté à mon plan (ce qui me fait du bien, aide de professionnel·les).' : 'Ajouté à mon plan (étape 8, services et institutions de garde).');
+      const garde = STEPS.findIndex((s) => s.id === 'aide') + 1;
+      toast(isAdo() ? tr('Ajouté à mon plan (ce qui me fait du bien, aide de professionnel·les).', 'Added to my plan (what helps me, help from professionals).') : tr(`Ajouté à mon plan (étape ${garde}, services et institutions de garde).`, `Added to my plan (step ${garde}, crisis teams and services).`));
       break;
     }
     case 'warnings-reset':
       resetWarnings();
       rerender(renderSettings);
-      toast('Tous les avertissements sont réactivés.');
+      toast(tr('Tous les avertissements sont réactivés.', 'All warnings are back on.'));
       break;
     case 'mes-minor-hide':
       plan.data.masquerNoteMineur = true;
       scheduleSave(false);
       btn.closest('.note')?.remove();
-      toast('Message masqué.');
+      toast(tr('Message masqué.', 'Message hidden.'));
       break;
     case 'mes-pdf':
       try {
         const file = await makePlanPdf('');
         download(file, file.name);
-        toast('PDF téléchargé : je peux maintenant l’ajouter dans Mon Espace Santé.');
-      } catch { toast('Impossible de créer le PDF sur cet appareil.'); }
+        toast(hasMES() ? tr('PDF téléchargé : je peux maintenant l’ajouter dans Mon Espace Santé.', 'PDF downloaded: I can now add it to Mon Espace Santé.') : tr('PDF téléchargé : je peux maintenant le remettre à mon équipe de soins.', 'PDF downloaded: I can now give it to my care team.'));
+      } catch { pdfFail(); }
       break;
     case 'card-img':
-      try { download(await toJpeg(renderCrisisCard(carte())), 'carte-de-crise.jpg'); } catch { toast('Impossible de préparer l’image.'); }
+      try { download(await toJpeg(renderCrisisCard(carte())), tr('carte-de-crise.jpg', 'crisis-card.jpg')); } catch { toast(tr('Impossible de préparer l’image.', 'The image cannot be prepared.')); }
       break;
     case 'card-print':
-      try { download(await crisisCardPdf(await toJpeg(renderCrisisCard(carte()))), 'carte-de-crise.pdf'); } catch { toast('Impossible de préparer le PDF.'); }
+      try { download(await crisisCardPdf(await toJpeg(renderCrisisCard(carte()))), tr('carte-de-crise.pdf', 'crisis-card.pdf')); } catch { toast(tr('Impossible de préparer le PDF.', 'The PDF cannot be prepared.')); }
       break;
     case 'pdf-send': pdfSend(); break;
     case 'share-text': shareText(); break;
@@ -2505,17 +2700,17 @@ document.addEventListener('click', async (e) => {
         try { const b = await media.get(id); if (b) files.push({ id, data: await media.blobToDataURL(b) }); } catch { /* ignoré */ }
       }
       const blob = new Blob([JSON.stringify({ app: 'mon-pcc', exported: new Date().toISOString(), plan, media: files })], { type: 'application/json' });
-      download(blob, 'sauvegarde-mon-pcc-' + new Date().toISOString().slice(0, 10) + '.json');
+      download(blob, tr('sauvegarde-mon-pcc-', 'mon-pcc-backup-') + new Date().toISOString().slice(0, 10) + '.json');
       break;
     }
     case 'wipe':
-      if (await modal({ title: 'Tout effacer ?', body: '<p>Mon plan sera supprimé définitivement de ce téléphone. Pensez à exporter une sauvegarde si vous souhaitez le garder.</p>', ok: 'Tout effacer', danger: true })) {
+      if (await modal({ title: tr('Tout effacer ?', 'Delete everything?'), body: `<p>${tr('Mon plan sera supprimé définitivement de ce téléphone. Pensez à exporter une sauvegarde si vous souhaitez le garder.', 'My plan will be permanently deleted from this phone. Remember to export a backup if you want to keep it.')}</p>`, ok: tr('Tout effacer', 'Delete everything'), danger: true })) {
         store.wipe();
         await media.clear();
         forgetMediaURLs();
         plan = store.emptyPlan();
         applyVersion();
-        toast('Données effacées.');
+        toast(tr('Données effacées.', 'Data deleted.'));
         location.hash = '#/';
         route();
       }
@@ -2526,7 +2721,7 @@ document.addEventListener('click', async (e) => {
         await store.unprotect(plan);
         await media.saveAll(files);
       }
-      toast('Code retiré.');
+      toast(tr('Code retiré.', 'Code removed.'));
       renderSettings();
       break;
     case 'lock-now':
@@ -2537,7 +2732,7 @@ document.addEventListener('click', async (e) => {
       renderLock();
       break;
     case 'forgot':
-      if (await modal({ title: 'Code oublié', body: '<p>Sans le code, le plan chiffré ne peut pas être récupéré. Vous pouvez l’effacer pour recommencer, ou réimporter une sauvegarde ensuite.</p>', ok: 'Effacer et recommencer', danger: true })) {
+      if (await modal({ title: tr('Code oublié', 'Forgotten code'), body: `<p>${tr('Sans le code, le plan chiffré ne peut pas être récupéré. Vous pouvez l’effacer pour recommencer, ou réimporter une sauvegarde ensuite.', 'Without the code, the encrypted plan cannot be recovered. You can delete it to start again, or import a backup afterwards.')}</p>`, ok: tr('Effacer et recommencer', 'Delete and start again'), danger: true })) {
         store.wipe();
         await media.clear();
         plan = store.emptyPlan();
@@ -2558,25 +2753,31 @@ document.addEventListener('click', async (e) => {
     }
     case 'install-open': closeMenu(); showInstallBanner(true); break;
     case 'ib-later': hideInstallBanner(); if (installPref() !== 'never') setInstallPref(String(Date.now() + 30 * 24 * 3600 * 1000)); break;
-    case 'ib-never': hideInstallBanner(); setInstallPref('never'); toast('Le bandeau ne sera plus proposé. Installation possible depuis le menu.'); break;
-    case 'share-copy': toast((await copyText(appUrl())) ? 'Lien copié.' : 'Copie impossible sur cet appareil.'); break;
+    case 'ib-never': hideInstallBanner(); setInstallPref('never'); toast(tr('Le bandeau ne sera plus proposé. Installation possible depuis le menu.', 'The banner won’t be shown again. You can still install from the menu.')); break;
+    case 'share-copy': toast((await copyText(appUrl())) ? tr('Lien copié.', 'Link copied.') : tr('Copie impossible sur cet appareil.', 'Copying is not possible on this device.')); break;
     case 'share-app':
-      try { await navigator.share({ title: 'Mon PCC', text: 'Mon PCC : préparer son plan de crise conjoint pas à pas. Gratuit, sans inscription, les réponses restent sur le téléphone.', url: appUrl() }); } catch { /* annulé */ }
+      try { await navigator.share({ title: 'Mon PCC', text: tr('Mon PCC : préparer son plan de crise conjoint pas à pas. Gratuit, sans inscription, les réponses restent sur le téléphone.', 'Mon PCC: prepare your joint crisis plan step by step. Free, no sign-up, your answers stay on your phone.'), url: appUrl() }); } catch { /* annulé */ }
       break;
     case 'qr-open': openQrFull(); break;
     case 'qr-close': closeQrFull(); break;
     case 'card-share': {
       const c = await prepareShare();
-      const f = new File([c.blob], 'carte-mon-pcc.jpg', { type: 'image/jpeg' });
-      try { await navigator.share({ files: [f], title: 'Mon PCC', text: 'Mon PCC : préparer son plan de crise conjoint pas à pas. ' + c.url }); } catch (err) { if (err?.name !== 'AbortError') download(c.blob, 'carte-mon-pcc.jpg'); }
+      const f = new File([c.blob], cardFileName(), { type: 'image/jpeg' });
+      try { await navigator.share({ files: [f], title: 'Mon PCC', text: shareBlurb() + ' ' + c.url }); } catch (err) { if (err?.name !== 'AbortError') download(c.blob, cardFileName()); }
       break;
     }
-    case 'card-download': try { download((await prepareShare()).blob, 'carte-mon-pcc.jpg'); } catch { toast('Impossible de préparer la carte.'); } break;
+    case 'card-download': try { download((await prepareShare()).blob, cardFileName()); } catch { toast(tr('Impossible de préparer la carte.', 'The card cannot be prepared.')); } break;
     case 'sheet-download':
       try {
         const c = await prepareShare();
-        download(await buildSheetPdf(c.blob, 'Mon PCC - 10 cartes 85 x 55 mm - imprimer à 100 % (taille réelle), puis découper le long des pointillés'), 'planche-cartes-mon-pcc.pdf');
-      } catch { toast('Impossible de préparer le PDF.'); }
+        download(await buildSheetPdf(c.blob, tr('Mon PCC - 10 cartes 85 x 55 mm - imprimer à 100 % (taille réelle), puis découper le long des pointillés', 'Mon PCC - 10 cards 85 x 55 mm - print at 100% (actual size), then cut along the dotted lines')), tr('planche-cartes-mon-pcc.pdf', 'mon-pcc-card-sheet.pdf'));
+      } catch { toast(tr('Impossible de préparer le PDF.', 'The PDF cannot be prepared.')); }
+      break;
+    case 'lang-switch':
+      setLangPref(btn.dataset.l);
+      closeMenu();
+      applyLocale();
+      toast(tr('Langue : français.', 'Language: English.'));
       break;
     case 'menu': openMenu(); break;
     case 'menu-close': closeMenu(); break;
@@ -2585,13 +2786,25 @@ document.addEventListener('click', async (e) => {
 });
 
 document.addEventListener('change', async (e) => {
-  if (e.target.dataset?.act === 'version') {
+  const act = e.target.dataset?.act;
+  if (act === 'version') {
     await changeVersion(e.target.value);
     return;
   }
-  if (e.target.dataset?.act === 'ib-toggle') {
+  if (act === 'lang') {
+    setLangPref(e.target.value || null);
+    applyLocale();
+    return;
+  }
+  if (act === 'country') {
+    setCountryPref(e.target.value || null);
+    applyLocale();
+    toast(`${country().flag} ${L(country().name)}`);
+    return;
+  }
+  if (act === 'ib-toggle') {
     setInstallPref(e.target.checked ? null : 'never');
-    toast(e.target.checked ? 'Le bandeau d’installation sera proposé.' : 'Le bandeau ne sera plus proposé.');
+    toast(e.target.checked ? tr('Le bandeau d’installation sera proposé.', 'The install banner will be shown.') : tr('Le bandeau ne sera plus proposé.', 'The banner won’t be shown again.'));
   }
 });
 
@@ -2622,13 +2835,12 @@ document.addEventListener('visibilitychange', () => {
   }
 });
 
-// Ajuste la hauteur des lignes de texte après chaque affichage
 /* Bouton flottant « Terminé » : visible tant qu'une liste de la page est en modification */
 const editFloat = document.createElement('button');
 editFloat.type = 'button';
 editFloat.className = 'btn btn-primary edit-float no-print';
 editFloat.dataset.act = 'edit-done-all';
-editFloat.textContent = '✓ Terminé';
+editFloat.textContent = tr('✓ Terminé', '✓ Done');
 editFloat.hidden = true;
 document.body.appendChild(editFloat);
 new MutationObserver(() => {
@@ -2636,14 +2848,16 @@ new MutationObserver(() => {
   editFloat.hidden = !on;
   document.body.classList.toggle('has-edit-float', on);
 }).observe(app, { childList: true });
+// Ajuste la hauteur des lignes de texte après chaque affichage
 new MutationObserver(() => app.querySelectorAll('textarea.item-input, textarea.tb-quote-text').forEach(autosize))
   .observe(app, { childList: true, subtree: true });
 
 /* ---------- démarrage ---------- */
 
 function start() {
+  renderChrome();
   if (!store.storageAvailable()) {
-    app.innerHTML = '<h1>Enregistrement impossible</h1><p class="warn">Ce navigateur bloque l’enregistrement local (navigation privée ?). Ouvrez Mon PCC dans une fenêtre normale pour pouvoir enregistrer votre plan.</p>';
+    app.innerHTML = `<h1>${tr('Enregistrement impossible', 'Saving is not possible')}</h1><p class="warn">${tr('Ce navigateur bloque l’enregistrement local (navigation privée ?). Ouvrez Mon PCC dans une fenêtre normale pour pouvoir enregistrer votre plan.', 'This browser blocks local storage (private browsing?). Open Mon PCC in a normal window to be able to save your plan.')}</p>`;
     return;
   }
   const st = store.status();
@@ -2651,7 +2865,7 @@ function start() {
   else plan = store.loadPlain() || store.emptyPlan();
   if (plan && !plan.data) plan.data = {};
   applyVersion();
-  saveState.textContent = st === 'none' ? '' : 'Enregistré sur ce téléphone';
+  saveState.textContent = st === 'none' ? '' : savedLabel();
   store.requestPersistence();
   if (plan) media.prune(usedMediaIds()).catch(() => {});
   route();

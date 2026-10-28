@@ -2,6 +2,7 @@
 import { STEPS, SOURCE, PRINT_TITLE, PRINT_SUBTITLE } from './data.js';
 import { stepContent, fmtDate, fmtDateTime, lastUpdate } from './export.js';
 import { PdfDoc, wrap, textWidth, jpegSize } from './pdf.js';
+import { tr } from './i18n.js';
 
 const MM = 72 / 25.4;
 const M = 18 * MM;            // marges latérales et haute
@@ -54,7 +55,7 @@ export async function buildPlanPdf(plan, password = '') {
   y += 22;
   para(PRINT_SUBTITLE, { size: 10, color: GREY });
   y += 2;
-  para(`Dernière mise à jour : ${fmtDateTime(lastUpdate(plan))}`, { font: 'B', size: 9.5, color: TEAL_DARK });
+  para(`${tr('Dernière mise à jour :', 'Last updated:')} ${fmtDateTime(lastUpdate(plan))}`, { font: 'B', size: 9.5, color: TEAL_DARK });
   y += 3;
   doc.line(page, M, y, M + CW, y, 2, 0.35);
   doc.op(page, ''); // séparation lisible
@@ -67,7 +68,7 @@ export async function buildPlanPdf(plan, password = '') {
         const [first, ...rest] = content[0].lines;
         para(first, { font: 'B', size: 13 });
         rest.forEach((l) => para(l, { size: 10 }));
-      } else para('Coordonnées non renseignées', { font: 'I', size: 10, color: GREY });
+      } else para(tr('Coordonnées non renseignées', 'Details not filled in'), { font: 'I', size: 10, color: GREY });
       y += 8;
       continue;
     }
@@ -78,7 +79,7 @@ export async function buildPlanPdf(plan, password = '') {
     para(step.question, { font: 'B', size: 10.5, color: TEAL_DARK, lead: 1.3 });
     y += 2;
 
-    if (!content.length && step.type !== 'final') para('Non renseigné', { font: 'I', size: 10, color: GREY });
+    if (!content.length && step.type !== 'final') para(tr('Non renseigné', 'Not filled in'), { font: 'I', size: 10, color: GREY });
 
     for (const block of content) {
       if (block.label) {
@@ -103,20 +104,20 @@ export async function buildPlanPdf(plan, password = '') {
   need(50);
   doc.line(page, M, y, M + CW, y, 0.5, 0.75);
   y += 8;
-  para(`Document rédigé avec Mon PCC, d’après le support : ${SOURCE.citation} ${SOURCE.url} — © ${SOURCE.holder}, licence ${SOURCE.license}. Mise en page adaptée.`, { size: 7.5, color: GREY });
-  para(`Dernière mise à jour : ${fmtDateTime(lastUpdate(plan))}. À relire après une crise, lors d’un changement important et au moins tous les six mois.`, { size: 7.5, color: GREY });
+  para(`${tr('Document rédigé avec Mon PCC, d’après le support :', 'Document written with Mon PCC, based on:')} ${SOURCE.citation} ${SOURCE.url} — © ${SOURCE.holder}, ${tr('licence', 'licence')} ${SOURCE.license}. ${tr('Mise en page adaptée.', 'Layout adapted.')}`, { size: 7.5, color: GREY });
+  para(`${tr('Dernière mise à jour :', 'Last updated:')} ${fmtDateTime(lastUpdate(plan))}. ${tr('À relire après une crise, lors d’un changement important et au moins tous les six mois.', 'To be reviewed after a crisis, when something important changes, and at least every six months.')}`, { size: 7.5, color: GREY });
 
   // Pied de page
   const id = plan.data.coordonnees || {};
   const who = [id.prenom, id.nom].filter(Boolean).join(' ');
   doc.pages.forEach((_, i) => {
-    const t = `Plan de crise conjoint${who ? ' — ' + who : ''} — mis à jour le ${fmtDate(lastUpdate(plan))}`;
+    const t = `${tr('Plan de crise conjoint', 'Joint crisis plan')}${who ? ' — ' + who : ''} — ${tr('mis à jour le', 'updated on')} ${fmtDate(lastUpdate(plan))}`;
     doc.text(i, M, PH - 10 * MM, t, 'R', 7.5, GREY);
     const pn = `Page ${i + 1} / ${doc.pages.length}`;
     doc.text(i, PW - M - textWidth(pn, 'R', 7.5), PH - 10 * MM, pn, 'R', 7.5, GREY);
   });
 
-  return doc.build({ title: 'Plan de crise conjoint' + (who ? ' - ' + who : ''), password });
+  return doc.build({ title: tr('Plan de crise conjoint', 'Joint crisis plan') + (who ? ' - ' + who : ''), password });
 
   async function signatureBoxes(signers) {
     const gap = 10;
@@ -128,7 +129,7 @@ export async function buildPlanPdf(plan, password = '') {
         const r = signers[i + k];
         const x = M + k * (bw + gap);
         doc.rect(page, x, y, bw, bh, { stroke: '0.74 0.8 0.8', width: 0.7, radius: 4 });
-        const name = [r.nom, r.role].filter(Boolean).join(' — ') || 'Nom et rôle';
+        const name = [r.nom, r.role].filter(Boolean).join(' — ') || tr('Nom et rôle', 'Name and role');
         const nl = wrap(name, 'R', 9, bw - 14).slice(0, 2);
         nl.forEach((l, j) => doc.text(page, x + 7, y + 13 + j * 11, l, 'R', 9, r.nom || r.role ? INK : GREY));
         const lineY = y + bh - 13;
@@ -144,7 +145,7 @@ export async function buildPlanPdf(plan, password = '') {
           } catch { /* signature illisible */ }
         }
         doc.line(page, x + 7, lineY, x + bw - 7, lineY, 0.5, 0.6, '2 2');
-        doc.text(page, x + 7, lineY + 9, r.sig ? `Signé sur écran le ${fmtDate(r.signedAt)}` : 'Signature', 'R', 7, GREY);
+        doc.text(page, x + 7, lineY + 9, r.sig ? tr(`Signé sur écran le ${fmtDate(r.signedAt)}`, `Signed on screen on ${fmtDate(r.signedAt)}`) : 'Signature', 'R', 7, GREY);
       }
       y += bh + 8;
     }

@@ -1,10 +1,10 @@
 /* Mon PCC — service worker : fonctionnement hors connexion.
    Il ne met en cache que les fichiers de l'application, jamais les données du plan. */
-const CACHE = 'mon-pcc-v2.6.2';
+const CACHE = 'mon-pcc-v2.7.0';
 const FILES = [
   './', './index.html', './css/style.css',
-  './js/app.js', './js/data.js', './js/data-ado.js', './js/storage.js', './js/export.js', './js/media.js', './js/share.js', './js/pdf.js', './js/planpdf.js', './js/crisiscard.js', './js/resources.js', './js/embed.js', './js/exercises.js', './js/early.js', './js/vendor/qrcode.js',
-  './manifest.webmanifest', './icons/icon.svg', './icons/icon-192.png', './icons/icon-512.png',
+  './js/app.js', './js/i18n.js', './js/data.js', './js/data-ado.js', './js/data-en.js', './js/data-ado-en.js', './js/storage.js', './js/export.js', './js/media.js', './js/share.js', './js/pdf.js', './js/planpdf.js', './js/crisiscard.js', './js/resources.js', './js/embed.js', './js/exercises.js', './js/early.js', './js/vendor/qrcode.js',
+  './manifest.webmanifest', './manifest-en.webmanifest', './icons/icon.svg', './icons/icon-192.png', './icons/icon-512.png',
   './icons/icon-maskable-512.png', './icons/apple-touch-icon.png',
 ];
 

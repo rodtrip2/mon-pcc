@@ -6,26 +6,58 @@
  */
 
 /** Adresse de Ma boussole bien-être, à côté de Mon PCC sur le même site */
+import { LANG } from './i18n.js';
+
 export const BOUSSOLE_BASE = new URL('../ma-boussole-bien-etre/', location.origin + location.pathname.replace(/[^/]*$/, '')).href;
 export const BOUSSOLE_SCOPE = new URL(BOUSSOLE_BASE).pathname;
 
-export const EXERCISES = [
-  { id: 'breathing', path: 'breathing/', icon: '💨', name: 'Respiration en 2 minutes', desc: 'Ralentir sa respiration pour se poser.', duration: '2-3 min' },
-  { id: 'guided-breathing', path: 'guided-breathing/', icon: '🫁', name: 'Respiration guidée', desc: 'Suivre un rythme lent, dont la cohérence cardiaque.', duration: '5-10 min' },
-  { id: 'grounding', path: 'grounding/', icon: '🖐', name: 'Ancrage 5-4-3-2-1', desc: 'Revenir à l’instant présent avec ses cinq sens.', duration: '3-5 min' },
-  { id: 'progressive-muscle-relaxation', path: 'progressive-muscle-relaxation/', icon: '💪', name: 'Relaxation musculaire progressive', desc: 'Contracter puis relâcher les muscles pour détendre le corps.', duration: '8-12 min' },
-  { id: 'peaceful-visualization', path: 'peaceful-visualization/', icon: '🏞', name: 'Visualisation apaisante', desc: 'Se laisser guider vers un lieu calme, avec une voix.', duration: '10-12 min' },
-  { id: 'self-compassion', path: 'self-compassion/', icon: '💛', name: 'Pause d’autocompassion', desc: 'Se parler avec douceur dans un moment difficile.', duration: '3-5 min' },
-  { id: 'leaves-on-stream', path: 'leaves-on-stream/', icon: '🍃', name: 'Les feuilles sur la rivière', desc: 'Poser ses pensées sur des feuilles et les regarder s’éloigner.', duration: '3-5 min' },
-  { id: 'sound-therapy', path: 'sound-therapy/', icon: '🎧', name: 'Sons apaisants', desc: 'Écouter des sons doux pour se détendre.', duration: '5-30 min' },
-  { id: 'stress-relief-bubbles', path: 'stress-relief-bubbles/', icon: '🫧', name: 'Bulles anti-stress', desc: 'Éclater des bulles pour occuper ses mains et son esprit.', duration: '2-5 min' },
-  { id: 'fidget-spinner', path: 'fidget-spinner/', icon: '🌀', name: 'Fidget spinner', desc: 'Faire tourner une toupie pour canaliser l’agitation.', duration: '1-3 min' },
+const EX = [
+  { id: 'breathing', path: 'breathing/', icon: '💨', duration: '2-3 min',
+    fr: { name: 'Respiration en 2 minutes', desc: 'Ralentir sa respiration pour se poser.' },
+    en: { name: '2-Minute Breathing', desc: 'Slow your breathing down to settle.' } },
+  { id: 'guided-breathing', path: 'guided-breathing/', icon: '🫁', duration: '5-10 min',
+    fr: { name: 'Respiration guidée', desc: 'Suivre un rythme lent, dont la cohérence cardiaque.' },
+    en: { name: 'Guided Breathing', desc: 'Follow a slow rhythm, including coherent breathing.' } },
+  { id: 'grounding', path: 'grounding/', icon: '🖐', duration: '3-5 min',
+    fr: { name: 'Ancrage 5-4-3-2-1', desc: 'Revenir à l’instant présent avec ses cinq sens.' },
+    en: { name: '5-4-3-2-1 Grounding', desc: 'Come back to the present moment through your five senses.' } },
+  { id: 'progressive-muscle-relaxation', path: 'progressive-muscle-relaxation/', icon: '💪', duration: '8-12 min',
+    fr: { name: 'Relaxation musculaire progressive', desc: 'Contracter puis relâcher les muscles pour détendre le corps.' },
+    en: { name: 'Progressive Muscle Relaxation', desc: 'Tense then release your muscles to relax your body.' } },
+  { id: 'peaceful-visualization', path: 'peaceful-visualization/', icon: '🏞', duration: '10-12 min',
+    fr: { name: 'Visualisation apaisante', desc: 'Se laisser guider vers un lieu calme, avec une voix.' },
+    en: { name: 'Peaceful Visualization', desc: 'Let a voice guide you to a calm place.' } },
+  { id: 'self-compassion', path: 'self-compassion/', icon: '💛', duration: '3-5 min',
+    fr: { name: 'Pause d’autocompassion', desc: 'Se parler avec douceur dans un moment difficile.' },
+    en: { name: 'Self-Compassion Break', desc: 'Speak to yourself kindly in a difficult moment.' } },
+  { id: 'leaves-on-stream', path: 'leaves-on-stream/', icon: '🍃', duration: '3-5 min',
+    fr: { name: 'Les feuilles sur la rivière', desc: 'Poser ses pensées sur des feuilles et les regarder s’éloigner.' },
+    en: { name: 'Leaves on a Stream', desc: 'Place your thoughts on leaves and watch them float away.' } },
+  { id: 'sound-therapy', path: 'sound-therapy/', icon: '🎧', duration: '5-30 min',
+    fr: { name: 'Sons apaisants', desc: 'Écouter des sons doux pour se détendre.' },
+    en: { name: 'Sound Therapy', desc: 'Listen to gentle sounds to relax.' } },
+  { id: 'stress-relief-bubbles', path: 'stress-relief-bubbles/', icon: '🫧', duration: '2-5 min',
+    fr: { name: 'Bulles anti-stress', desc: 'Éclater des bulles pour occuper ses mains et son esprit.' },
+    en: { name: 'Stress Relief Bubbles', desc: 'Pop bubbles to keep your hands and mind busy.' } },
+  { id: 'fidget-spinner', path: 'fidget-spinner/', icon: '🌀', duration: '1-3 min',
+    fr: { name: 'Fidget spinner', desc: 'Faire tourner une toupie pour canaliser l’agitation.' },
+    en: { name: 'Fidget Spinner', desc: 'Spin a fidget spinner to channel restlessness.' } },
 ];
 
-export const exerciseById = (id) => EXERCISES.find((e) => e.id === id);
-export const exerciseUrl = (e) => BOUSSOLE_BASE + e.path; // mode intégré détecté par Ma boussole (page dans un cadre)
+/** Exercices dans la langue courante */
+export const EXERCISES_ALL = EX;
+const local = (e) => ({ id: e.id, path: e.path, icon: e.icon, duration: e.duration, ...(e[LANG] || e.fr) });
+export const exercises = () => EX.map(local);
+export const exerciseById = (id) => { const e = EX.find((x) => x.id === id); return e ? local(e) : undefined; };
+/** Page de l'exercice, dans la langue de Mon PCC (Ma boussole : anglais sous /en/) */
+export const exerciseUrl = (e) => BOUSSOLE_BASE + (LANG === 'en' ? 'en/' : '') + e.path; // mode intégré détecté par Ma boussole (page dans un cadre)
 
-/* ---------- préparation hors connexion ---------- */
+/* ---------- préparation hors connexion ----------
+ * Français : les pages sont gardées par le service worker de Ma boussole (précache).
+ * Anglais : Mon PCC dépose les pages anglaises des exercices et les textes anglais dans
+ * le cache « mbb-pages-en », que le service worker de Ma boussole sert hors connexion.
+ */
+const PAGES_EN = 'mbb-pages-en';
 
 /** État : { sw: bool, pages: n, audios: n, audiosTotal: n|null } (même site requis) */
 export async function offlineStatus() {
@@ -37,13 +69,14 @@ export async function offlineStatus() {
       if (k.startsWith('workbox-precache') && k.includes(BOUSSOLE_SCOPE)) st.pages += (await (await caches.open(k)).keys()).length;
     }
     if (await caches.has('mbb-audios')) st.audios = (await (await caches.open('mbb-audios')).keys()).length;
+    if (LANG === 'en') st.pages = (await caches.has(PAGES_EN)) ? (await (await caches.open(PAGES_EN)).keys()).length : 0;
   } catch { /* stockage indisponible */ }
   return st;
 }
 
 /**
  * Charge Ma boussole dans un cadre invisible (installe son service worker et ses pages),
- * puis télécharge les sons français. onProgress({ step, done, total }).
+ * puis télécharge les sons (et, en anglais, les pages anglaises). onProgress({ step, done, total }).
  */
 export async function prepareOffline(onProgress = () => {}) {
   if (!('serviceWorker' in navigator) || !window.caches) throw new Error('unsupported');
@@ -62,8 +95,17 @@ export async function prepareOffline(onProgress = () => {}) {
       if (Date.now() - t0 > 180000) throw new Error('timeout');
       await new Promise((r) => setTimeout(r, 1000));
     }
-    // Sons et narrations en français
-    const list = await (await fetch(BOUSSOLE_BASE + 'audios/offline-fr.json', { cache: 'no-store' })).json();
+    // Pages et textes anglais (les pages françaises sont déjà en mémoire)
+    if (LANG === 'en') {
+      const pages = await caches.open(PAGES_EN);
+      const urls = [BOUSSOLE_BASE + '_i18n/en/messages.json', ...EX.map((e) => BOUSSOLE_BASE + 'en/' + e.path)];
+      for (const url of urls) {
+        const res = await fetch(url, { cache: 'no-store' });
+        if (res.ok) await pages.put(url, res);
+      }
+    }
+    // Sons et narrations dans la langue de Mon PCC
+    const list = await (await fetch(BOUSSOLE_BASE + `audios/offline-${LANG === 'en' ? 'en' : 'fr'}.json`, { cache: 'no-store' })).json();
     const files = list.files || [];
     const cache = await caches.open('mbb-audios');
     let done = 0;

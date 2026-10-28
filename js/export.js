@@ -1,5 +1,7 @@
 /* Mon PCC — mise en forme du plan (affichage, texte, fichier autonome) */
 import { STEPS, SOURCE, PRINT_TITLE, PRINT_SUBTITLE } from './data.js';
+import { tr, locale, LANG } from './i18n.js';
+import { exerciseById } from './exercises.js';
 
 export const esc = (s) =>
   String(s ?? '').replace(/[&<>"']/g, (c) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
@@ -8,14 +10,15 @@ export function fmtDate(iso) {
   if (!iso) return '';
   const d = new Date(iso.length === 10 ? iso + 'T12:00:00' : iso);
   if (isNaN(d)) return iso;
-  return d.toLocaleDateString('fr-FR', { day: 'numeric', month: 'long', year: 'numeric' });
+  return d.toLocaleDateString(locale(), { day: 'numeric', month: 'long', year: 'numeric' });
 }
 
 export function fmtDateTime(iso) {
   if (!iso) return '';
   const d = new Date(iso);
   if (isNaN(d)) return iso;
-  return fmtDate(iso) + ' à ' + d.toLocaleTimeString('fr-FR', { hour: '2-digit', minute: '2-digit' }).replace(':', ' h ');
+  if (LANG === 'en') return fmtDate(iso) + ' at ' + d.toLocaleTimeString(locale(), { hour: '2-digit', minute: '2-digit' });
+  return fmtDate(iso) + ' à ' + d.toLocaleTimeString(locale(), { hour: '2-digit', minute: '2-digit' }).replace(':', ' h ');
 }
 
 /** Date de la dernière modification du contenu du plan */
@@ -42,22 +45,22 @@ export function stepContent(step, data, plan = null) {
     const lines = [];
     const nom = [id.prenom, id.nom].filter(filled).join(' ');
     if (filled(nom)) lines.push(nom);
-    if (filled(id.naissance)) lines.push('Né·e le ' + fmtDate(id.naissance));
-    if (filled(id.tel)) lines.push('Tél. : ' + id.tel);
-    if (filled(id.adresse)) lines.push('Adresse : ' + id.adresse);
+    if (filled(id.naissance)) lines.push(tr('Né·e le ', 'Date of birth: ') + fmtDate(id.naissance));
+    if (filled(id.tel)) lines.push(tr('Tél. : ', 'Phone: ') + id.tel);
+    if (filled(id.adresse)) lines.push(tr('Adresse : ', 'Address: ') + id.adresse);
     if (lines.length) out.push({ lines });
     return out;
   }
   if (step.type === 'final') {
     const f = v || {};
     const lines = [];
-    const ld = [f.lieu, f.date ? fmtDate(f.date) : ''].filter(filled).join(', le ');
+    const ld = [f.lieu, f.date ? fmtDate(f.date) : ''].filter(filled).join(tr(', le ', ', '));
     if (filled(ld)) lines.push(ld);
     if (lines.length) out.push({ lines });
     const sig = (f.signataires || []).filter(recFilled);
     // signatures antérieures à la dernière modification : non reprises
     const signers = sig.map((r) => (plan && r.sig && !sigValid(r, plan) ? { nom: r.nom, role: r.role } : r));
-    if (sig.length) out.push({ label: 'Rôles & signatures', lines: signers.map((r) => [r.nom, r.role].filter(filled).join(' — ') + (r.sig ? ' (signé le ' + fmtDate(r.signedAt) + ')' : '')), signers, signatures: true });
+    if (sig.length) out.push({ label: tr('Rôles & signatures', 'Roles & signatures'), lines: signers.map((r) => [r.nom, r.role].filter(filled).join(' — ') + (r.sig ? tr(' (signé le ', ' (signed on ') + fmtDate(r.signedAt) + ')' : '')), signers, signatures: true });
     return out;
   }
   const groups = step.groups || [{ id: null }];
@@ -70,7 +73,7 @@ export function stepContent(step, data, plan = null) {
       const recs = arr.filter(recFilled);
       if (!recs.length) continue;
       const lines = recs.map((r) => {
-        if (step.id === 'soinsEvites') return [r.soin, filled(r.raison) ? 'parce que : ' + r.raison : ''].filter(filled).join(' — ');
+        if (step.id === 'soinsEvites') return [r.soin, filled(r.raison) ? tr('parce que : ', 'because: ') + r.raison : ''].filter(filled).join(' — ');
         if (step.labelled) return step.fields.filter((f) => filled(r[f.key])).map((f) => `${f.label} ${r[f.key]}`).join(' — ');
         return step.fields.map((f) => r[f.key]).filter(filled).join(' — ');
       });
@@ -78,19 +81,21 @@ export function stepContent(step, data, plan = null) {
     }
   }
   if (step.id === 'strategies') {
-    const EXN = { 'breathing': 'Respiration en 2 minutes', 'guided-breathing': 'Respiration guidée', 'grounding': 'Ancrage 5-4-3-2-1', 'progressive-muscle-relaxation': 'Relaxation musculaire progressive', 'peaceful-visualization': 'Visualisation apaisante', 'self-compassion': 'Pause d’autocompassion', 'leaves-on-stream': 'Les feuilles sur la rivière', 'sound-therapy': 'Sons apaisants', 'stress-relief-bubbles': 'Bulles anti-stress', 'fidget-spinner': 'Fidget spinner' };
     const tb = (data.boiteOutils || []).filter((it) => it && (it.title || it.url || it.file || it.ex || (it.photos || []).length || (it.text || '').trim()));
-    const names = { photo: 'photo', video: 'vidéo', audio: 'son', voix: 'message vocal', lien: 'lien', citation: 'citation', album: 'album photo', exercice: 'exercice de Ma boussole bien-être' };
+    const names = {
+      photo: tr('photo', 'photo'), video: tr('vidéo', 'video'), audio: tr('son', 'audio'), voix: tr('message vocal', 'voice message'),
+      lien: tr('lien', 'link'), citation: tr('citation', 'quote'), album: tr('album photo', 'photo album'), exercice: tr('exercice de Ma boussole bien-être', 'Ma boussole bien-être exercise'),
+    };
     if (tb.length) {
       out.push({
-        label: 'Ma boîte à outils (sur mon téléphone)',
-        lines: tb.map((it) => (it.kind === 'citation'
-          ? `« ${it.text.trim()} »${it.author ? ' — ' + it.author : ''}`
-          : it.kind === 'exercice'
-            ? `${EXN[it.ex] || 'Exercice'} (exercice de Ma boussole bien-être)`
-          : it.kind === 'album'
-            ? `${it.title ? it.title + ' ' : ''}(album, ${(it.photos || []).length} photo${(it.photos || []).length > 1 ? 's' : ''})`
-            : (it.title ? it.title + ' ' : '') + '(' + names[it.kind] + ')' + (it.kind === 'lien' ? ' : ' + it.url : ''))),
+        label: tr('Ma boîte à outils (sur mon téléphone)', 'My toolbox (on my phone)'),
+        lines: tb.map((it) => {
+          const n = (it.photos || []).length;
+          if (it.kind === 'citation') return tr(`« ${it.text.trim()} »`, `“${it.text.trim()}”`) + (it.author ? ' — ' + it.author : '');
+          if (it.kind === 'exercice') return `${exerciseById(it.ex)?.name || tr('Exercice', 'Exercise')} (${tr('exercice de Ma boussole bien-être', 'Ma boussole bien-être exercise')})`;
+          if (it.kind === 'album') return `${it.title ? it.title + ' ' : ''}(${tr('album', 'album')}, ${n} photo${n > 1 ? 's' : ''})`;
+          return (it.title ? it.title + ' ' : '') + '(' + names[it.kind] + ')' + (it.kind === 'lien' ? tr(' : ', ': ') + it.url : '');
+        }),
       });
     }
   }
@@ -109,24 +114,24 @@ export function progress(data) {
 /** Document HTML (sans <html>), réutilisé pour l'aperçu, l'impression et le fichier */
 export function documentHTML(plan) {
   const data = plan.data;
-  let h = `<header class="doc-head"><h1>${PRINT_TITLE}</h1><p class="doc-sub">${esc(PRINT_SUBTITLE)}</p><p class="doc-date">Dernière mise à jour : <strong>${esc(fmtDateTime(lastUpdate(plan)))}</strong></p></header>`;
+  let h = `<header class="doc-head"><h1>${PRINT_TITLE}</h1><p class="doc-sub">${esc(PRINT_SUBTITLE)}</p><p class="doc-date">${tr('Dernière mise à jour :', 'Last updated:')} <strong>${esc(fmtDateTime(lastUpdate(plan)))}</strong></p></header>`;
   for (const step of STEPS) {
     const content = stepContent(step, data, plan);
     if (step.type === 'identity') {
-      h += `<section class="doc-sec doc-id">${content.length ? content[0].lines.map((l) => `<p>${esc(l)}</p>`).join('') : '<p class="doc-empty">Coordonnées non renseignées</p>'}</section>`;
+      h += `<section class="doc-sec doc-id">${content.length ? content[0].lines.map((l) => `<p>${esc(l)}</p>`).join('') : `<p class="doc-empty">${tr('Coordonnées non renseignées', 'Details not filled in')}</p>`}</section>`;
       continue;
     }
     h += `<section class="doc-sec"><h2>${esc(step.question)}</h2>`;
     if (!content.length) {
-      h += step.type === 'final' ? '' : '<p class="doc-empty">Non renseigné</p>';
+      h += step.type === 'final' ? '' : `<p class="doc-empty">${tr('Non renseigné', 'Not filled in')}</p>`;
     }
     for (const block of content) {
       if (block.label) h += `<h3>${esc(block.label)}</h3>`;
       if (block.signatures) {
         h += '<div class="doc-sign">' + block.signers.map((r) => {
           const who = [r.nom, r.role].filter(filled).join(' — ');
-          const img = r.sig && r.sig.startsWith('data:image/png;base64,') ? `<img class="doc-sign-img" src="${r.sig}" alt="Signature">` : '';
-          const line = r.sig ? `Signé sur écran le ${esc(fmtDate(r.signedAt))}` : 'Signature';
+          const img = r.sig && r.sig.startsWith('data:image/png;base64,') ? `<img class="doc-sign-img" src="${r.sig}" alt="${tr('Signature', 'Signature')}">` : '';
+          const line = r.sig ? tr(`Signé sur écran le ${esc(fmtDate(r.signedAt))}`, `Signed on screen on ${esc(fmtDate(r.signedAt))}`) : tr('Signature', 'Signature');
           return `<div class="doc-sign-box${img ? ' signed' : ''}"><span>${esc(who)}</span>${img}<span class="doc-sign-line">${line}</span></div>`;
         }).join('') + '</div>';
       } else if (step.type === 'final') {
@@ -137,17 +142,18 @@ export function documentHTML(plan) {
       }
     }
     if (step.type === 'final' && !content.some((b) => b.signatures)) {
-      h += '<div class="doc-sign"><div class="doc-sign-box"><span>Nom et rôle</span><span class="doc-sign-line">Signature</span></div><div class="doc-sign-box"><span>Nom et rôle</span><span class="doc-sign-line">Signature</span></div></div>';
+      const box = `<div class="doc-sign-box"><span>${tr('Nom et rôle', 'Name and role')}</span><span class="doc-sign-line">Signature</span></div>`;
+      h += `<div class="doc-sign">${box}${box}</div>`;
     }
     h += '</section>';
   }
-  h += `<footer class="doc-foot"><p>Document rédigé avec Mon PCC, d’après le support : ${esc(SOURCE.citation)} ${esc(SOURCE.url)} — © ${esc(SOURCE.holder)}, licence ${esc(SOURCE.license)}. Mise en page adaptée.</p><p>Dernière mise à jour : ${esc(fmtDateTime(lastUpdate(plan)))}. À relire après une crise, lors d’un changement important et au moins tous les six mois.</p></footer>`;
+  h += `<footer class="doc-foot"><p>${tr('Document rédigé avec Mon PCC, d’après le support :', 'Document written with Mon PCC, based on:')} ${esc(SOURCE.citation)} ${esc(SOURCE.url)} — © ${esc(SOURCE.holder)}, ${tr('licence', 'licence')} ${esc(SOURCE.license)}. ${tr('Mise en page adaptée.', 'Layout adapted.')}</p><p>${tr('Dernière mise à jour :', 'Last updated:')} ${esc(fmtDateTime(lastUpdate(plan)))}. ${tr('À relire après une crise, lors d’un changement important et au moins tous les six mois.', 'To be reviewed after a crisis, when something important changes, and at least every six months.')}</p></footer>`;
   return h;
 }
 
 export function planText(plan) {
   const data = plan.data;
-  const L = [PRINT_TITLE, PRINT_SUBTITLE, `Dernière mise à jour : ${fmtDateTime(lastUpdate(plan))}`, ''];
+  const L = [PRINT_TITLE, PRINT_SUBTITLE, `${tr('Dernière mise à jour :', 'Last updated:')} ${fmtDateTime(lastUpdate(plan))}`, ''];
   for (const step of STEPS) {
     const content = stepContent(step, data, plan);
     if (step.type === 'identity') {
@@ -162,8 +168,8 @@ export function planText(plan) {
     }
     L.push('');
   }
-  L.push(`Dernière mise à jour : ${fmtDateTime(lastUpdate(plan))}.`);
-  L.push(`D’après : ${SOURCE.citation} ${SOURCE.url} — ${SOURCE.license}.`);
+  L.push(`${tr('Dernière mise à jour :', 'Last updated:')} ${fmtDateTime(lastUpdate(plan))}.`);
+  L.push(`${tr('D’après :', 'Based on:')} ${SOURCE.citation} ${SOURCE.url} — ${SOURCE.license}.`);
   return L.join('\n');
 }
 
@@ -190,11 +196,11 @@ export const DOC_CSS = `
 
 export function standaloneHTML(plan) {
   const nom = [plan.data.coordonnees?.prenom, plan.data.coordonnees?.nom].filter(Boolean).join(' ');
-  return `<!doctype html><html lang="fr"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><meta name="robots" content="noindex"><title>Plan de crise conjoint${nom ? ' — ' + esc(nom) : ''}</title><style>body{margin:0;padding:16px;background:#fff}${DOC_CSS}@media print{body{padding:0}}</style></head><body><article class="doc">${documentHTML(plan)}</article></body></html>`;
+  return `<!doctype html><html lang="${LANG}"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><meta name="robots" content="noindex"><title>${tr('Plan de crise conjoint', 'Joint crisis plan')}${nom ? ' — ' + esc(nom) : ''}</title><style>body{margin:0;padding:16px;background:#fff}${DOC_CSS}@media print{body{padding:0}}</style></head><body><article class="doc">${documentHTML(plan)}</article></body></html>`;
 }
 
 export function fileBaseName(plan) {
   const id = plan.data.coordonnees || {};
   const who = [id.prenom, id.nom].filter(Boolean).join('-').replace(/œ/g, 'oe').replace(/Œ/g, 'OE').replace(/æ/g, 'ae').replace(/Æ/g, 'AE').normalize('NFD').replace(/[̀-ͯ]/g, '').replace(/[^A-Za-z0-9-]+/g, '-');
-  return 'plan-de-crise-conjoint' + (who ? '-' + who.toLowerCase() : '') + '-' + new Date().toISOString().slice(0, 10);
+  return tr('plan-de-crise-conjoint', 'joint-crisis-plan') + (who ? '-' + who.toLowerCase() : '') + '-' + new Date().toISOString().slice(0, 10);
 }

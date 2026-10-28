@@ -23,6 +23,16 @@ Mon PCC est une application web installable (PWA), gratuite et sans serveur, qui
 - **On peut changer de version à tout moment** dans Réglages › Version. Les réponses communes sont conservées. Les rubriques propres à l'autre version sont masquées, jamais effacées.
 - Toute nouvelle fonctionnalité doit marcher dans les deux versions. Exemples : pour l'ado, les ressources sont ajoutées à `strategies.pros` ; pour l'adulte, à `aide.garde`. Sur la page Mon Espace Santé, une note s'adresse aux mineur·es. Elle s'affiche si la date de naissance indique moins de 18 ans, ou en version ado quand cette date n'est pas renseignée. Elle ne s'affiche jamais pour une personne majeure, et on peut la masquer (✕).
 
+## 2 bis. Langues et pays
+
+- **Deux langues, français et anglais.** Tout texte affiché s'écrit `tr('français', 'English')` (`js/i18n.js`) ; les valeurs bilingues des données s'écrivent `{ fr, en }` et se lisent avec `L()`. Aucun texte d'interface en dur dans une seule langue.
+- Langue : celle du téléphone par défaut, changeable dans le menu et les Réglages, sans recharger. Les réponses de la personne ne sont **jamais traduites**.
+- Version adulte anglaise : questions **reprises mot pour mot** du formulaire officiel anglais (V5), même avec ses maladresses. Version ado anglaise : **traduction non officielle**, à signaler partout où la source est citée.
+- **Pays** (réglage séparé de la langue, déduit du fuseau horaire) : il décide des numéros d'urgence, des ressources, des exemples « services de garde » (`countrySuggestions`) et de la page dossier de santé. Mon Espace Santé et la note pour les mineur·es ne concernent que la France.
+- Exemples en anglais : neutres, valables dans tous les pays anglophones (pas de service propre à un pays) ; orthographe britannique, sauf dans les questions officielles.
+- Toute nouvelle fonctionnalité est testée en français **et** en anglais. Avant de toucher au code, vérifier qu'en français l'affichage reste identique.
+- Ma boussole bien-être en anglais : pages sous `/en/` ; hors connexion en anglais via le cache `mbb-pages-en` et `audios/offline-en.json`.
+
 ## 3. Confidentialité et sécurité (RGPD)
 
 - **Aucune donnée ne quitte l'appareil sans action explicite de la personne.** Pas de compte, de serveur, de cookie, de mesure d'audience, de police ou de ressource externe.
@@ -57,7 +67,7 @@ Mon PCC est une application web installable (PWA), gratuite et sans serveur, qui
 
 ## 6. Ressources d'aide
 
-- Les données sont dans `js/resources.js`, avec leur date de vérification (`CHECKED`). **Revérifier numéros et horaires sur les sites officiels** avant toute modification, et mettre la date à jour.
+- Les données sont dans `js/resources.js`, par pays, avec leur date de vérification (`checked`). Ne garder que des services vérifiés sur une source officielle (exemple : PAPYRUS, au Royaume-Uni, a fermé en septembre 2026). **Revérifier numéros et horaires sur les sites officiels** avant toute modification, et mettre la date à jour.
 - La présentation actuelle des ressources est validée : ne pas la changer sans demande.
 
 ## 7. Méthode de travail

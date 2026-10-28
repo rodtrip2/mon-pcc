@@ -4,6 +4,7 @@
  * sans aucune information de santé détaillée.
  */
 import { PdfDoc, jpegSize } from './pdf.js';
+import { tr } from './i18n.js';
 
 const W = 1700;
 const H = 1100;
@@ -53,33 +54,33 @@ export function renderCrisisCard(c) {
   ctx.fillStyle = BRAND;
   ctx.fillRect(0, 0, W, 230);
   logo(ctx, 90, 55, 120);
-  fit(ctx, 'J’ai un plan de crise conjoint', 250, 140, W - 340, 84, 700, '#fff');
+  fit(ctx, tr('J’ai un plan de crise conjoint', 'I have a joint crisis plan'), 250, 140, W - 340, 84, 700, '#fff');
   fit(ctx, c.nom || '', 250, 200, W - 340, 44, 500, '#e3f0ee');
 
   const L = 90;
   const maxW = W - 2 * L;
   let y = 330;
-  fit(ctx, 'Où le trouver :', L, y, maxW, 40, 600, '#5d6b6c');
+  fit(ctx, tr('Où le trouver :', 'Where to find it:'), L, y, maxW, 40, 600, '#5d6b6c');
   y += 70;
-  fit(ctx, c.ou || 'Dans Mon Espace Santé', L, y, maxW, 58, 700, '#1d2a2c');
+  fit(ctx, c.ou || tr('Dans Mon Espace Santé', 'With my care team'), L, y, maxW, 58, 700, '#1d2a2c');
 
   y += 120;
   ctx.fillStyle = '#d9dfdc';
   ctx.fillRect(L, y - 60, maxW, 3);
   if (c.contactNom || c.contactTel) {
-    fit(ctx, 'En cas de crise, merci de prévenir :', L, y, maxW, 40, 600, '#5d6b6c');
+    fit(ctx, tr('En cas de crise, merci de prévenir :', 'In a crisis, please contact:'), L, y, maxW, 40, 600, '#5d6b6c');
     y += 70;
     fit(ctx, [c.contactNom, c.contactLien && `(${c.contactLien})`].filter(Boolean).join(' '), L, y, maxW, 54, 700, '#1d2a2c');
     if (c.contactTel) { y += 70; fit(ctx, '☎ ' + c.contactTel, L, y, maxW, 58, 700, BRAND); }
     y += 100;
   }
   if (c.soignantNom || c.soignantTel) {
-    fit(ctx, 'Mon soignant référent :', L, y, maxW, 40, 600, '#5d6b6c');
+    fit(ctx, tr('Mon soignant référent :', 'My key professional:'), L, y, maxW, 40, 600, '#5d6b6c');
     y += 66;
     fit(ctx, [c.soignantNom, c.soignantTel && '☎ ' + c.soignantTel].filter(Boolean).join('   '), L, y, maxW, 48, 600, '#1d2a2c');
   }
 
-  fit(ctx, 'Carte réalisée avec Mon PCC', L, H - 45, maxW, 26, 400, '#8a9697');
+  fit(ctx, tr('Carte réalisée avec Mon PCC', 'Card made with Mon PCC'), L, H - 45, maxW, 26, 400, '#8a9697');
   return canvas;
 }
 
@@ -97,8 +98,8 @@ export async function crisisCardPdf(jpegBlob) {
   const cw = 85 * MM;
   const ch = 55 * MM;
   const x = (doc.width - cw) / 2;
-  doc.text(p, 20 * MM, 18 * MM, 'Ma carte de crise - imprimer à 100 % (taille réelle), découper le long des pointillés,', 'R', 9, '0.36 0.42 0.42');
-  doc.text(p, 20 * MM, 18 * MM + 12, 'puis la glisser dans mon portefeuille, à côté de ma carte Vitale.', 'R', 9, '0.36 0.42 0.42');
+  doc.text(p, 20 * MM, 18 * MM, tr('Ma carte de crise - imprimer à 100 % (taille réelle), découper le long des pointillés,', 'My crisis card - print at 100% (actual size), cut along the dotted lines,'), 'R', 9, '0.36 0.42 0.42');
+  doc.text(p, 20 * MM, 18 * MM + 12, tr('puis la glisser dans mon portefeuille, à côté de ma carte Vitale.', 'then keep it in my wallet, next to my ID or health card.'), 'R', 9, '0.36 0.42 0.42');
   for (let k = 0; k < 2; k++) {
     const y = 32 * MM + k * (ch + 14 * MM);
     doc.image(p, im, x, y, cw, ch);
@@ -110,5 +111,5 @@ export async function crisisCardPdf(jpegBlob) {
       doc.line(p, cx, cy === y ? cy - g - l : cy + g, cx, cy === y ? cy - g : cy + g + l, 0.5, 0.4);
     }
   }
-  return doc.build({ title: 'Carte de crise' });
+  return doc.build({ title: tr('Carte de crise', 'Crisis card') });
 }

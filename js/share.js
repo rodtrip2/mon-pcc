@@ -5,6 +5,8 @@
  * QR code : bibliothèque qrcode-generator (Kazuhiko Arase, licence MIT), js/vendor/qrcode.js.
  */
 
+import { tr } from './i18n.js';
+
 export const CARD_MM = { w: 85, h: 55 };
 export const CARD_PX = { w: 1700, h: 1100 };
 
@@ -110,20 +112,20 @@ export function renderCard(url, qr) {
   fitText(ctx, 'Mon PCC', left + 195, 205, maxW - 195, 100, 700);
 
   ctx.fillStyle = BRAND_DARK;
-  fitText(ctx, 'Mon plan de crise conjoint', left, 400, maxW, 60, 650);
+  fitText(ctx, tr('Mon plan de crise conjoint', 'My joint crisis plan'), left, 400, maxW, 60, 650);
 
   ctx.fillStyle = '#4b5a5c';
   ctx.font = `400 44px ${FONT}`;
-  wrapText(ctx, 'Le préparer pas à pas sur mon téléphone, puis le construire avec les personnes qui m’accompagnent.', left, 495, maxW, 58);
+  wrapText(ctx, tr('Le préparer pas à pas sur mon téléphone, puis le construire avec les personnes qui m’accompagnent.', 'Prepare it step by step on my phone, then build it with the people who support me.'), left, 495, maxW, 58);
 
   ctx.fillStyle = '#5d6b6c';
-  fitText(ctx, 'Gratuit · Sans inscription · Mes réponses restent sur mon téléphone', left, 805, maxW, 36, 500);
+  fitText(ctx, tr('Gratuit · Sans inscription · Mes réponses restent sur mon téléphone', 'Free · No sign-up · My answers stay on my phone'), left, 805, maxW, 36, 500);
 
   ctx.fillStyle = '#1d2a2c';
   fitText(ctx, displayUrl(url), left, 900, maxW, 42, 700);
 
   ctx.fillStyle = '#7a8687';
-  fitText(ctx, 'D’après le Plan de Crise Conjoint — plandecriseconjoint.ch (CC BY-NC-SA)', left, 1010, maxW, 26, 400);
+  fitText(ctx, tr('D’après le Plan de Crise Conjoint — plandecriseconjoint.ch (CC BY-NC-SA)', 'Based on the Joint Crisis Plan — plandecriseconjoint.ch (CC BY-NC-SA)'), left, 1010, maxW, 26, 400);
 
   // QR code
   const box = 500;
@@ -147,7 +149,7 @@ export function renderCard(url, qr) {
 
   ctx.fillStyle = '#374445';
   ctx.textAlign = 'center';
-  fitText(ctx, 'Scannez pour ouvrir l’application', bx + box / 2, by + box + 90, W - panelX - 80, 38, 500);
+  fitText(ctx, tr('Scannez pour ouvrir l’application', 'Scan to open the app'), bx + box / 2, by + box + 90, W - panelX - 80, 38, 500);
   ctx.textAlign = 'left';
   return canvas;
 }
@@ -238,7 +240,7 @@ export async function buildSheetPdf(jpegBlob, header) {
   obj(4, `<< /Type /XObject /Subtype /Image /Width ${width} /Height ${height} /ColorSpace /DeviceRGB /BitsPerComponent 8 /Filter /DCTDecode /Length ${jpeg.length} >>`, jpeg);
   obj(5, '<< /Type /Font /Subtype /Type1 /BaseFont /Helvetica /Encoding /WinAnsiEncoding >>');
   obj(6, `<< /Length ${content.length} >>`, content);
-  obj(7, '<< /Title (Mon PCC - planche de cartes) /Producer (Mon PCC) >>');
+  obj(7, `<< /Title (${tr('Mon PCC - planche de cartes', 'Mon PCC - sheet of cards')}) /Producer (Mon PCC) >>`);
   const xref = len;
   let x = 'xref\n0 8\n0000000000 65535 f \n';
   for (let n = 1; n <= 7; n++) x += String(offsets[n]).padStart(10, '0') + ' 00000 n \n';

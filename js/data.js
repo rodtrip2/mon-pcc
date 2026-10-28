@@ -1,4 +1,7 @@
 import { STEPS_ADO, PROCESS_ADO, SOURCE_ADO, PRINT_TITLE_ADO, PRINT_SUBTITLE_ADO } from './data-ado.js';
+import { STEPS_ADULTE_EN, PROCESS_ADULTE_EN, SOURCE_ADULTE_EN, PRINT_TITLE_ADULTE_EN, PRINT_SUBTITLE_ADULTE_EN } from './data-en.js';
+import { STEPS_ADO_EN, PROCESS_ADO_EN, SOURCE_ADO_EN, PRINT_TITLE_ADO_EN, PRINT_SUBTITLE_ADO_EN } from './data-ado-en.js';
+import { LANG } from './i18n.js';
 /*
  * Mon PCC — trame et suggestions
  *
@@ -195,14 +198,8 @@ const STEPS_ADULTE = [
       { id: 'pros', label: '2. Mes professionnel·les habituel·les', contacts: true, suggestField: 'lien', suggestions: [
         'Infirmier·ère référent·e', 'Psychiatre', 'Médecin traitant', 'Psychologue', 'CMP de mon secteur', 'Pair-aidant·e',
       ] },
-      { id: 'garde', label: '3. Services et institutions de garde', suggestions: [
-        { nom: 'SAMU', lien: 'Urgence médicale (France)', tel: '15' },
-        { nom: 'Numéro d’urgence européen', lien: 'Toute urgence', tel: '112' },
-        { nom: '3114', lien: 'Numéro national de prévention du suicide, 24 h/24 (France)', tel: '3114' },
-        { nom: 'Urgences sourds et malentendants', lien: 'SMS ou visio (France)', tel: '114' },
-        { nom: 'Urgences psychiatriques', lien: 'Service de garde de mon secteur', tel: '' },
-        { nom: 'Médecin de garde', lien: 'Permanence des soins', tel: '' },
-      ] },
+      // Exemples tirés du pays choisi dans les Réglages (resources.js)
+      { id: 'garde', label: '3. Services et institutions de garde', countrySuggestions: true, suggestions: [] },
     ],
   },
   {
@@ -313,15 +310,22 @@ const STEPS_ADULTE = [
 const PRINT_TITLE_ADULTE = 'PLAN DE CRISE CONJOINT';
 const PRINT_SUBTITLE_ADULTE = 'Un partenariat entre moi et mon réseau de soutien — version adulte';
 
-/* ---------- choix de la version (adulte / ado) ----------
+/* ---------- choix de la version (adulte / ado) et de la langue ----------
  * Les exports ci-dessous sont des liaisons vivantes : après setVersion(),
- * tous les modules qui les importent voient la trame de la version choisie.
+ * tous les modules qui les importent voient la trame de la version et de la langue choisies.
  */
-export const VERSIONS = {
-  adulte: { label: 'Adulte', steps: STEPS_ADULTE, process: PROCESS_ADULTE, source: SOURCE_ADULTE, title: PRINT_TITLE_ADULTE, subtitle: PRINT_SUBTITLE_ADULTE },
-  ado: { label: 'Ado', steps: STEPS_ADO, process: PROCESS_ADO, source: SOURCE_ADO, title: PRINT_TITLE_ADO, subtitle: PRINT_SUBTITLE_ADO },
+const ALL = {
+  fr: {
+    adulte: { label: 'Adulte', steps: STEPS_ADULTE, process: PROCESS_ADULTE, source: SOURCE_ADULTE, title: PRINT_TITLE_ADULTE, subtitle: PRINT_SUBTITLE_ADULTE },
+    ado: { label: 'Ado', steps: STEPS_ADO, process: PROCESS_ADO, source: SOURCE_ADO, title: PRINT_TITLE_ADO, subtitle: PRINT_SUBTITLE_ADO },
+  },
+  en: {
+    adulte: { label: 'Adult', steps: STEPS_ADULTE_EN, process: PROCESS_ADULTE_EN, source: SOURCE_ADULTE_EN, title: PRINT_TITLE_ADULTE_EN, subtitle: PRINT_SUBTITLE_ADULTE_EN },
+    ado: { label: 'Teen', steps: STEPS_ADO_EN, process: PROCESS_ADO_EN, source: SOURCE_ADO_EN, title: PRINT_TITLE_ADO_EN, subtitle: PRINT_SUBTITLE_ADO_EN },
+  },
 };
 
+export let VERSIONS = ALL.fr;
 export let VERSION = 'adulte';
 export let STEPS = STEPS_ADULTE;
 export let PROCESS = PROCESS_ADULTE;
@@ -329,7 +333,9 @@ export let SOURCE = SOURCE_ADULTE;
 export let PRINT_TITLE = PRINT_TITLE_ADULTE;
 export let PRINT_SUBTITLE = PRINT_SUBTITLE_ADULTE;
 
+/** Applique la version (adulte / ado) dans la langue courante */
 export function setVersion(v) {
+  VERSIONS = ALL[LANG] || ALL.fr;
   const c = VERSIONS[v] || VERSIONS.adulte;
   VERSION = VERSIONS[v] ? v : 'adulte';
   STEPS = c.steps;
