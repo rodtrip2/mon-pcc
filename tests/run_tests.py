@@ -195,9 +195,7 @@ def changes_between_two_signatures(ctx, page, errors):
     seed(page, {'version': 'adulte', 'difficultes': ['Angoisse'],
                 'signature': {'signataires': [{'nom': 'Léa', 'sig': 'data:image/png;base64,iVBORw0KGgo=',
                                                'signedAt': '2026-10-21T10:00:00.000Z'}]}})
-    page.wait_for_timeout(500)
-    assert page.evaluate('JSON.parse(localStorage.getItem("monpcc.v1")).plan.data.versions.length') == 1, \
-        'un plan déjà signé doit avoir sa version dans l’historique'
+    page.wait_for_function('(JSON.parse(localStorage.getItem("monpcc.v1")).plan.data.versions || []).length === 1', timeout=5000)
     page.goto(BASE + '#/etape/2')
     page.fill('#free-_', 'Insomnie')
     page.click('form.free button')
@@ -244,10 +242,12 @@ def main():
                 if errors:
                     raise AssertionError('erreurs JavaScript : ' + '; '.join(errors))
                 print(f'✓ {fn.__name__}')
-            except Exception:
+            except Exception as exc:
                 failed += 1
                 print(f'✗ {fn.__name__}')
                 traceback.print_exc()
+                # Annotation lisible dans le résumé GitHub Actions
+                print(f'::error title={fn.__name__}::{type(exc).__name__}: {str(exc)[:300]}'.replace('\n', ' '))
             finally:
                 ctx.close()
         browser.close()
