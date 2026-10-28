@@ -302,6 +302,9 @@ def examples_follow_country(ctx, page, errors):
     ado = chips('GB', 'ado', 6)
     assert 'Childline (0800 1111)' in ado and 'Samaritans' in ado and '3114' not in ado and 'Maison des adolescents' not in ado
     assert '@' not in chips('INT', 'ado', 6)
+    qc = chips('QC', 'ado', 1)
+    assert 'DPJ' in qc and 'ASE' not in qc
+    assert 'Référent·e de l’aide sociale à l’enfance (ASE)' in chips('FR', 'ado', 1)
 
 
 def main():

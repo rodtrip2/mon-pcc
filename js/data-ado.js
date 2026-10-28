@@ -29,7 +29,7 @@ export const PRINT_SUBTITLE_ADO = 'Un partenariat entre moi et mon réseau de so
 // Adultes qui peuvent prendre soin de l'ado, quelle que soit sa situation de vie
 const ADULTES = [
   'Parent', 'Représentant·e légal·e', 'Famille d’accueil (assistant·e familial·e)',
-  'Éducateur·rice (foyer, lieu de vie)', 'Référent·e de l’aide sociale à l’enfance (ASE)',
+  'Éducateur·rice (foyer, lieu de vie)', '@aseRole',
   'Grand-parent ou autre membre de la famille', 'Adulte de confiance',
 ];
 
@@ -190,7 +190,7 @@ export const STEPS_ADO = [
     question: 'Quand ça ne va pas, qui devrait être informé ? Par qui ? Et comment ?',
     tip: 'Pour chaque personne, j’indique qui la prévient et comment (appel, message, en personne…). Je vérifie avec elle qu’elle est d’accord.',
     fields: [
-      { key: 'qui', label: 'Qui ?', placeholder: 'Ex. : ma référente ASE, Mme Diallo' },
+      { key: 'qui', label: 'Qui ?', placeholder: 'Ex. : @asePh' },
       { key: 'parQui', label: 'Par qui ?', placeholder: 'Ex. : moi, ou mon éducateur' },
       { key: 'comment', label: 'Comment ?', placeholder: 'Ex. : par téléphone au 06…', multiline: true },
     ],
@@ -218,7 +218,7 @@ export const STEPS_ADO = [
     suggestLabel: 'Ajouter un destinataire',
     suggestions: [
       'Les adultes qui prennent soin de moi', 'Mon infirmier·ère scolaire', 'Mon éducateur·rice ou mon lieu de vie',
-      'Mon ou ma référent·e ASE', 'Mon ou ma psychologue ou pédopsychiatre', 'Mon médecin traitant',
+      '@aseInform', 'Mon ou ma psychologue ou pédopsychiatre', 'Mon médecin traitant',
       'Un exemplaire chez moi, dans un endroit facile à trouver',
     ],
   },

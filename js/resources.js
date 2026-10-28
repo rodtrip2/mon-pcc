@@ -692,6 +692,9 @@ const LOCAL_DEFAULT = {
   adoPlaceAct: null,
   youthLineAct: null,
   suicideLineAct: null,
+  aseRole: 'Travailleur·se social·e de la protection de l’enfance',
+  aseInform: 'Mon ou ma travailleur·se social·e',
+  asePh: 'ma travailleuse sociale, Mme Diallo',
 };
 const LOCAL = {
   FR: {
@@ -699,21 +702,25 @@ const LOCAL = {
     adoCmpRole: 'Infirmier·ère du CMP', adoCmpAct: 'Je vais au CMP',
     adoPlaceRole: 'Professionnel·le de la Maison des adolescents', adoPlaceAct: 'Je contacte la Maison des adolescents',
     youthLineAct: 'J’appelle Fil Santé Jeunes (0 800 235 236)', suicideLineAct: 'J’appelle le 3114',
+    aseRole: 'Référent·e de l’aide sociale à l’enfance (ASE)', aseInform: 'Mon ou ma référent·e ASE', asePh: 'ma référente ASE, Mme Diallo',
   },
   BE: {
     cmpRole: 'Service de santé mentale (SSM) de ma région', cmpAct: 'Je me rends au service de santé mentale (SSM)',
     adoCmpRole: 'Professionnel·le du service de santé mentale', adoCmpAct: 'Je vais au service de santé mentale',
     youthLineAct: 'J’appelle Écoute-Enfants (103)', suicideLineAct: 'J’appelle le Centre de Prévention du Suicide (0800 32 123)',
+    aseRole: 'Délégué·e du SAJ ou du SPJ (aide à la jeunesse)', aseInform: 'Mon ou ma délégué·e du SAJ ou du SPJ', asePh: 'ma déléguée du SAJ, Mme Diallo',
   },
   CH: {
     cmpRole: 'Consultation psychiatrique ambulatoire de ma région', cmpAct: 'Je me rends à la consultation psychiatrique ambulatoire',
     adoCmpRole: 'Professionnel·le de la consultation de pédopsychiatrie', adoCmpAct: 'Je vais à la consultation de pédopsychiatrie',
     youthLineAct: 'J’appelle le 147 (Pro Juventute)', suicideLineAct: 'J’appelle La Main Tendue (143)',
+    aseRole: 'Assistant·e social·e de la protection de l’enfance', aseInform: 'Mon assistant·e social·e', asePh: 'mon assistante sociale, Mme Diallo',
   },
   QC: {
     cmpRole: 'CLSC de mon secteur', cmpAct: 'Je me rends à mon CLSC',
     adoCmpRole: 'Intervenant·e du CLSC', adoCmpAct: 'Je vais au CLSC',
     youthLineAct: 'J’appelle Tel-jeunes (1 800 263-2266)', suicideLineAct: 'J’appelle la ligne de prévention du suicide (1 866 277-3553)',
+    aseRole: 'Intervenant·e de la DPJ (protection de la jeunesse)', aseInform: 'Mon intervenant·e de la DPJ', asePh: 'mon intervenante de la DPJ, Mme Diallo',
   },
   CA: { youthLineAct: 'J’appelle Jeunesse, J’écoute (1-800-668-6868)', suicideLineAct: 'J’appelle le 9-8-8' },
   GB: {
