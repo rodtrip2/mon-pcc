@@ -5,7 +5,7 @@ import * as store from './storage.js';
 import * as media from './media.js';
 import { appUrl, displayUrl, makeQr, qrSvg, renderCard, canvasToJpeg, buildSheetPdf } from './share.js';
 import {
-  esc, fmtDate, addMonths, stepIsFilled, progress, documentHTML, planText,
+  esc, fmtDate, addMonths, stepIsFilled, stepContent, progress, documentHTML, planText,
   fileBaseName, sigValid, lastUpdate, fmtDateTime,
 } from './export.js';
 import { buildPlanPdf } from './planpdf.js';
@@ -182,6 +182,7 @@ function route() {
     case 'ressources': renderResources(); break;
     case 'boite-outils': renderToolbox(arg === 'etape'); break;
     case 'crise': renderCrisis(); break;
+    case 'versions': renderVersions(arg); break;
     case 'apropos': renderAbout(); break;
     case 'confidentialite': renderPrivacy(); break;
     default: renderHome();
@@ -455,7 +456,7 @@ function finalHTML(step) {
       <button type="button" class="btn btn-ghost btn-sm" data-act="today">${tr('Mettre la date du jour', 'Use today’s date')}</button>
       ${v.date ? `<p class="small field-wide">${tr('Relecture conseillée le', 'Suggested review on')} <strong>${fmtDate(addMonths(v.date, 6))}</strong> · <button type="button" class="link small" data-act="review-ics">📅 ${tr('Ajouter un rappel à mon agenda', 'Add a reminder to my calendar')}</button></p>` : ''}
     </section>
-    ${modifiedAfterSigning() ? `<div class="warn" role="status"><strong>${tr(`Le plan a été modifié le ${esc(fmtDateTime(lastUpdate(plan)))}, après certaines signatures.`, `The plan was changed on ${esc(fmtDateTime(lastUpdate(plan)))}, after some signatures.`)}</strong> ${tr('Ces signatures ne figurent plus sur l’impression ni sur le PDF : relisez le plan ensemble puis signez à nouveau.', 'These signatures no longer appear on the printout or the PDF: read the plan through together, then sign again.')}</div>` : ''}
+    ${modifiedAfterSigning() ? `<div class="warn" role="status"><strong>${tr(`Le plan a été modifié le ${esc(fmtDateTime(lastUpdate(plan)))}, après certaines signatures.`, `The plan was changed on ${esc(fmtDateTime(lastUpdate(plan)))}, after some signatures.`)}</strong> ${tr('Ces signatures ne figurent plus sur l’impression ni sur le PDF : relisez le plan ensemble puis signez à nouveau.', 'These signatures no longer appear on the printout or the PDF: read the plan through together, then sign again.')}${(plan.data.versions || []).length ? ` <a href="#/versions">${tr('Voir ce qui a changé', 'See what changed')}</a>` : ''}</div>` : ''}
     <section class="group card">
       <h2>${tr('Signataires', 'Signatories')}</h2>
       <p class="muted small">${tr('Chacun·e peut signer avec le doigt directement sur ce téléphone, ou à la main sur le document imprimé.', 'Everyone can sign with a finger directly on this phone, or by hand on the printed copy.')}</p>
@@ -1684,7 +1685,8 @@ function renderPlan() {
   app.innerHTML = `
     <h1>${tr('Mon plan', 'My plan')}</h1>
     ${refused && !alt ? `<div class="warn" role="status"><strong>${tr('À compléter :', 'To complete:')}</strong> ${tr('j’ai indiqué des soins à éviter sans proposer d’alternative.', 'I have listed care to avoid without suggesting an alternative.')} <a href="#/etape/${STEPS.findIndex((s) => s.id === 'alternatives')}">${tr('Compléter les alternatives', 'Add alternatives')}</a></div>` : ''}
-    ${modifiedAfterSigning() ? `<div class="warn no-print" role="status"><strong>${tr('Le plan a été modifié après certaines signatures', 'The plan was changed after some signatures')}</strong>${tr(' : elles ne figurent plus sur l’impression ni sur le PDF.', ': they no longer appear on the printout or the PDF.')} <a href="#/etape/${STEPS.length - 1}">${tr('Signer à nouveau', 'Sign again')}</a></div>` : ''}
+    ${modifiedAfterSigning() ? `<div class="warn no-print" role="status"><strong>${tr('Le plan a été modifié après certaines signatures', 'The plan was changed after some signatures')}</strong>${tr(' : elles ne figurent plus sur l’impression ni sur le PDF.', ': they no longer appear on the printout or the PDF.')} <a href="#/etape/${STEPS.length - 1}">${tr('Signer à nouveau', 'Sign again')}</a>${(plan.data.versions || []).length ? ` · <a href="#/versions">${tr('Voir ce qui a changé', 'See what changed')}</a>` : ''}</div>` : ''}
+    ${(plan.data.versions || []).length ? `<p class="no-print small"><a href="#/versions">🔄 ${tr('Versions signées et changements', 'Signed versions and changes')} (${plan.data.versions.length})</a></p>` : ''}
     <section class="card actions no-print">
       <h2>${tr('Imprimer, enregistrer, envoyer', 'Print, save, send')}</h2>
       <p class="muted">${tr('Rien ne part sans mon accord. Je choisis à qui j’envoie mon plan et par quel moyen.', 'Nothing is sent without my consent. I choose who I send my plan to, and how.')}</p>
@@ -1822,6 +1824,86 @@ async function reviewIcs() {
   }
   download(file, file.name);
   toast(tr('Fichier d’agenda téléchargé : je l’ouvre pour ajouter le rappel.', 'Calendar file downloaded: I open it to add the reminder.'));
+}
+
+/* ---------- versions signées et changements ---------- */
+
+/** Contenu du plan sans les signatures dessinées ni les fichiers (pour l'archive) */
+function contentData(d) {
+  const { signature, carte, versions, dossiers, masquerNoteMineur, boiteOutils, ...rest } = d;
+  const copy = JSON.parse(JSON.stringify(rest));
+  copy.boiteOutils = (boiteOutils || []).map(({ kind, title, text, author, url, ex, photos }) => ({ kind, title, text, author, url, ex, photos: photos ? photos.map(() => ({})) : undefined }));
+  copy.signature = { lieu: signature?.lieu || '', date: signature?.date || '' };
+  return copy;
+}
+
+/** À chaque signature : garde la version signée (10 au plus) */
+function archiveSigned() {
+  const d = plan.data;
+  const snap = contentData(d);
+  const signers = (d.signature?.signataires || []).filter((r) => sigValid(r, plan)).map((r) => ({ nom: r.nom || '', role: r.role || '', at: r.signedAt }));
+  const vs = (d.versions ??= []);
+  const last = vs[vs.length - 1];
+  const same = last && JSON.stringify({ ...last.data, signature: null }) === JSON.stringify({ ...snap, signature: null });
+  if (same) { last.signers = signers; last.data = snap; return; }
+  vs.push({ at: new Date().toISOString(), signers, data: snap });
+  if (vs.length > 10) vs.shift();
+}
+
+/** Lignes du plan par étape, pour comparer deux versions */
+function linesByStep(data) {
+  return STEPS.filter((st) => st.type !== 'final').map((st) => ({
+    st,
+    lines: stepContent(st, data).filter((b) => !b.signatures).flatMap((b) => b.lines.map((l) => (b.label ? `${b.label} › ${l}` : l))),
+  }));
+}
+
+function changesHTML(oldData, newData) {
+  const before = linesByStep(oldData);
+  const after = linesByStep(newData);
+  const rows = after.map(({ st, lines }, k) => {
+    const old = before[k].lines;
+    const added = lines.filter((l) => !old.includes(l));
+    const removed = old.filter((l) => !lines.includes(l));
+    if (!added.length && !removed.length) return '';
+    return `<li><strong>${esc(st.title)}</strong><ul class="diff">
+      ${removed.map((l) => `<li class="diff-del"><span aria-hidden="true">−</span> <span class="sr-only">${tr('retiré :', 'removed:')}</span> ${esc(l)}</li>`).join('')}
+      ${added.map((l) => `<li class="diff-add"><span aria-hidden="true">+</span> <span class="sr-only">${tr('ajouté :', 'added:')}</span> ${esc(l)}</li>`).join('')}
+    </ul></li>`;
+  }).filter(Boolean);
+  return rows.length ? `<ul class="diff-steps">${rows.join('')}</ul>` : `<p class="muted">${tr('Aucun changement dans le contenu.', 'No change in the content.')}</p>`;
+}
+
+const signersText = (v) => (v.signers || []).map((r) => [r.nom, r.role].filter(Boolean).join(', ')).filter(Boolean).join(' ; ');
+
+function renderVersions(arg) {
+  const vs = plan.data.versions || [];
+  if (arg !== undefined && arg !== '' && vs[+arg]) {
+    const v = vs[+arg];
+    const doc = { data: { ...v.data, signature: { ...v.data.signature, signataires: (v.signers || []).map((r) => ({ nom: r.nom, role: r.role })) } }, contentUpdated: v.at, updated: v.at };
+    app.innerHTML = `
+      <h1>${tr('Version signée', 'Signed version')}</h1>
+      <p class="lead">${tr(`Signée sur écran le ${esc(fmtDateTime(v.at))}`, `Signed on screen on ${esc(fmtDateTime(v.at))}`)}${signersText(v) ? ` ${tr('par', 'by')} ${esc(signersText(v))}` : ''}.</p>
+      <p class="muted small">${tr('Les signatures dessinées ne sont pas conservées dans l’historique.', 'Drawn signatures are not kept in the history.')}</p>
+      <article class="doc">${documentHTML(doc)}</article>
+      <div class="nav-bottom no-print"><a class="btn btn-ghost" href="#/versions">${tr('← Versions', '← Versions')}</a></div>`;
+    return;
+  }
+  const last = vs[vs.length - 1];
+  app.innerHTML = `
+    <h1>🔄 ${tr('Versions signées', 'Signed versions')}</h1>
+    <p class="lead">${tr('À chaque signature, Mon PCC garde une copie du plan sur ce téléphone. Cela aide à relire ensemble ce qui a changé avant de signer à nouveau.', 'Each time the plan is signed, Mon PCC keeps a copy on this phone. This helps you review together what has changed before signing again.')}</p>
+    ${last ? `<section class="card">
+      <h2>${tr('Changements depuis la dernière version signée', 'Changes since the last signed version')}</h2>
+      <p class="muted small">${tr(`Version du ${esc(fmtDateTime(last.at))}`, `Version of ${esc(fmtDateTime(last.at))}`)}${signersText(last) ? ` · ${esc(signersText(last))}` : ''}</p>
+      ${changesHTML(last.data, contentData(plan.data))}
+    </section>
+    <section class="card">
+      <h2>${tr('Toutes les versions', 'All versions')}</h2>
+      <ol class="versions">${vs.map((v, k) => `<li><a href="#/versions/${k}">${esc(fmtDateTime(v.at))}</a>${signersText(v) ? ` <span class="muted small">— ${esc(signersText(v))}</span>` : ''}</li>`).reverse().join('')}</ol>
+      <p class="muted small">${tr('Les 10 dernières versions sont gardées.', 'The last 10 versions are kept.')}</p>
+    </section>` : `<p class="card muted">${tr('Aucune version signée pour l’instant.', 'No signed version yet.')}</p>`}
+    <div class="nav-bottom"><a class="btn btn-ghost" href="#/plan">${tr('← Mon plan', '← My plan')}</a></div>`;
 }
 
 /* ---------- PDF du plan (enregistrer / envoyer), protégé par code ---------- */
@@ -2737,7 +2819,7 @@ document.addEventListener('click', async (e) => {
       const r = getArr(step)[i];
       const who = [r.nom, r.role].filter(Boolean).join(' — ') || tr('Signataire', 'Signatory');
       const img = await signaturePad(who);
-      if (img) { r.sig = img; r.signedAt = new Date().toISOString(); scheduleSave(false); rerender(() => renderStep(STEPS.indexOf(step))); toast(tr('Signature enregistrée.', 'Signature saved.')); }
+      if (img) { r.sig = img; r.signedAt = new Date().toISOString(); archiveSigned(); scheduleSave(false); rerender(() => renderStep(STEPS.indexOf(step))); toast(tr('Signature enregistrée.', 'Signature saved.')); }
       break;
     }
     case 'unsign': {

@@ -511,3 +511,11 @@ body.no-scroll { overflow: hidden; }
 .cp-who { display: flex; flex-direction: column; }
 .crisis-tb { margin: 1rem 0; }
 .crisis-open { margin-top: 1rem; padding-top: .8rem; border-top: 1px solid var(--line); }
+.diff-steps { margin: 0; padding-left: 1.1rem; }
+.diff-steps > li { margin: .5rem 0; }
+.diff { list-style: none; margin: .2rem 0 0; padding: 0; }
+.diff li { padding: .2rem .4rem; border-radius: 6px; margin: .15rem 0; }
+.diff-add { background: #e3f3e6; color: #1f5130; }
+.diff-del { background: #fbe7e4; color: #7a2a1f; text-decoration: line-through; }
+@media (prefers-color-scheme: dark) { .diff-add { background: #1f3a27; color: #cfe9d6; } .diff-del { background: #3e2420; color: #f2cdc6; } }
+.versions li { margin: .3rem 0; }
