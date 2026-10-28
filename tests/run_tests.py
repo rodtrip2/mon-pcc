@@ -180,6 +180,30 @@ def toolbox_dialogs(ctx, page, errors):
 
 
 @test
+def album_with_photos_and_videos(ctx, page, errors):
+    png = bytes.fromhex('89504e470d0a1a0a0000000d4948445200000001000000010806000000'
+                        '1f15c4890000000d49444154789c6360000002000154a24f5d0000000049454e44ae426082')
+    page.goto(BASE)
+    page.click('[data-act=start][data-v=adulte]')
+    page.goto(BASE + '#/boite-outils')
+    page.set_input_files('[data-act=tb-album-new]', files=[
+        {'name': 'a.png', 'mimeType': 'image/png', 'buffer': png},
+        {'name': 'b.webm', 'mimeType': 'video/webm', 'buffer': b'\x1a\x45\xdf\xa3' + b'\0' * 64}])
+    wait_until(page, '(JSON.parse(localStorage.getItem("monpcc.v1") || "{}").plan?.data.boiteOutils || []).length === 1')
+    album = page.evaluate('JSON.parse(localStorage.getItem("monpcc.v1")).plan.data.boiteOutils[0]')
+    assert album['kind'] == 'album' and [bool(p.get('video')) for p in album['photos']] == [False, True], album
+    assert page.locator('.album-ed-th video').count() == 1, 'vidéo visible en mode modification'
+    page.click('.edit-float')
+    assert page.locator('.album-th video').count() == 1 and page.locator('.album-play').count() == 1
+    assert '1 photo, 1 vidéo' in page.inner_text('.tbv-album')
+    page.click('.album-th >> nth=1')
+    assert page.locator('#lightbox .lb-stage video').count() == 1
+    page.click('[data-lb=next]')
+    assert page.locator('#lightbox .lb-stage img').count() == 1
+    page.click('[data-lb=close]')
+
+
+@test
 def signed_versions(ctx, page, errors):
     seed(page, {'version': 'adulte', 'difficultes': ['Angoisse'],
                 'signature': {'signataires': [{'nom': 'Léa', 'role': 'Usagère'}]}})

@@ -51,6 +51,7 @@ Mon PCC est une application web installable (PWA), gratuite et sans serveur, qui
 - **À chaque mise à jour, incrémenter `CACHE` dans `sw.js`**, et ajouter tout nouveau fichier à `FILES`.
 - Mode compact / mode modification : l'ensemble `editing` dans `app.js` contient les listes en cours de modification. On y entre par l'icône ✏️ et on en sort par le bouton flottant « ✓ Terminé ».
 - Dans la boîte à outils, chaque type d'ajout a son bouton dans la grille « Ajouter ». Les ajouts qui demandent une saisie (lien, citation) ouvrent une fenêtre.
+- Les albums mêlent photos et vidéos : chaque élément de `photos` vaut `{ file }` ou `{ file, video: true }`. Toute fonction qui touche aux albums doit gérer les deux.
 - La règle globale `[hidden]{display:none!important}` est nécessaire parce que `.btn` impose un `display`.
 - Fenêtres (`modal()`) : formulaire `method="dialog"`. Ne pas mettre `required` sur les champs, sinon « Annuler » est bloqué. On valide plutôt au clic sur OK.
 - **Limites connues des navigateurs :**

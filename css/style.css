@@ -304,6 +304,9 @@ body.has-edit-float .toast { bottom: calc(9rem + env(safe-area-inset-bottom)); }
 .size-s .album-grid { grid-template-columns: 1fr 1fr; }
 .album-th { position: relative; padding: 0; border: 0; background: #000; cursor: zoom-in; aspect-ratio: 1; overflow: hidden; }
 .album-th img { width: 100%; height: 100%; object-fit: cover; display: block; }
+.album-th video, .album-ed-th video, .album-pick-th video { width: 100%; height: 100%; object-fit: cover; display: block; pointer-events: none; }
+.album-play { position: absolute; left: 50%; top: 50%; transform: translate(-50%, -50%); width: 2.4rem; height: 2.4rem; border-radius: 50%; background: rgba(0,0,0,.55); color: #fff; display: grid; place-items: center; font-size: 1rem; padding-left: .15rem; pointer-events: none; }
+.album-pick-th video { opacity: .75; }
 .album-more { position: absolute; inset: 0; background: rgba(0,0,0,.55); color: #fff; display: grid; place-items: center; font-size: 1.4rem; font-weight: 700; }
 .tb-folder { background: var(--card); border: 1px solid var(--line); border-radius: 14px; margin-bottom: .7rem; box-shadow: var(--shadow); }
 .tb-folder > summary { list-style: none; display: flex; align-items: center; gap: .6rem; padding: .75rem .9rem; cursor: pointer; font-weight: 700; min-height: 52px; }
@@ -339,6 +342,7 @@ body.has-edit-float .toast { bottom: calc(9rem + env(safe-area-inset-bottom)); }
 .lb-count { font-size: .9rem; opacity: .8; min-width: 3.5rem; }
 .lb-stage { flex: 1; display: grid; place-items: center; min-height: 0; padding: .5rem; }
 .lb-stage img { max-width: 100%; max-height: 100%; object-fit: contain; user-select: none; -webkit-user-drag: none; }
+.lb-stage video { max-width: 100%; max-height: 100%; background: #000; }
 .lb-btn { border: 0; background: rgba(255,255,255,.14); color: #fff; width: 48px; height: 48px; border-radius: 50%; font-size: 1.5rem; cursor: pointer; }
 .lb-prev, .lb-next { position: absolute; top: 50%; transform: translateY(-50%); }
 .lb-prev { left: .6rem; } .lb-next { right: .6rem; }
@@ -551,3 +555,4 @@ html[data-text="xl"] .save-state { display: none; }
 .talk-bar .btn { background: #fff; color: var(--brand-ink); border-color: #fff; font-size: 14px; min-height: 34px; padding: 4px 12px; }
 body.has-talk-bar { padding-top: 48px; }
 body.has-talk-bar .topbar { top: 48px; }
+.album-pick-th .album-play { display: none; }

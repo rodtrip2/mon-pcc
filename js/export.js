@@ -84,7 +84,7 @@ export function stepContent(step, data, plan = null) {
     const tb = (data.boiteOutils || []).filter((it) => it && (it.title || it.url || it.file || it.ex || (it.photos || []).length || (it.text || '').trim()));
     const names = {
       photo: tr('photo', 'photo'), video: tr('vidéo', 'video'), audio: tr('son', 'audio'), voix: tr('message vocal', 'voice message'),
-      lien: tr('lien', 'link'), citation: tr('citation', 'quote'), album: tr('album photo', 'photo album'), exercice: tr('exercice de Ma boussole bien-être', 'Ma boussole bien-être exercise'),
+      lien: tr('lien', 'link'), citation: tr('citation', 'quote'), album: tr('album', 'album'), exercice: tr('exercice de Ma boussole bien-être', 'Ma boussole bien-être exercise'),
     };
     if (tb.length) {
       out.push({
@@ -94,7 +94,11 @@ export function stepContent(step, data, plan = null) {
           const n = (it.photos || []).length;
           if (it.kind === 'citation') return tr(`« ${it.text.trim()} »`, `“${it.text.trim()}”`) + (it.author ? ' — ' + it.author : '');
           if (it.kind === 'exercice') return `${exerciseById(it.ex)?.name || tr('Exercice', 'Exercise')} (${tr('exercice de Ma boussole bien-être', 'Ma boussole bien-être exercise')})`;
-          if (it.kind === 'album') return `${it.title ? it.title + ' ' : ''}(${tr('album', 'album')}, ${n} photo${n > 1 ? 's' : ''})`;
+          if (it.kind === 'album') {
+            const v = (it.photos || []).filter((p) => p.video).length; const ph = n - v;
+            const parts = [ph ? `${ph} photo${ph > 1 ? 's' : ''}` : '', v ? tr(`${v} vidéo${v > 1 ? 's' : ''}`, `${v} video${v > 1 ? 's' : ''}`) : ''].filter(Boolean);
+            return `${it.title ? it.title + ' ' : ''}(${tr('album', 'album')}, ${parts.join(', ') || '0 photo'})`;
+          }
           return (it.title ? it.title + ' ' : '') + '(' + names[it.kind] + ')' + (it.kind === 'lien' ? tr(' : ', ': ') + it.url : '');
         }),
       });

@@ -653,7 +653,7 @@ const KINDS = {
   voix: { icon: '🎙', label: () => tr('Message vocal', 'Voice message') },
   lien: { icon: '🔗', label: () => tr('Lien', 'Link') },
   citation: { icon: '❝', label: () => tr('Citation', 'Quote') },
-  album: { icon: '🖼', label: () => tr('Album photo', 'Photo album') },
+  album: { icon: '🖼', label: () => tr('Album', 'Album') },
   exercice: { icon: '🧘', label: () => tr('Exercice', 'Exercise') },
 };
 const SIZES = () => [['s', tr('Petit', 'Small')], ['m', tr('Moyen', 'Medium')], ['l', tr('Grand', 'Large')]];
@@ -694,6 +694,20 @@ const QUOTES_ALL = [
 ];
 const quotes = () => QUOTES_ALL.map((q) => q[LANG] || q.fr);
 
+/** « 3 photos, 1 vidéo » */
+function albumCount(list = []) {
+  const v = list.filter((p) => p.video).length;
+  const ph = list.length - v;
+  const parts = [];
+  if (ph) parts.push(`${ph} photo${ph > 1 ? 's' : ''}`);
+  if (v) parts.push(tr(`${v} vidéo${v > 1 ? 's' : ''}`, `${v} video${v > 1 ? 's' : ''}`));
+  return parts.join(', ') || '0 photo';
+}
+/** Vignette d'un élément d'album (photo ou vidéo) */
+const albumThumb = (p) => p.video
+  ? `<video data-media="${esc(p.file)}" data-thumb muted playsinline preload="metadata"></video><span class="album-play" aria-hidden="true">▶</span>`
+  : `<img data-media="${esc(p.file)}" alt="">`;
+
 /** Libellé court d'un élément de la boîte à outils */
 function tbLabel(it) {
   if (it.kind === 'citation') {
@@ -701,7 +715,7 @@ function tbLabel(it) {
     return t ? tr('« ', '“') + (t.length > 40 ? t.slice(0, 38) + '…' : t) + tr(' »', '”') : tr('Citation', 'Quote');
   }
   if (it.kind === 'exercice') return exerciseById(it.ex)?.name || tr('Exercice', 'Exercise');
-  if (it.kind === 'album') { const n = (it.photos || []).length; return it.title || `${tr('Album', 'Album')} (${n} photo${n > 1 ? 's' : ''})`; }
+  if (it.kind === 'album') return it.title || `${tr('Album', 'Album')} (${albumCount(it.photos)})`;
   return it.title || KINDS[it.kind].label();
 }
 const mediaURLs = new Map(); // id -> URL d'affichage (session)
@@ -761,7 +775,7 @@ function renderToolbox(fromStep) {
       <h2>${tr('Ajouter', 'Add')}</h2>
       <div class="tb-add-grid">
         ${['photo', 'video', 'audio'].map((k) => `<label class="btn btn-secondary tb-add-btn"><span aria-hidden="true">${KINDS[k].icon}</span> ${KINDS[k].label()}<input type="file" accept="${KINDS[k].accept}" data-act="tb-file" data-kind="${k}" hidden></label>`).join('')}
-        <label class="btn btn-secondary tb-add-btn"><span aria-hidden="true">🖼</span> ${tr('Album photo', 'Photo album')}<input type="file" accept="image/*" multiple data-act="tb-album-new" hidden></label>
+        <label class="btn btn-secondary tb-add-btn"><span aria-hidden="true">🖼</span> ${tr('Album', 'Album')}<input type="file" accept="image/*,video/*" multiple data-act="tb-album-new" hidden></label>
         <button type="button" class="btn btn-secondary tb-add-btn" data-act="tb-link-new"><span aria-hidden="true">🔗</span> ${tr('Lien', 'Link')}</button>
         <button type="button" class="btn btn-secondary tb-add-btn" data-act="tb-quote-new"><span aria-hidden="true">❝</span> ${tr('Citation', 'Quote')}</button>
         <button type="button" class="btn btn-secondary tb-add-btn" data-act="tb-exercises"><span aria-hidden="true">🧘</span> ${tr('Exercice', 'Exercise')}</button>
@@ -821,8 +835,8 @@ function toolboxViewHTML(it, idx) {
     const max = it.size === 's' ? 4 : 6;
     return `<div class="tbv tbv-album">
       <p class="tbv-title">🖼 ${esc(tbLabel(it))}</p>
-      <div class="album-grid n${Math.min(ph.length, max)}">${ph.slice(0, max).map((p, k) => `<button type="button" class="album-th" data-act="lightbox" data-i="${idx}" data-k="${k}" aria-label="${tr(`Voir la photo ${k + 1} sur ${ph.length}`, `View photo ${k + 1} of ${ph.length}`)}">
-        <img data-media="${esc(p.file)}" alt="">${k === max - 1 && ph.length > max ? `<span class="album-more">+${ph.length - max}</span>` : ''}</button>`).join('')}</div>
+      <div class="album-grid n${Math.min(ph.length, max)}">${ph.slice(0, max).map((p, k) => `<button type="button" class="album-th" data-act="lightbox" data-i="${idx}" data-k="${k}" aria-label="${p.video ? tr(`Voir la vidéo ${k + 1} sur ${ph.length}`, `View video ${k + 1} of ${ph.length}`) : tr(`Voir la photo ${k + 1} sur ${ph.length}`, `View photo ${k + 1} of ${ph.length}`)}">
+        ${albumThumb(p)}${k === max - 1 && ph.length > max ? `<span class="album-more">+${ph.length - max}</span>` : ''}</button>`).join('')}</div>
     </div>`;
   }
   if (it.kind === 'photo') {
@@ -876,16 +890,17 @@ function toolboxItemHTML(it, idx, n) {
   const k = KINDS[it.kind];
   let body = '';
   if (it.kind === 'album') {
-    const others = toolbox().map((x, j) => [x, j]).filter(([x]) => x.kind === 'photo');
-    body = `<div class="album-edit">${(it.photos || []).map((p, j) => `<div class="album-ed-th"><img data-media="${esc(p.file)}" alt="">
-        <button type="button" class="chip-x" data-act="album-out" data-i="${idx}" data-k="${j}" aria-label="${tr('Sortir cette photo de l’album', 'Take this photo out of the album')}">⤴</button>
-        <button type="button" class="chip-x danger" data-act="album-del" data-i="${idx}" data-k="${j}" aria-label="${tr('Supprimer cette photo', 'Delete this photo')}">✕</button></div>`).join('')}</div>
-      <label class="btn btn-secondary btn-sm file-btn">＋ ${tr('Ajouter des photos', 'Add photos')}<input type="file" accept="image/*" multiple data-act="album-add" data-i="${idx}" hidden></label>
-      ${others.length ? `<p class="muted small">${tr('Ou y ranger une photo déjà dans ma boîte :', 'Or move in a photo already in my toolbox:')}</p><div class="album-pick">${others.map(([x, j]) => `<button type="button" class="album-pick-th" data-act="album-take" data-i="${idx}" data-j="${j}" aria-label="${tr(`Ajouter ${esc(x.title || 'cette photo')} à l’album`, `Add ${esc(x.title || 'this photo')} to the album`)}"><img data-media="${esc(x.file)}" alt=""><span>＋</span></button>`).join('')}</div>` : ''}`;
+    const others = toolbox().map((x, j) => [x, j]).filter(([x]) => x.kind === 'photo' || x.kind === 'video');
+    body = `<div class="album-edit">${(it.photos || []).map((p, j) => `<div class="album-ed-th">${albumThumb(p)}
+        <button type="button" class="chip-x" data-act="album-out" data-i="${idx}" data-k="${j}" aria-label="${p.video ? tr('Sortir cette vidéo de l’album', 'Take this video out of the album') : tr('Sortir cette photo de l’album', 'Take this photo out of the album')}">⤴</button>
+        <button type="button" class="chip-x danger" data-act="album-del" data-i="${idx}" data-k="${j}" aria-label="${p.video ? tr('Supprimer cette vidéo', 'Delete this video') : tr('Supprimer cette photo', 'Delete this photo')}">✕</button></div>`).join('')}</div>
+      <label class="btn btn-secondary btn-sm file-btn">＋ ${tr('Ajouter des photos ou vidéos', 'Add photos or videos')}<input type="file" accept="image/*,video/*" multiple data-act="album-add" data-i="${idx}" hidden></label>
+      ${others.length ? `<p class="muted small">${tr('Ou y ranger une photo ou une vidéo déjà dans ma boîte :', 'Or move in a photo or video already in my toolbox:')}</p><div class="album-pick">${others.map(([x, j]) => `<button type="button" class="album-pick-th" data-act="album-take" data-i="${idx}" data-j="${j}" aria-label="${tr(`Ajouter ${esc(x.title || (x.kind === 'video' ? 'cette vidéo' : 'cette photo'))} à l’album`, `Add ${esc(x.title || (x.kind === 'video' ? 'this video' : 'this photo'))} to the album`)}">${albumThumb({ file: x.file, video: x.kind === 'video' })}<span>＋</span></button>`).join('')}</div>` : ''}`;
   }
   if (it.kind === 'photo') body = `<img class="tb-media" data-media="${esc(it.file)}" alt="${esc(it.title || 'Photo')}">
     <button type="button" class="btn btn-ghost btn-sm" data-act="album-from" data-i="${idx}">🖼 ${tr('Créer un album avec cette photo', 'Make an album with this photo')}</button>`;
-  else if (it.kind === 'video') body = `<video class="tb-media" data-media="${esc(it.file)}" controls playsinline preload="metadata"></video>`;
+  else if (it.kind === 'video') body = `<video class="tb-media" data-media="${esc(it.file)}" controls playsinline preload="metadata"></video>
+    <button type="button" class="btn btn-ghost btn-sm" data-act="album-from" data-i="${idx}">🖼 ${tr('Créer un album avec cette vidéo', 'Make an album with this video')}</button>`;
   else if (it.kind === 'audio' || it.kind === 'voix') body = `<audio class="tb-audio" data-media="${esc(it.file)}" controls preload="metadata"></audio>`;
   else if (it.kind === 'lien') {
     let host = '';
@@ -943,7 +958,7 @@ async function fillMedia() {
         if (!blob) { el.replaceWith(Object.assign(document.createElement('p'), { className: 'muted small', textContent: tr('Fichier introuvable sur ce téléphone.', 'File not found on this phone.') })); continue; }
         mediaURLs.set(id, URL.createObjectURL(blob));
       }
-      el.src = mediaURLs.get(id);
+      el.src = mediaURLs.get(id) + ('thumb' in el.dataset ? '#t=0.1' : '');
     } catch {
       el.replaceWith(Object.assign(document.createElement('p'), { className: 'muted small', textContent: tr('Impossible d’afficher ce fichier.', 'This file cannot be displayed.') }));
     }
@@ -1058,8 +1073,9 @@ async function newFolder() {
 async function putFiles(files) {
   const out = [];
   for (const f of files) {
-    if (f.size > media.MAX_BYTES) { toast(tr('Une photo est trop volumineuse (150 Mo maximum).', 'A photo is too large (150 MB maximum).')); continue; }
-    out.push({ file: await media.put(f) });
+    if (f.size > media.MAX_BYTES) { toast(tr('Un fichier est trop volumineux (150 Mo maximum).', 'A file is too large (150 MB maximum).')); continue; }
+    const video = f.type.startsWith('video/');
+    out.push(video ? { file: await media.put(f), video: true } : { file: await media.put(f) });
   }
   return out;
 }
@@ -1193,11 +1209,11 @@ async function showLightbox() {
   lb.k = (lb.k + ph.length) % ph.length;
   el.innerHTML = `<div class="lb-top"><span class="lb-count">${ph.length > 1 ? `${lb.k + 1} / ${ph.length}` : ''}</span><span class="lb-title">${esc(it.title || '')}</span>
     <button type="button" class="lb-btn" data-lb="close" aria-label="${tr('Fermer', 'Close')}">✕</button></div>
-    <div class="lb-stage"><img alt="${esc(it.title || 'Photo')}" data-media="${esc(ph[lb.k].file)}"></div>
-    ${ph.length > 1 ? `<button type="button" class="lb-btn lb-prev" data-lb="prev" aria-label="${tr('Photo précédente', 'Previous photo')}">‹</button><button type="button" class="lb-btn lb-next" data-lb="next" aria-label="${tr('Photo suivante', 'Next photo')}">›</button>` : ''}`;
+    <div class="lb-stage">${ph[lb.k].video ? `<video controls playsinline autoplay data-media="${esc(ph[lb.k].file)}"></video>` : `<img alt="${esc(it.title || 'Photo')}" data-media="${esc(ph[lb.k].file)}">`}</div>
+    ${ph.length > 1 ? `<button type="button" class="lb-btn lb-prev" data-lb="prev" aria-label="${tr('Précédent', 'Previous')}">‹</button><button type="button" class="lb-btn lb-next" data-lb="next" aria-label="${tr('Suivant', 'Next')}">›</button>` : ''}`;
   el.hidden = false;
   document.body.classList.add('no-scroll');
-  const img = el.querySelector('img');
+  const img = el.querySelector('.lb-stage [data-media]');
   const id = img.dataset.media;
   try {
     if (!mediaURLs.has(id)) { const b = await media.get(id); if (b) mediaURLs.set(id, URL.createObjectURL(b)); }
@@ -1207,6 +1223,7 @@ async function showLightbox() {
 }
 function closeLightbox() {
   $('#lightbox').hidden = true;
+  $('#lightbox').innerHTML = ''; // arrête une vidéo en cours
   document.body.classList.remove('no-scroll');
   lb = null;
 }
@@ -1221,7 +1238,7 @@ function closeLightbox() {
     else if (e.target.classList.contains('lb-stage')) closeLightbox();
   });
   let x0 = null;
-  el.addEventListener('pointerdown', (e) => { x0 = e.clientX; });
+  el.addEventListener('pointerdown', (e) => { x0 = e.target.closest('video') ? null : e.clientX; }); // pas de balayage sur les commandes d'une vidéo
   el.addEventListener('pointerup', (e) => {
     if (x0 === null || !lb) return;
     const dx = e.clientX - x0; x0 = null;
@@ -2837,10 +2854,11 @@ app.addEventListener('change', async (e) => {
     const files = [...el.files]; el.value = '';
     const photos = await putFiles(files);
     if (!photos.length) return;
-    toolbox().push(photos.length === 1 ? { kind: 'photo', file: photos[0].file, title: '', added: new Date().toISOString() } : { kind: 'album', photos, title: '', added: new Date().toISOString() });
+    const one = photos.length === 1 ? photos[0] : null;
+    toolbox().push(one ? { kind: one.video ? 'video' : 'photo', file: one.file, title: '', added: new Date().toISOString() } : { kind: 'album', photos, title: '', added: new Date().toISOString() });
     editing.add('toolbox');
     scheduleSave(); tbRedraw();
-    toast(photos.length > 1 ? tr(`Album créé avec ${photos.length} photos. Je peux lui donner un titre.`, `Album created with ${photos.length} photos. I can give it a title.`) : tr('Photo ajoutée.', 'Photo added.'));
+    toast(one ? (one.video ? tr('Vidéo ajoutée.', 'Video added.') : tr('Photo ajoutée.', 'Photo added.')) : tr(`Album créé (${albumCount(photos)}). Je peux lui donner un titre.`, `Album created (${albumCount(photos)}). I can give it a title.`));
     return;
   }
   if (el.dataset.act === 'album-add' && el.files.length) {
@@ -2986,16 +3004,16 @@ document.addEventListener('click', async (e) => {
     }
     case 'album-from': {
       const it = toolbox()[i];
-      toolbox()[i] = { kind: 'album', title: it.title || '', photos: [{ file: it.file }], size: it.size, folder: it.folder, added: it.added };
+      toolbox()[i] = { kind: 'album', title: it.title || '', photos: [it.kind === 'video' ? { file: it.file, video: true } : { file: it.file }], size: it.size, folder: it.folder, added: it.added };
       scheduleSave(); tbRedraw();
-      toast(tr('Album créé : j’y ajoute d’autres photos.', 'Album created: I can add more photos to it.'));
+      toast(tr('Album créé : j’y ajoute d’autres photos ou vidéos.', 'Album created: I can add more photos or videos to it.'));
       break;
     }
     case 'album-take': {
       const album = toolbox()[i];
       const j = +btn.dataset.j;
       const photo = toolbox()[j];
-      (album.photos ??= []).push({ file: photo.file });
+      (album.photos ??= []).push(photo.kind === 'video' ? { file: photo.file, video: true } : { file: photo.file });
       toolbox().splice(j, 1);
       scheduleSave(); tbRedraw();
       break;
@@ -3003,14 +3021,15 @@ document.addEventListener('click', async (e) => {
     case 'album-out': {
       const album = toolbox()[i];
       const [p] = album.photos.splice(+btn.dataset.k, 1);
-      toolbox().splice(i + 1, 0, { kind: 'photo', file: p.file, title: '', folder: album.folder, added: new Date().toISOString() });
+      toolbox().splice(i + 1, 0, { kind: p.video ? 'video' : 'photo', file: p.file, title: '', folder: album.folder, added: new Date().toISOString() });
       if (!album.photos.length) toolbox().splice(i, 1);
       scheduleSave(); tbRedraw();
       break;
     }
     case 'album-del': {
       const album = toolbox()[i];
-      if (!(await modal({ title: tr('Supprimer cette photo ?', 'Delete this photo?'), body: `<p>${tr('Elle sera effacée de ce téléphone.', 'It will be erased from this phone.')}</p>`, ok: tr('Supprimer', 'Delete'), danger: true }))) break;
+      const isVid = album.photos[+btn.dataset.k]?.video;
+      if (!(await modal({ title: isVid ? tr('Supprimer cette vidéo ?', 'Delete this video?') : tr('Supprimer cette photo ?', 'Delete this photo?'), body: `<p>${tr('Elle sera effacée de ce téléphone.', 'It will be erased from this phone.')}</p>`, ok: tr('Supprimer', 'Delete'), danger: true }))) break;
       const [p] = album.photos.splice(+btn.dataset.k, 1);
       await media.remove(p.file).catch(() => {});
       if (!album.photos.length) toolbox().splice(i, 1);
