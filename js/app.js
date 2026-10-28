@@ -259,7 +259,7 @@ function renderHome() {
     const due = addMonths(sigDate, 6);
     const late = due <= new Date().toISOString().slice(0, 10);
     review = `<p class="review ${late ? 'late' : ''}">${late ? tr('Il est temps de relire mon plan', 'It’s time to review my plan') : tr('Prochaine relecture conseillée', 'Next suggested review')}${tr(' :', ':')} <strong>${fmtDate(due)}</strong>
-      ${late ? '' : `<button type="button" class="link small" data-act="review-ics">📅 ${tr('Ajouter à mon agenda', 'Add to my calendar')}</button>`}</p>`;
+      <br>${plan.data.rappel?.date ? `<span class="small">📅 ${tr('Rappel prévu le', 'Reminder set for')} ${fmtDate(plan.data.rappel.date)} · </span>` : ''}<button type="button" class="link small" data-act="review-ics">${plan.data.rappel?.date ? tr('modifier', 'change') : `📅 ${tr('Ajouter un rappel à mon agenda', 'Add a reminder to my calendar')}`}</button></p>`;
   }
   const vl = versionLabel();
   app.innerHTML = `
@@ -464,7 +464,7 @@ function finalHTML(step) {
       <label class="field"><span>${tr('Lieu', 'Place')}</span><input data-k="lieu" data-fk="fin:lieu" value="${esc(v.lieu || '')}" placeholder="${tr('Ex. : CMP, à domicile…', 'E.g. clinic, at home…')}"></label>
       <label class="field"><span>${tr('Date', 'Date')}</span><input type="date" data-k="date" data-fk="fin:date" value="${esc(v.date || '')}"></label>
       <button type="button" class="btn btn-ghost btn-sm" data-act="today">${tr('Mettre la date du jour', 'Use today’s date')}</button>
-      ${v.date ? `<p class="small field-wide">${tr('Relecture conseillée le', 'Suggested review on')} <strong>${fmtDate(addMonths(v.date, 6))}</strong> · <button type="button" class="link small" data-act="review-ics">📅 ${tr('Ajouter un rappel à mon agenda', 'Add a reminder to my calendar')}</button></p>` : ''}
+      ${v.date ? `<p class="small field-wide">${tr('Relecture conseillée le', 'Suggested review on')} <strong>${fmtDate(addMonths(v.date, 6))}</strong> · <button type="button" class="link small" data-act="review-ics">📅 ${plan.data.rappel?.date ? tr(`Rappel prévu le ${fmtDate(plan.data.rappel.date)} (modifier)`, `Reminder set for ${fmtDate(plan.data.rappel.date)} (change)`) : tr('Ajouter un rappel à mon agenda', 'Add a reminder to my calendar')}</button></p>` : ''}
     </section>
     ${modifiedAfterSigning() ? `<div class="warn" role="status"><strong>${tr(`Le plan a été modifié le ${esc(fmtDateTime(lastUpdate(plan)))}, après certaines signatures.`, `The plan was changed on ${esc(fmtDateTime(lastUpdate(plan)))}, after some signatures.`)}</strong> ${tr('Ces signatures ne figurent plus sur l’impression ni sur le PDF : relisez le plan ensemble puis signez à nouveau.', 'These signatures no longer appear on the printout or the PDF: read the plan through together, then sign again.')}${(plan.data.versions || []).length ? ` <a href="#/versions">${tr('Voir ce qui a changé', 'See what changed')}</a>` : ''}</div>` : ''}
     <section class="group card">
@@ -1813,29 +1813,92 @@ async function confirmShare() {
 
 /* ---------- rappel de relecture (fichier d'agenda .ics, rien n'est envoyé) ---------- */
 
-async function reviewIcs() {
-  const sig = plan.data.signature?.date;
-  if (!sig) return;
-  const due = addMonths(sig, 6);
-  const d = due.replace(/-/g, '');
-  const next = new Date(due + 'T12:00:00'); next.setDate(next.getDate() + 1);
+/** Fichier d'agenda (.ics) pour un rappel d'une journée, avec alertes */
+function reminderIcs(date, title, desc) {
+  const d = date.replace(/-/g, '');
+  const next = new Date(date + 'T12:00:00'); next.setDate(next.getDate() + 1);
   const d2 = next.toISOString().slice(0, 10).replace(/-/g, '');
   const stamp = new Date().toISOString().replace(/[-:]/g, '').replace(/\.\d+/, '');
-  const icsEsc = (t) => t.replace(/[\\;,]/g, (c) => '\\' + c).replace(/\n/g, '\\n');
-  const title = tr('Relire mon plan de crise conjoint', 'Review my joint crisis plan');
-  const desc = tr('Relire mon plan avec les personnes qui m’accompagnent (Mon PCC). À faire aussi après une crise ou un changement important.', 'Review my plan with the people who support me (Mon PCC). Also do this after a crisis or an important change.');
-  const ics = ['BEGIN:VCALENDAR', 'VERSION:2.0', 'PRODID:-//Mon PCC//FR', 'CALSCALE:GREGORIAN', 'BEGIN:VEVENT',
+  const icsEsc = (t) => t.replace(/[\;,]/g, (c) => '\\' + c).replace(/\n/g, '\\n');
+  return ['BEGIN:VCALENDAR', 'VERSION:2.0', 'PRODID:-//Mon PCC//FR', 'CALSCALE:GREGORIAN', 'BEGIN:VEVENT',
     `UID:monpcc-relecture-${d}@mon-pcc`, `DTSTAMP:${stamp}`, `DTSTART;VALUE=DATE:${d}`, `DTEND;VALUE=DATE:${d2}`,
     `SUMMARY:${icsEsc(title)}`, `DESCRIPTION:${icsEsc(desc)}`,
     'BEGIN:VALARM', 'ACTION:DISPLAY', `DESCRIPTION:${icsEsc(title)}`, 'TRIGGER:-P7D', 'END:VALARM',
     'BEGIN:VALARM', 'ACTION:DISPLAY', `DESCRIPTION:${icsEsc(title)}`, 'TRIGGER:PT9H', 'END:VALARM',
     'END:VEVENT', 'END:VCALENDAR'].join('\r\n') + '\r\n';
-  const file = new File([ics], tr('relecture-plan-de-crise.ics', 'crisis-plan-review.ics'), { type: 'text/calendar' });
-  if (navigator.canShare && navigator.canShare({ files: [file] })) {
-    try { await navigator.share({ files: [file], title }); return; } catch (e) { if (e.name === 'AbortError') return; }
-  }
-  download(file, file.name);
-  toast(tr('Fichier d’agenda téléchargé : je l’ouvre pour ajouter le rappel.', 'Calendar file downloaded: I open it to add the reminder.'));
+}
+
+/** Liens d'ajout direct à un agenda (rien n'est envoyé par Mon PCC lui-même) */
+function reminderLinks(date, title, desc) {
+  const d = date.replace(/-/g, '');
+  const next = new Date(date + 'T12:00:00'); next.setDate(next.getDate() + 1);
+  const d2 = next.toISOString().slice(0, 10).replace(/-/g, '');
+  const start = new Date(date + 'T09:00:00').getTime();
+  const enc = encodeURIComponent;
+  return {
+    // Android : ouvre l'écran « nouvel évènement » de l'application d'agenda du téléphone
+    android: `intent:#Intent;action=android.intent.action.INSERT;type=vnd.android.cursor.item/event;S.title=${enc(title)};S.description=${enc(desc)};l.beginTime=${start};l.endTime=${start + 3600000};B.allDay=true;end`,
+    google: `https://calendar.google.com/calendar/render?action=TEMPLATE&text=${enc(title)}&dates=${d}/${d2}&details=${enc(desc)}`,
+    outlook: `https://outlook.live.com/calendar/0/deeplink/compose?subject=${enc(title)}&startdt=${date}&enddt=${next.toISOString().slice(0, 10)}&allday=true&body=${enc(desc)}`,
+  };
+}
+
+/** Fenêtre « Rappel de relecture » : date au choix, titre modifiable, ajout direct à l'agenda */
+function reminderDialog() {
+  const sig = plan.data.signature?.date;
+  const def = plan.data.rappel?.date || addMonths(sig || new Date().toISOString().slice(0, 10), 6);
+  const defTitle = plan.data.rappel?.title || tr('Relire mon plan de crise conjoint', 'Review my joint crisis plan');
+  const desc = tr('Relire mon plan avec les personnes qui m’accompagnent (Mon PCC). À faire aussi après une crise ou un changement important.', 'Review my plan with the people who support me (Mon PCC). Also do this after a crisis or an important change.');
+  const d = $('#modal');
+  d.innerHTML = `<div class="modal-inner">
+    <h2>📅 ${tr('Rappel de relecture', 'Review reminder')}</h2>
+    <label class="field"><span>${tr('Date du rappel', 'Reminder date')}</span><input type="date" id="rem-date" value="${esc(def)}" min="${new Date().toISOString().slice(0, 10)}"></label>
+    <div class="chips rem-quick">${[1, 3, 6, 12].map((m) => `<button type="button" class="chip" data-m="${m}">${tr(`dans ${m} mois`, `in ${m} month${m > 1 ? 's' : ''}`)}</button>`).join('')}</div>
+    ${sig ? `<p class="muted small">${tr(`Conseillé : au plus tard 6 mois après la signature (${fmtDate(addMonths(sig, 6))}), et après chaque crise.`, `Suggested: no later than 6 months after signing (${fmtDate(addMonths(sig, 6))}), and after each crisis.`)}</p>` : ''}
+    <label class="field"><span>${tr('Titre dans mon agenda', 'Title in my calendar')}</span><input id="rem-title" value="${esc(defTitle)}" maxlength="80"></label>
+    <p class="muted small">${tr('Je peux choisir un titre discret (par exemple «&nbsp;Relecture&nbsp;») si d’autres personnes voient mon agenda.', 'I can choose a discreet title (for example “Review”) if other people can see my calendar.')}</p>
+    <div class="stack">
+      ${env.isAndroid ? `<button type="button" class="btn btn-primary" data-rem="android">📅 ${tr('Ouvrir l’agenda de mon téléphone', 'Open my phone’s calendar')}</button>` : ''}
+      <button type="button" class="btn ${env.isAndroid ? 'btn-secondary' : 'btn-primary'}" data-rem="ics">📅 ${env.isIos ? tr('Ajouter à mon agenda (Calendrier)', 'Add to my calendar (Calendar)') : tr('Fichier agenda (.ics)', 'Calendar file (.ics)')}</button>
+      <button type="button" class="btn btn-secondary" data-rem="google">${tr('Google Agenda', 'Google Calendar')} ↗</button>
+      <button type="button" class="btn btn-secondary" data-rem="outlook">Outlook ↗</button>
+    </div>
+    <p class="muted small">${tr('Avec Google Agenda ou Outlook, le titre et la date du rappel sont envoyés à ce service, comme pour tout évènement de mon agenda. Rien d’autre de mon plan.', 'With Google Calendar or Outlook, the reminder’s title and date are sent to that service, like any event in my calendar. Nothing else from my plan.')}</p>
+    <div class="modal-actions"><button type="button" class="btn btn-ghost" data-rem="close">${tr('Fermer', 'Close')}</button></div>
+  </div>`;
+  const dateEl = d.querySelector('#rem-date');
+  const titleEl = d.querySelector('#rem-title');
+  const remember = () => {
+    plan.data.rappel = { date: dateEl.value, title: titleEl.value.trim() || defTitle };
+    scheduleSave(false); // le rappel ne fait pas partie du plan signé
+  };
+  d.onclick = async (e) => {
+    const m = e.target.closest('[data-m]')?.dataset.m;
+    if (m) { dateEl.value = addMonths(new Date().toISOString().slice(0, 10), +m); return; }
+    const a = e.target.closest('[data-rem]')?.dataset.rem;
+    if (!a) return;
+    if (a === 'close') { d.close(); return; }
+    if (!/^\d{4}-\d{2}-\d{2}$/.test(dateEl.value)) { dateEl.focus(); return; }
+    remember();
+    const title = plan.data.rappel.title;
+    const links = reminderLinks(dateEl.value, title, desc);
+    if (a === 'android') location.href = links.android;
+    else if (a === 'google' || a === 'outlook') window.open(links[a], '_blank', 'noopener');
+    else {
+      const file = new File([reminderIcs(dateEl.value, title, desc)], tr('rappel-relecture.ics', 'review-reminder.ics'), { type: 'text/calendar' });
+      if (env.isIos) {
+        // Sur iPhone, ouvrir le fichier propose directement « Ajouter au calendrier »
+        const u = URL.createObjectURL(file); location.href = u; setTimeout(() => URL.revokeObjectURL(u), 60000);
+      } else if (navigator.canShare && navigator.canShare({ files: [file] })) {
+        try { await navigator.share({ files: [file], title }); } catch (err) { if (err.name !== 'AbortError') download(file, file.name); }
+      } else download(file, file.name);
+    }
+    d.close();
+    toast(tr(`Rappel prévu le ${fmtDate(dateEl.value)}.`, `Reminder set for ${fmtDate(dateEl.value)}.`));
+    rerender(() => route());
+  };
+  d.addEventListener('close', () => { d.onclick = null; }, { once: true });
+  d.showModal();
 }
 
 /* ---------- page pour les professionnel·les ---------- */
@@ -2015,7 +2078,7 @@ function renderTalk() {
 
 /** Contenu du plan sans les signatures dessinées ni les fichiers (pour l'archive) */
 function contentData(d) {
-  const { signature, carte, versions, dossiers, masquerNoteMineur, boiteOutils, ...rest } = d;
+  const { signature, carte, versions, dossiers, masquerNoteMineur, boiteOutils, notes, rappel, ...rest } = d;
   const copy = JSON.parse(JSON.stringify(rest));
   copy.boiteOutils = (boiteOutils || []).map(({ kind, title, text, author, url, ex, photos }) => ({ kind, title, text, author, url, ex, photos: photos ? photos.map(() => ({})) : undefined }));
   copy.signature = { lieu: signature?.lieu || '', date: signature?.date || '' };
@@ -3071,7 +3134,7 @@ document.addEventListener('click', async (e) => {
     }
     case 'print': window.print(); break;
     case 'pdf-save': pdfSave(); break;
-    case 'review-ics': reviewIcs(); break;
+    case 'review-ics': reminderDialog(); break;
     case 'dictate': await runDictation(btn); break;
     case 'dict-check': {
       e.preventDefault();

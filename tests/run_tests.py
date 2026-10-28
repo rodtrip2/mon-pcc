@@ -237,6 +237,28 @@ def appointment_mode_is_temporary(ctx, page, errors):
     assert page.evaluate('document.documentElement.dataset.text') == 'm', 'le mode entretien ne doit pas rester'
 
 
+@test
+def review_reminder_with_chosen_date(ctx, page, errors):
+    seed(page, {'version': 'adulte', 'difficultes': ['x'], 'signature': {'date': '2026-10-21', 'signataires': []}})
+    page.click('[data-act=review-ics]')
+    assert page.is_visible('#rem-date')
+    assert page.input_value('#rem-date') == '2027-04-21', 'date par défaut : 6 mois après la signature'
+    page.fill('#rem-date', '2027-03-15')
+    page.fill('#rem-title', 'Relecture')
+    ctx.route('https://calendar.google.com/**', lambda r: r.fulfill(body='ok'))  # pas d'accès au réseau en test
+    with ctx.expect_page() as popup:
+        page.click('[data-rem=google]')
+    url = popup.value.url
+    assert 'calendar.google.com' in url and 'dates=20270315/20270316' in url and 'text=Relecture' in url, url
+    popup.value.close()
+    wait_until(page, 'JSON.parse(localStorage.getItem("monpcc.v1")).plan.data.rappel?.date === "2027-03-15"')
+    assert '15/03/2027' in page.inner_text('.review') or '15 mars 2027' in page.inner_text('.review')
+    page.click('[data-act=review-ics]')
+    assert page.input_value('#rem-date') == '2027-03-15', 'la date choisie est gardée'
+    ics = download(page, lambda: page.click('[data-rem=ics]')).decode()
+    assert 'DTSTART;VALUE=DATE:20270315' in ics and 'SUMMARY:Relecture' in ics
+
+
 def main():
     failed = 0
     with sync_playwright() as pw:
