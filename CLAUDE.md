@@ -62,6 +62,7 @@ Mon PCC est une application web installable (PWA), gratuite et sans serveur, qui
 ## 5. Licence et crédits
 
 - Le projet est sous **CC BY-NC-SA 4.0**, comme le PCC dont il reprend les questions. Il faut citer la source PCC (Haute École de la Santé La Source) et indiquer les modifications. Projet indépendant, non validé par les auteur·es du PCC.
+- **Pied de page** : la licence s'affiche avec le badge officiel CC BY-NC-SA (`icons/cc-by-nc-sa.svg`, fichier local), centré sur sa propre ligne, et non en texte.
 - **Crédits** : « Roddy Ricart » apparaît dans la page À propos, le README et le LICENSE, **pas en pied de page**. **Pas de mention « Copyright » à son nom**, puisque le projet est sous Creative Commons.
 - Composants tiers : seulement des licences compatibles, déclarées dans le README et le LICENSE (aujourd'hui, `js/vendor/qrcode.js`, licence MIT).
 

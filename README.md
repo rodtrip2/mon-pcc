@@ -113,7 +113,7 @@ Code source : https://github.com/rodtrip2/mon-pcc — suggestions et signalement
 
 ## Licence
 
-Composant tiers : `js/vendor/qrcode.js` — QR Code Generator, © Kazuhiko Arase, licence MIT.
+Composant tiers : `js/vendor/qrcode.js` — QR Code Generator, © Kazuhiko Arase, licence MIT. Le badge `icons/cc-by-nc-sa.svg` est une marque de Creative Commons, utilisée selon sa politique des marques pour indiquer la licence.
 
 
 Conformément à la clause « partage dans les mêmes conditions » du PCC, l’ensemble de ce projet est diffusé sous licence

@@ -33,3 +33,8 @@ Composant tiers
 js/vendor/qrcode.js : QR Code Generator for JavaScript, Copyright (c) 2009
 Kazuhiko Arase, sous licence MIT (https://opensource.org/licenses/MIT).
 « QR Code » est une marque déposée de DENSO WAVE INCORPORATED.
+
+icons/cc-by-nc-sa.svg : badge officiel de la licence CC BY-NC-SA (dépôt
+creativecommons/cc-assets). Marque de Creative Commons, utilisée selon sa
+politique des marques (https://creativecommons.org/policies#trademark) pour
+indiquer la licence ; ce fichier n'est pas sous licence Creative Commons.
