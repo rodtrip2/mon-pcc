@@ -8,7 +8,7 @@
  */
 
 export const LANGS = { fr: 'Français', en: 'English' };
-export const COUNTRY_CODES = ['FR', 'GB', 'IE', 'US', 'CA', 'AU', 'NZ', 'INT'];
+export const COUNTRY_CODES = ['FR', 'BE', 'CH', 'QC', 'CA', 'GB', 'IE', 'US', 'AU', 'NZ', 'INT'];
 
 const LANG_KEY = 'monpcc.lang';
 const COUNTRY_KEY = 'monpcc.country';
@@ -30,21 +30,22 @@ export function deviceCountry() {
   let tz = '';
   try { tz = Intl.DateTimeFormat().resolvedOptions().timeZone || ''; } catch { /* indisponible */ }
   const TZ = {
-    'Europe/Paris': 'FR', 'Europe/London': 'GB', 'Europe/Belfast': 'GB', 'Europe/Dublin': 'IE',
+    'Europe/Paris': 'FR', 'Europe/Brussels': 'BE', 'Europe/Zurich': 'CH', 'Europe/London': 'GB', 'Europe/Belfast': 'GB', 'Europe/Dublin': 'IE',
     'Pacific/Auckland': 'NZ', 'Pacific/Chatham': 'NZ',
     'Indian/Reunion': 'FR', 'America/Guadeloupe': 'FR', 'America/Martinique': 'FR', 'America/Cayenne': 'FR', 'Indian/Mayotte': 'FR',
   };
   if (TZ[tz]) return TZ[tz];
   if (tz.startsWith('Australia/')) return 'AU';
   const CA_TZ = ['Toronto', 'Vancouver', 'Montreal', 'Edmonton', 'Winnipeg', 'Halifax', 'St_Johns', 'Regina', 'Moncton', 'Whitehorse', 'Yellowknife', 'Iqaluit', 'Glace_Bay', 'Goose_Bay', 'Dawson_Creek', 'Swift_Current'];
-  if (tz.startsWith('America/') && CA_TZ.some((c) => tz.endsWith(c))) return 'CA';
+  if (tz.startsWith('America/') && CA_TZ.some((c) => tz.endsWith(c))) return deviceLang() === 'fr' ? 'QC' : 'CA';
   const US_TZ = ['New_York', 'Chicago', 'Denver', 'Los_Angeles', 'Phoenix', 'Anchorage', 'Detroit', 'Boise', 'Juneau'];
   if (tz.startsWith('America/') && US_TZ.some((c) => tz.endsWith(c))) return 'US';
   if (tz === 'Pacific/Honolulu') return 'US';
   for (const l of navigator.languages || [navigator.language || '']) {
     const m = /^[a-z]{2}-([A-Z]{2})$/i.exec(l || '');
     if (!m) continue;
-    const r = m[1].toUpperCase() === 'UK' ? 'GB' : m[1].toUpperCase();
+    let r = m[1].toUpperCase() === 'UK' ? 'GB' : m[1].toUpperCase();
+    if (r === 'CA' && /^fr/i.test(l)) r = 'QC';
     if (COUNTRY_CODES.includes(r)) return r;
   }
   return deviceLang() === 'fr' ? 'FR' : 'INT';
@@ -86,8 +87,8 @@ export const L = (v) => (v && typeof v === 'object' ? (v[LANG] ?? v.fr ?? v.en ?
 
 /** Locale pour les dates et heures */
 export function locale() {
-  if (LANG === 'fr') return COUNTRY === 'CA' ? 'fr-CA' : 'fr-FR';
-  return { US: 'en-US', CA: 'en-CA', AU: 'en-AU', NZ: 'en-NZ', IE: 'en-IE' }[COUNTRY] || 'en-GB';
+  if (LANG === 'fr') return { CA: 'fr-CA', QC: 'fr-CA', BE: 'fr-BE', CH: 'fr-CH' }[COUNTRY] || 'fr-FR';
+  return { US: 'en-US', CA: 'en-CA', QC: 'en-CA', AU: 'en-AU', NZ: 'en-NZ', IE: 'en-IE' }[COUNTRY] || 'en-GB';
 }
 
 /** Accord simple : plural(n, 'étape', 'étapes') */

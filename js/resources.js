@@ -484,6 +484,163 @@ export const COUNTRIES = {
     ],
   },
 
+  /* ----------------------------------------------------------------- Suisse */
+  CH: {
+    flag: '🇨🇭',
+    name: { fr: 'Suisse', en: 'Switzerland' },
+    inName: { fr: 'en Suisse', en: 'in Switzerland' },
+    checked: { fr: '28 octobre 2026', en: '28 October 2026' },
+    emergency: {
+      text: {
+        fr: 'En cas d’urgence, appelez le 144 (ambulance) ou le 112. Pour parler à quelqu’un : La Main Tendue au 143, 24 h/24.',
+        en: 'In an emergency, call 144 (ambulance) or 112. To talk to someone: La Main Tendue on 143, 24/7.',
+      },
+      tels: ['144', '112', '143'],
+    },
+    garde: [
+      { nom: { fr: 'Ambulance', en: 'Ambulance' }, lien: { fr: 'Urgence médicale', en: 'Medical emergency' }, tel: '144' },
+      { nom: { fr: 'Numéro d’urgence européen', en: 'European emergency number' }, lien: { fr: 'Toute urgence', en: 'Any emergency' }, tel: '112' },
+      { nom: 'La Main Tendue', lien: { fr: 'Écoute, 24 h/24', en: 'Listening support, 24/7' }, tel: '143' },
+      { nom: { fr: 'Urgences psychiatriques', en: 'Psychiatric emergency service' }, lien: { fr: 'Service de garde de ma région', en: 'On-call service for my area' }, tel: '' },
+      { nom: { fr: 'Médecin de garde', en: 'On-call doctor' }, lien: { fr: 'Permanence de mon canton', en: 'My canton’s on-call service' }, tel: '' },
+    ],
+    youthFirst: ['urgence', 'jeunes'],
+    cats: [
+      {
+        id: 'urgence', icon: '🚨', title: { fr: 'Urgence', en: 'Emergency' },
+        items: [
+          { name: { fr: 'Ambulance', en: 'Ambulance' }, tel: '144', hours: H24, desc: { fr: 'Urgence médicale.', en: 'Medical emergency.' } },
+          { name: { fr: 'Numéro d’urgence européen', en: 'European emergency number' }, tel: '112', hours: H24, desc: { fr: 'Toute urgence.', en: 'Any emergency.' } },
+          { name: 'Tox Info Suisse', tel: '145', desc: { fr: 'En cas d’intoxication.', en: 'In case of poisoning.' } },
+        ],
+      },
+      {
+        id: 'ecoute', icon: '💬', title: { fr: 'Besoin de parler', en: 'Need to talk' },
+        items: [
+          { name: 'La Main Tendue', tel: '143', hours: H24, url: 'https://www.143.ch/', desc: { fr: 'Écoute pour les adultes, en français, allemand ou italien. Aussi par chat et par e-mail. Appel à petit prix.', en: 'Listening support for adults, in French, German or Italian. Also by chat and email. Low-cost call. English line: 0800 143 000, every day from 6 pm to 11 pm.' } },
+        ],
+      },
+      {
+        id: 'jeunes', icon: '🎓', title: { fr: 'Jeunes et parents', en: 'Young people and parents' },
+        items: [
+          { name: { fr: '147 — Pro Juventute', en: '147 — Pro Juventute' }, tel: '147', hours: H24, url: 'https://www.147.ch/fr', desc: { fr: 'Pour les enfants et les jeunes. Aussi par WhatsApp, e-mail ou chat.', en: 'For children and young people. Also by WhatsApp, email or chat.' } },
+          { name: { fr: 'Pro Juventute — conseil aux parents', en: 'Pro Juventute — parent advice' }, tel: '058 261 61 61', hours: H24, desc: { fr: 'Pour les parents : éducation, développement, organisation familiale.', en: 'For parents: upbringing, development, family organisation.' } },
+        ],
+      },
+      {
+        id: 'violences', icon: '🛡', title: { fr: 'Violences', en: 'Violence and abuse' },
+        items: [
+          { name: { fr: 'Aide aux victimes', en: 'Victim support' }, tel: '142', url: 'https://www.opferhilfe-schweiz.ch/fr/', desc: { fr: 'Pour les victimes de violences ou d’abus : conseil gratuit, confidentiel et anonyme.', en: 'For victims of violence or abuse: free, confidential and anonymous advice.' } },
+        ],
+      },
+      {
+        id: 'info', icon: '📚', title: { fr: 'S’informer', en: 'Information' },
+        items: [
+          { name: { fr: 'OFSP — offres d’aide en santé mentale', en: 'FOPH — mental health support' }, url: 'https://www.bag.admin.ch/fr/offres-daide-sante-mentale', desc: { fr: 'Liste officielle des offres d’aide en Suisse.', en: 'Official list of support services in Switzerland.' } },
+          { name: 'Parler peut sauver', url: 'https://www.parler-peut-sauver.ch', desc: { fr: 'Plateforme de prévention du suicide : informations et soutien.', en: 'Suicide prevention platform: information and support.' } },
+          { name: 'Plan de Crise Conjoint', url: 'https://plandecriseconjoint.ch/', desc: { fr: 'Le site de référence du PCC, créé en Suisse : informations, formulaires officiels et formation en ligne gratuite.', en: 'The reference website for the joint crisis plan, created in Switzerland: information, official forms and free online training (in French).' } },
+        ],
+      },
+    ],
+  },
+
+  /* ---------------------------------------------------------------- Belgique */
+  BE: {
+    flag: '🇧🇪',
+    name: { fr: 'Belgique', en: 'Belgium' },
+    inName: { fr: 'en Belgique', en: 'in Belgium' },
+    checked: { fr: '28 octobre 2026', en: '28 October 2026' },
+    emergency: {
+      text: {
+        fr: 'En cas d’urgence, appelez le 112. Si vous pensez au suicide : 0800 32 123 (en français) ou 1813 (en néerlandais), 24 h/24.',
+        en: 'In an emergency, call 112. If you are thinking about suicide: 0800 32 123 (in French) or 1813 (in Dutch), 24/7.',
+      },
+      tels: ['112', '0800 32 123', '1813'],
+    },
+    garde: [
+      { nom: { fr: 'Numéro d’urgence', en: 'Emergency number' }, lien: { fr: 'Toute urgence', en: 'Any emergency' }, tel: '112' },
+      { nom: { fr: 'Centre de Prévention du Suicide', en: 'Suicide Prevention Centre' }, lien: { fr: 'Crise suicidaire, 24 h/24', en: 'Suicidal crisis, 24/7' }, tel: '0800 32 123' },
+      { nom: 'Télé-Accueil', lien: { fr: 'Écoute, 24 h/24', en: 'Listening support, 24/7' }, tel: '107' },
+      { nom: { fr: 'Urgences psychiatriques', en: 'Psychiatric emergency service' }, lien: { fr: 'Service de garde de ma région', en: 'On-call service for my area' }, tel: '' },
+      { nom: { fr: 'Médecin de garde', en: 'On-call doctor' }, lien: { fr: 'Le soir et le week-end', en: 'Evenings and weekends' }, tel: '' },
+    ],
+    youthFirst: ['urgence', 'jeunes'],
+    cats: [
+      {
+        id: 'urgence', icon: '🚨', title: { fr: 'Urgence et crise', en: 'Emergency and crisis' },
+        items: [
+          { name: { fr: 'Numéro d’urgence', en: 'Emergency number' }, tel: '112', hours: H24, desc: { fr: 'Toute urgence, danger immédiat.', en: 'Any emergency, immediate danger.' } },
+          { name: { fr: 'Centre de Prévention du Suicide', en: 'Suicide Prevention Centre' }, tel: '0800 32 123', hours: H24, url: 'https://www.preventionsuicide.be/', desc: { fr: 'Ligne d’écoute pour les personnes en crise suicidaire (Belgique francophone). Gratuit et anonyme ; si c’est occupé, je rappelle.', en: 'Line for people in a suicidal crisis (French-speaking Belgium). Free and anonymous; if it’s busy, call again.' } },
+          { name: 'Zelfmoordlijn 1813', tel: '1813', hours: H24, url: 'https://www.zelfmoord1813.be/', desc: { fr: 'Ligne de prévention du suicide en néerlandais. Gratuit et anonyme ; chat tous les jours de 17 h à minuit.', en: 'Suicide prevention line in Dutch. Free and anonymous; chat every day from 5 pm to midnight.' } },
+        ],
+      },
+      {
+        id: 'ecoute', icon: '💬', title: { fr: 'Besoin de parler', en: 'Need to talk' },
+        items: [
+          { name: 'Télé-Accueil', tel: '107', hours: { fr: '24 h/24 ; chat de 13 h à 3 h', en: '24/7; chat from 1 pm to 3 am' }, url: 'https://tele-accueil.be/', desc: { fr: 'Pour toute personne qui a besoin de parler. Gratuit.', en: 'For anyone who needs to talk (in French). Free.' } },
+        ],
+      },
+      {
+        id: 'jeunes', icon: '🎓', title: { fr: 'Jeunes', en: 'Young people' },
+        items: [
+          { name: { fr: '103 Écoute-Enfants', en: '103 children’s helpline' }, tel: '103', hours: { fr: 'Tous les jours de 10 h à minuit', en: 'Every day, 10 am to midnight' }, url: 'https://www.103ecoute.be/', desc: { fr: 'Pour les enfants et les ados en difficulté, et les adultes qui les accompagnent. Gratuit et anonyme, aussi par chat.', en: 'For children and teenagers in difficulty, and the adults supporting them (in French). Free and anonymous, also by chat.' } },
+        ],
+      },
+    ],
+  },
+
+  /* ------------------------------------------------------------------ Québec */
+  QC: {
+    flag: '⚜️',
+    name: { fr: 'Québec (Canada)', en: 'Quebec (Canada)' },
+    inName: { fr: 'au Québec', en: 'in Quebec' },
+    checked: { fr: '28 octobre 2026', en: '28 October 2026' },
+    emergency: {
+      text: {
+        fr: 'En cas d’urgence, appelez le 911. Si vous pensez au suicide : 1 866 APPELLE (1 866 277-3553), texto au 535353 ou le 9-8-8, en tout temps.',
+        en: 'In an emergency, call 911. If you are thinking about suicide: 1 866 APPELLE (1 866 277-3553), text 535353 or 9-8-8, at any time.',
+      },
+      tels: ['911', '1 866 277-3553', '9-8-8'],
+    },
+    garde: [
+      { nom: { fr: 'Services d’urgence', en: 'Emergency services' }, lien: { fr: 'Danger immédiat', en: 'Immediate danger' }, tel: '911' },
+      { nom: { fr: 'Ligne québécoise de prévention du suicide', en: 'Quebec suicide prevention line' }, lien: { fr: 'En tout temps', en: 'At any time' }, tel: '1 866 277-3553' },
+      { nom: 'Info-Social 811', lien: { fr: 'Consultation psychosociale', en: 'Psychosocial consultation' }, tel: '811' },
+      { nom: { fr: 'Centre de crise de ma région', en: 'Local crisis centre' }, lien: { fr: 'Intervention de crise', en: 'Crisis intervention' }, tel: '' },
+    ],
+    youthFirst: ['urgence', 'jeunes'],
+    cats: [
+      {
+        id: 'urgence', icon: '🚨', title: { fr: 'Urgence et crise', en: 'Emergency and crisis' },
+        items: [
+          { name: { fr: 'Services d’urgence', en: 'Emergency services' }, tel: '911', hours: H24, desc: { fr: 'Si je crains pour ma sécurité ou celle de quelqu’un.', en: 'If I fear for my safety or someone else’s.' } },
+          { name: { fr: 'Ligne d’aide en prévention du suicide', en: 'Suicide prevention helpline' }, tel: '1 866 277-3553', hours: { fr: 'En tout temps', en: 'At any time' }, url: 'https://suicide.ca/', desc: { fr: 'Pour les personnes qui pensent au suicide ou qui s’inquiètent pour quelqu’un. Aussi par texto au 535353 et par clavardage sur suicide.ca. Le 9-8-8 fonctionne aussi.', en: 'For people thinking about suicide or worried about someone. Also by text to 535353 and by chat on suicide.ca. 9-8-8 also works.' } },
+          { name: 'Info-Social 811', tel: '811', hours: H24, desc: { fr: 'Consultation téléphonique gratuite et confidentielle avec un·e intervenant·e psychosocial·e, pour moi ou un proche.', en: 'Free, confidential phone consultation with a psychosocial worker, for me or someone close (French and English).' } },
+        ],
+      },
+      {
+        id: 'jeunes', icon: '🎓', title: { fr: 'Jeunes et parents', en: 'Young people and parents' },
+        items: [
+          { name: 'Tel-jeunes', tel: '1 800 263-2266', hours: { fr: 'Téléphone de 6 h à 2 h ; texto et clavardage de 8 h à 22 h 30', en: 'Phone 6 am to 2 am; text and chat 8 am to 10:30 pm' }, desc: { fr: 'Pour les 12-17 ans. Texto ou clavardage : 514 600-1002.', en: 'For 12 to 17-year-olds. Text or chat: 514 600-1002.' } },
+          { name: { fr: 'Jeunesse, J’écoute', en: 'Kids Help Phone' }, tel: '1-800-668-6868', hours: H24, url: 'https://jeunessejecoute.ca/', desc: { fr: 'Pour les 5-29 ans, partout au Canada. Aussi par texto au 686868.', en: 'For 5 to 29-year-olds, anywhere in Canada. You can also text CONNECT to 686868.' } },
+          { name: 'LigneParents', tel: '1 800 361-5085', hours: { fr: 'De 6 h à minuit', en: '6 am to midnight' }, desc: { fr: 'Pour les parents d’enfants de 0 à 20 ans.', en: 'For parents of children aged 0 to 20.' } },
+        ],
+      },
+      {
+        id: 'proches', icon: '🤝', title: { fr: 'Pour les proches', en: 'For family and friends' },
+        items: [
+          { name: { fr: 'Pair·e·s aidant·e·s famille', en: 'Family peer helpers' }, tel: '1 800 349-9915', hours: { fr: 'Lundi de 13 h à 16 h ; mardi, mercredi, jeudi et samedi de 13 h à 18 h', en: 'Monday 1 pm to 4 pm; Tuesday, Wednesday, Thursday and Saturday 1 pm to 6 pm' }, desc: { fr: 'Pour les membres de l’entourage d’une personne vivant avec un trouble mental. Gratuit et confidentiel.', en: 'For the family of someone living with a mental disorder. Free and confidential.' } },
+        ],
+      },
+      {
+        id: 'info', icon: '📚', title: { fr: 'S’informer, trouver un soin', en: 'Information and finding care' },
+        items: [
+          { name: { fr: 'Québec.ca — ressources en santé mentale', en: 'Québec.ca — mental health resources' }, url: 'https://www.quebec.ca/sante/conseils-et-prevention/sante-mentale/obtenir-aide-en-sante-mentale/ressources-aide-et-soutien-en-sante-mentale', desc: { fr: 'Liste officielle des ressources d’aide, dont les centres de crise par région.', en: 'Official list of support resources, including crisis centres by region.' } },
+        ],
+      },
+    ],
+  },
+
   /* --------------------------------------------------------- Autre pays */
   INT: {
     flag: '🌍',
