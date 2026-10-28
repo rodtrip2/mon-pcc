@@ -74,6 +74,7 @@ function scheduleSave(content = true) {
   saveTimer = setTimeout(async () => {
     try {
       await store.save(plan);
+      syncCrisisSnapshot();
       saveState.textContent = savedLabel();
     } catch {
       saveState.textContent = tr('Échec de l’enregistrement', 'Could not save');
@@ -157,9 +158,12 @@ function groupSuggestions(g) {
 /* ---------- routage ---------- */
 
 function route() {
-  if (locked) return renderLock();
   const h = location.hash.replace(/^#\/?/, '');
   const [page, arg] = h.split('/');
+  if (locked) {
+    if (page === 'crise' && crisisSnapshot()) { closeMenu(); renderCrisis(); window.scrollTo(0, 0); return; }
+    return renderLock();
+  }
   document.body.dataset.page = page || 'accueil';
   closeMenu();
   if (!$('#exercise').hidden) closeExercise();
@@ -176,6 +180,7 @@ function route() {
     case 'mon-espace-sante': renderMES(); break;
     case 'ressources': renderResources(); break;
     case 'boite-outils': renderToolbox(arg === 'etape'); break;
+    case 'crise': renderCrisis(); break;
     case 'apropos': renderAbout(); break;
     case 'confidentialite': renderPrivacy(); break;
     default: renderHome();
@@ -252,6 +257,7 @@ function renderHome() {
   const vl = versionLabel();
   app.innerHTML = `
     <h1 class="sr-only">${tr('Accueil', 'Home')}</h1>
+    ${crisisButtonHTML()}
     <section class="card progress-card">
       <h2>${tr('Mon plan de crise conjoint', 'My joint crisis plan')}</h2>
       <div class="bar" role="progressbar" aria-valuemin="0" aria-valuemax="${p.total}" aria-valuenow="${p.done}" aria-label="${tr('Étapes complétées', 'Steps completed')}"><span style="width:${(p.done / p.total) * 100}%"></span></div>
@@ -540,6 +546,87 @@ function signaturePad(who) {
     d.showModal();
     requestAnimationFrame(size);
   });
+}
+
+/* ---------- écran « Ça ne va pas » (à utiliser en crise) ---------- */
+
+const CRISIS_OPEN = 'monpcc.crisisOpen'; // '1' : accessible sans le code (choix de la personne)
+const CRISIS_SNAP = 'monpcc.crisisSnap'; // copie non chiffrée des seuls éléments de cet écran
+const crisisOpenPref = () => { try { return localStorage.getItem(CRISIS_OPEN) === '1'; } catch { return false; } };
+
+/** Éléments de l'écran de crise (jamais les photos, vidéos ou sons) */
+function crisisSubset(d) {
+  const keep = ['citation', 'lien', 'exercice'];
+  return {
+    version: d.version, strategies: d.strategies, aide: d.aide, information: d.information,
+    boiteOutils: (d.boiteOutils || []).filter((it) => keep.includes(it.kind))
+      .map(({ kind, text, author, url, title, ex }) => ({ kind, text, author, url, title, ex })),
+  };
+}
+function clearCrisisSnapshot() { try { localStorage.removeItem(CRISIS_SNAP); } catch { /* ignoré */ } }
+/** Copie lisible sans code : seulement si le plan est protégé ET si la personne l'a choisi */
+function syncCrisisSnapshot() {
+  try {
+    if (plan && store.isProtected() && crisisOpenPref()) localStorage.setItem(CRISIS_SNAP, JSON.stringify(crisisSubset(plan.data)));
+    else if (!crisisOpenPref() || !store.isProtected()) localStorage.removeItem(CRISIS_SNAP);
+  } catch { /* ignoré */ }
+}
+function crisisSnapshot() {
+  if (!crisisOpenPref()) return null;
+  try { return JSON.parse(localStorage.getItem(CRISIS_SNAP) || 'null'); } catch { return null; }
+}
+
+function crisisButtonHTML() {
+  return `<a class="btn btn-crisis" href="#/crise"><span aria-hidden="true">💛</span> ${tr('Ça ne va pas', 'I’m not OK')}</a>`;
+}
+
+const telFrom = (t) => { const m = String(t || '').match(/(\+?\d[\d .()-]{1,}\d)/); return m ? m[1] : ''; };
+
+function renderCrisis() {
+  const limited = !plan;
+  const d = limited ? crisisSnapshot() : plan.data;
+  if (!d) { location.hash = '#/'; return; }
+  document.body.dataset.page = 'crise';
+  const ado = d.version === 'ado';
+  const strat = d.strategies || {};
+  const groups = [
+    ['moi', tr('Ce que je fais moi-même', 'What I do myself')],
+    ['entourage', tr('Avec mon entourage', 'With the people around me')],
+    ['pros', tr('Avec des professionnel·les', 'With professionals')],
+  ].map(([k, label]) => [label, (strat[k] || []).filter((x) => x && x.trim())]).filter(([, l]) => l.length);
+
+  // Personnes à appeler, dans l'ordre du plan
+  let people = [];
+  if (ado) {
+    people = (d.information || []).filter((r) => r.qui).map((r) => ({ nom: r.qui, lien: r.parQui ? `${tr('prévenu·e par', 'told by')} ${r.parQui}` : '', tel: telFrom(r.comment), note: r.comment }));
+  } else {
+    const a = d.aide || {};
+    people = ['proches', 'pros', 'garde'].flatMap((k) => (a[k] || []).filter((r) => r.nom || r.tel));
+  }
+  const tb = (d.boiteOutils || []);
+  const tbHTML = limited
+    ? tb.map((it) => {
+      if (it.kind === 'citation') return `<blockquote class="tbv tbv-quote"><p>${tr('« ', '“')}${esc(it.text || '')}${tr(' »', '”')}</p>${it.author ? `<cite>— ${esc(it.author)}</cite>` : ''}</blockquote>`;
+      if (it.kind === 'exercice') { const e = exerciseById(it.ex); return e ? `<button type="button" class="tbv tbv-exercise" data-act="exercise-open" data-ex="${esc(e.id)}"><span class="tbx-ico" aria-hidden="true">${e.icon}</span><span class="tbv-col"><span class="tbv-title">${esc(e.name)}</span><span class="tbx-dur">⏱ ${esc(e.duration)}</span></span><span class="tbx-play" aria-hidden="true">▶</span></button>` : ''; }
+      if (it.kind === 'lien') return `<a class="tbv tbv-link" href="${esc(it.url)}" target="_blank" rel="noopener noreferrer"><span class="tbv-ico" aria-hidden="true">🔗</span><span class="tbv-col"><span class="tbv-title">${esc(it.title || it.url)}</span></span></a>`;
+      return '';
+    }).map((h) => (h ? `<div class="tbv-cell size-m">${h}</div>` : '')).join('')
+    : '';
+
+  app.innerHTML = `
+    <h1 class="crisis-title">💛 ${tr('Ça ne va pas', 'I’m not OK')}</h1>
+    <p class="lead">${tr('Je respire. Voici ce qui peut m’aider, dans l’ordre que j’ai choisi quand j’allais mieux.', 'I breathe. Here is what can help me, in the order I chose when I was feeling better.')}</p>
+    ${groups.length ? `<section class="card crisis-sec"><h2>${tr('Ce que je peux faire', 'What I can do')}</h2>
+      ${groups.map(([label, list]) => `<h3>${esc(label)}</h3><ol class="crisis-list">${list.map((x) => `<li>${esc(x)}</li>`).join('')}</ol>`).join('')}</section>` : ''}
+    ${people.length ? `<section class="card crisis-sec"><h2>${tr('Qui je peux appeler', 'Who I can call')}</h2>
+      <ul class="crisis-people">${people.map((r) => `<li><span class="cp-who"><strong>${esc(r.nom || '')}</strong>${r.lien ? ` <span class="muted small">${esc(r.lien)}</span>` : ''}</span>
+        ${r.tel && /\d/.test(r.tel) ? `<a class="btn btn-primary btn-sm" href="tel:${esc(r.tel.replace(/[^\d+]/g, ''))}">☎ ${esc(r.tel)}</a>` : (r.note ? `<span class="small">${esc(r.note)}</span>` : '')}</li>`).join('')}</ul></section>` : ''}
+    ${tb.length ? `<section class="crisis-sec crisis-tb"><h2>🧰 ${tr('Ma boîte à outils', 'My toolbox')}</h2>
+      ${limited ? `<div class="tbv-grid">${tbHTML}</div><p class="muted small">${tr('Photos, vidéos et sons : ils s’affichent après avoir saisi mon code.', 'Photos, videos and sounds appear once I enter my code.')}</p>` : toolboxGridHTML(toolbox())}</section>` : ''}
+    ${!groups.length && !people.length && !tb.length ? `<p class="card">${tr('Mon plan ne contient pas encore de stratégies ni de personnes à appeler. Les numéros ci-dessous peuvent m’aider tout de suite.', 'My plan doesn’t contain any strategies or people to call yet. The numbers below can help right away.')}</p>` : ''}
+    ${emergencyNote()}
+    <div class="nav-bottom">${limited ? `<a class="btn btn-ghost" href="#/">${tr('← Saisir mon code', '← Enter my code')}</a>` : `<a class="btn btn-ghost" href="#/">${tr('← Accueil', '← Home')}</a><a class="btn btn-ghost" href="#/plan">${tr('Mon plan complet', 'My full plan')}</a>`}</div>`;
+  if (!limited) fillMedia();
 }
 
 /* ---------- boîte à outils (photos, vidéos, sons, liens) ---------- */
@@ -1898,7 +1985,11 @@ function renderSettings() {
       <h2>${tr('Protéger par un code', 'Protect with a code')}</h2>
       <p>${prot ? tr('Mon plan est <strong>chiffré</strong> sur ce téléphone. Le code est demandé à chaque ouverture.', 'My plan is <strong>encrypted</strong> on this phone. The code is needed each time I open the app.') : tr('Je peux chiffrer mon plan avec un code personnel. Il sera demandé à chaque ouverture de l’application.', 'I can encrypt my plan with a personal code. It will be needed each time I open the app.')}</p>
       ${prot
-        ? `<div class="stack"><button class="btn btn-secondary" data-act="lock-now">${tr('Verrouiller maintenant', 'Lock now')}</button><button class="btn btn-ghost" data-act="unprotect">${tr('Retirer le code', 'Remove the code')}</button></div>`
+        ? `<div class="stack"><button class="btn btn-secondary" data-act="lock-now">${tr('Verrouiller maintenant', 'Lock now')}</button><button class="btn btn-ghost" data-act="unprotect">${tr('Retirer le code', 'Remove the code')}</button></div>
+          <div class="crisis-open" id="acces-crise">
+            <label class="check"><input type="checkbox" data-act="crisis-open" ${crisisOpenPref() ? 'checked' : ''}> <strong>${tr('Ouvrir l’écran « Ça ne va pas » sans le code', 'Open the “I’m not OK” screen without the code')}</strong></label>
+            <p class="muted small">${tr('Pratique en pleine crise, quand taper un code est difficile. Mais <strong>toute personne qui a mon téléphone en main</strong> pourra alors lire, sans le code : mes stratégies, les personnes à appeler et leurs numéros, et les citations, liens et exercices de ma boîte à outils. Le reste du plan, les photos, les vidéos et les sons restent protégés.', 'Handy in a crisis, when typing a code is hard. But <strong>anyone holding my phone</strong> will then be able to read, without the code: my strategies, the people to call and their numbers, and the quotes, links and exercises in my toolbox. The rest of the plan, photos, videos and sounds stay protected.')}</p>
+          </div>`
         : `<form class="stack" data-act="protect">
             <label class="field"><span>${tr('Code (6 caractères minimum)', 'Code (at least 6 characters)')}</span><input type="password" name="c1" minlength="6" required autocomplete="new-password"></label>
             <label class="field"><span>${tr('Confirmer le code', 'Confirm the code')}</span><input type="password" name="c2" minlength="6" required autocomplete="new-password"></label>
@@ -2028,6 +2119,7 @@ function renderLock() {
     <section class="hero">
       <div class="hero-logo" aria-hidden="true">${logoSVG()}</div>
       <h1>${tr('Mon PCC est protégé', 'Mon PCC is protected')}</h1>
+      ${crisisSnapshot() ? crisisButtonHTML() : ''}
       <form class="card stack" data-act="unlock">
         <label class="field"><span>${tr('Mon code', 'My code')}</span><input type="password" name="code" required autocomplete="current-password" autofocus></label>
         <button class="btn btn-primary">${tr('Ouvrir', 'Open')}</button>
@@ -2220,6 +2312,7 @@ function renderChrome() {
         <strong>${tr('Sommaire', 'Contents')}</strong>
         <button id="menu-close" class="icon" data-act="menu-close" aria-label="${tr('Fermer le menu', 'Close menu')}">✕</button>
       </div>
+      <a class="menu-link menu-crisis" href="#/crise">💛 ${tr('Ça ne va pas', 'I’m not OK')}</a>
       <a class="menu-link" href="#/">${tr('Accueil', 'Home')}</a>
       <a class="menu-link" href="#/demarche">${tr('La démarche', 'How it works')}</a>
       <div id="menu-steps"></div>
@@ -2334,6 +2427,7 @@ app.addEventListener('submit', async (e) => {
     const files = await media.loadAll().catch(() => []);
     await store.protect(plan, form.c1.value);
     await media.saveAll(files);
+    syncCrisisSnapshot();
     forgetMediaURLs();
     toast(tr('Protection activée.', 'Protection turned on.'));
     renderSettings();
@@ -2706,6 +2800,7 @@ document.addEventListener('click', async (e) => {
     case 'wipe':
       if (await modal({ title: tr('Tout effacer ?', 'Delete everything?'), body: `<p>${tr('Mon plan sera supprimé définitivement de ce téléphone. Pensez à exporter une sauvegarde si vous souhaitez le garder.', 'My plan will be permanently deleted from this phone. Remember to export a backup if you want to keep it.')}</p>`, ok: tr('Tout effacer', 'Delete everything'), danger: true })) {
         store.wipe();
+        clearCrisisSnapshot();
         await media.clear();
         forgetMediaURLs();
         plan = store.emptyPlan();
@@ -2720,6 +2815,7 @@ document.addEventListener('click', async (e) => {
         const files = await media.loadAll().catch(() => []);
         await store.unprotect(plan);
         await media.saveAll(files);
+        syncCrisisSnapshot();
       }
       toast(tr('Code retiré.', 'Code removed.'));
       renderSettings();
@@ -2734,6 +2830,7 @@ document.addEventListener('click', async (e) => {
     case 'forgot':
       if (await modal({ title: tr('Code oublié', 'Forgotten code'), body: `<p>${tr('Sans le code, le plan chiffré ne peut pas être récupéré. Vous pouvez l’effacer pour recommencer, ou réimporter une sauvegarde ensuite.', 'Without the code, the encrypted plan cannot be recovered. You can delete it to start again, or import a backup afterwards.')}</p>`, ok: tr('Effacer et recommencer', 'Delete and start again'), danger: true })) {
         store.wipe();
+        clearCrisisSnapshot();
         await media.clear();
         plan = store.emptyPlan();
         applyVersion();
@@ -2800,6 +2897,12 @@ document.addEventListener('change', async (e) => {
     setCountryPref(e.target.value || null);
     applyLocale();
     toast(`${country().flag} ${L(country().name)}`);
+    return;
+  }
+  if (act === 'crisis-open') {
+    try { if (e.target.checked) localStorage.setItem(CRISIS_OPEN, '1'); else localStorage.removeItem(CRISIS_OPEN); } catch { /* ignoré */ }
+    syncCrisisSnapshot();
+    toast(e.target.checked ? tr('L’écran « Ça ne va pas » s’ouvrira sans le code.', 'The “I’m not OK” screen will open without the code.') : tr('L’écran « Ça ne va pas » demandera le code.', 'The “I’m not OK” screen will ask for the code.'));
     return;
   }
   if (act === 'ib-toggle') {
