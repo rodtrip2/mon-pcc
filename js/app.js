@@ -487,7 +487,8 @@ function finalHTML(step) {
           </div>
         </div><div class="item-tools"><button type="button" class="icon icon-del" data-act="del" data-g="_" data-i="${idx}" aria-label="${tr('Supprimer', 'Delete')}">✕</button></div></li>`).join('')}</ol>` : `<p class="muted empty">${tr('Personne pour l’instant.', 'No one yet.')}</p>`}
       <button type="button" class="btn btn-secondary btn-sm" data-act="empty" data-g="_">${tr('+ Ajouter un·e signataire', '+ Add a signatory')}</button>
-    </section>`;
+    </section>
+    ${(plan.data.versions || []).length ? `<p class="center"><a class="btn btn-ghost btn-sm" href="#/versions">🔄 ${tr('Versions signées et changements', 'Signed versions and changes')} (${plan.data.versions.length})</a></p>` : ''}`;
 }
 
 function modifiedAfterSigning() {
@@ -1973,14 +1974,24 @@ const TTS_KEY = 'monpcc.tts';
 const ttsOn = () => { try { return localStorage.getItem(TTS_KEY) === '1'; } catch { return false; } };
 const easyOn = () => { try { return localStorage.getItem(EASY_KEY) === '1'; } catch { return false; } };
 const textSize = () => { try { return localStorage.getItem(TEXT_KEY) || 'm'; } catch { return 'm'; } };
+let talkMode = false; // mode entretien : texte agrandi, seulement pendant l'entretien (jamais enregistré)
 function applyTextSize(v = textSize()) {
-  document.documentElement.dataset.text = v;
+  document.documentElement.dataset.text = talkMode ? ({ m: 'l', l: 'xl', xl: 'xl' }[v] || 'l') : v;
+  if (typeof talkBar !== 'undefined') {
+    talkBar.hidden = !talkMode;
+    document.body.classList.toggle('has-talk-bar', talkMode);
+  }
+}
+function setTalkMode(on) {
+  talkMode = on;
+  applyTextSize();
+  if (location.hash.startsWith('#/entretien')) rerender(renderTalk);
 }
 
 function renderTalk() {
   const notes = plan.data.notes || {};
   const withNotes = STEPS.map((st, i) => [st, i]).filter(([st]) => (notes[st.id] || '').trim());
-  const big = textSize() !== 'm';
+
   app.innerHTML = `
     <h1>🗣 ${tr('Préparer mon entretien', 'Prepare my appointment')}</h1>
     <p class="lead">${tr('Le plan de crise conjoint se construit avec un·e professionnel·le. Je note ici ce que je veux aborder ; pendant l’entretien, je peux afficher mon plan en grand pour le relire ensemble.', 'A joint crisis plan is built with a professional. I note here what I want to talk about; during the appointment, I can show my plan in large text to read it through together.')}</p>
@@ -1992,11 +2003,11 @@ function renderTalk() {
     <section class="card">
       <h2>🔎 ${tr('Pendant l’entretien', 'During the appointment')}</h2>
       <div class="stack">
-        <button type="button" class="btn ${big ? 'btn-secondary' : 'btn-primary'}" data-act="text-big">${big ? tr('Revenir au texte normal', 'Back to normal text') : tr('Afficher en grand', 'Show in large text')}</button>
+        <button type="button" class="btn ${talkMode ? 'btn-secondary' : 'btn-primary'}" data-act="talk-toggle">${talkMode ? tr('✕ Terminer le mode entretien', '✕ End appointment mode') : tr('🗣 Démarrer le mode entretien (texte agrandi)', '🗣 Start appointment mode (larger text)')}</button>
         <a class="btn btn-secondary" href="#/plan">📄 ${tr('Relire mon plan', 'Read my plan')}</a>
         ${(plan.data.versions || []).length ? `<a class="btn btn-secondary" href="#/versions">🔄 ${tr('Ce qui a changé depuis la dernière signature', 'What has changed since the last signature')}</a>` : ''}
       </div>
-      <p class="muted small">${tr('La taille du texte se règle aussi dans Réglages › Accessibilité.', 'Text size can also be set in Settings › Accessibility.')}</p>
+      <p class="muted small">${tr('Le texte reste agrandi sur toutes les pages pendant l’entretien. Le bandeau en haut de l’écran permet de terminer à tout moment ; le mode s’arrête aussi en fermant l’application.', 'Text stays larger on every page during the appointment. The banner at the top of the screen ends it at any time; the mode also stops when the app is closed.')}</p>
     </section>`;
 }
 
@@ -2012,6 +2023,17 @@ function contentData(d) {
 }
 
 /** À chaque signature : garde la version signée (10 au plus) */
+/** Plans signés avant l'historique : on garde la version signée actuelle si les signatures sont valables */
+function ensureVersionHistory() {
+  const d = plan?.data;
+  if (!d || (d.versions || []).length) return;
+  const valid = (d.signature?.signataires || []).filter((r) => sigValid(r, plan));
+  if (!valid.length) return;
+  const at = valid.map((r) => r.signedAt).sort().pop();
+  d.versions = [{ at, signers: valid.map((r) => ({ nom: r.nom || '', role: r.role || '', at: r.signedAt })), data: contentData(d) }];
+  scheduleSave(false);
+}
+
 function archiveSigned() {
   const d = plan.data;
   const snap = contentData(d);
@@ -2059,6 +2081,11 @@ function renderVersions(arg) {
       <h1>${tr('Version signée', 'Signed version')}</h1>
       <p class="lead">${tr(`Signée sur écran le ${esc(fmtDateTime(v.at))}`, `Signed on screen on ${esc(fmtDateTime(v.at))}`)}${signersText(v) ? ` ${tr('par', 'by')} ${esc(signersText(v))}` : ''}.</p>
       <p class="muted small">${tr('Les signatures dessinées ne sont pas conservées dans l’historique.', 'Drawn signatures are not kept in the history.')}</p>
+      <section class="card no-print">
+        <h2>${+arg > 0 ? tr(`Changements par rapport à la version du ${esc(fmtDateTime(vs[+arg - 1].at))}`, `Changes since the version of ${esc(fmtDateTime(vs[+arg - 1].at))}`) : tr('Première version signée', 'First signed version')}</h2>
+        ${+arg > 0 ? changesHTML(vs[+arg - 1].data, v.data) : `<p class="muted">${tr('Pas de version signée plus ancienne à comparer.', 'No older signed version to compare with.')}</p>`}
+        ${+arg < vs.length - 1 ? `<p class="small"><a href="#/versions/${+arg + 1}">${tr('Version suivante →', 'Next version →')}</a></p>` : ''}
+      </section>
       <article class="doc">${documentHTML(doc)}</article>
       <div class="nav-bottom no-print"><a class="btn btn-ghost" href="#/versions">${tr('← Versions', '← Versions')}</a></div>`;
     return;
@@ -2074,7 +2101,8 @@ function renderVersions(arg) {
     </section>
     <section class="card">
       <h2>${tr('Toutes les versions', 'All versions')}</h2>
-      <ol class="versions">${vs.map((v, k) => `<li><a href="#/versions/${k}">${esc(fmtDateTime(v.at))}</a>${signersText(v) ? ` <span class="muted small">— ${esc(signersText(v))}</span>` : ''}</li>`).reverse().join('')}</ol>
+      <ol class="versions">${vs.map((v, k) => `<li><a href="#/versions/${k}">${esc(fmtDateTime(v.at))}</a>${signersText(v) ? ` <span class="muted small">— ${esc(signersText(v))}</span>` : ''}
+        <br><a class="small" href="#/versions/${k}">${k > 0 ? tr('Voir cette version et ses changements', 'See this version and its changes') : tr('Voir cette version', 'See this version')}</a></li>`).reverse().join('')}</ol>
       <p class="muted small">${tr('Les 10 dernières versions sont gardées.', 'The last 10 versions are kept.')}</p>
     </section>` : `<p class="card muted">${tr('Aucune version signée pour l’instant.', 'No signed version yet.')}</p>`}
     <div class="nav-bottom"><a class="btn btn-ghost" href="#/plan">${tr('← Mon plan', '← My plan')}</a></div>`;
@@ -2637,6 +2665,7 @@ function renderChrome() {
   $('#qr-full')?.setAttribute('aria-label', tr('QR code de Mon PCC', 'Mon PCC QR code'));
   $('#sigpad')?.setAttribute('aria-label', 'Signature');
   editFloat.textContent = tr('✓ Terminé', '✓ Done');
+  renderTalkBar();
   refreshInstallUI();
 }
 
@@ -2644,7 +2673,7 @@ function renderChrome() {
 
 function openMenu() {
   const m = $('#menu');
-  $('#menu-steps').innerHTML = stepsListHTML();
+  $('#menu-steps').innerHTML = stepsListHTML() + ((plan?.data.versions || []).length ? `<a class="menu-link" href="#/versions">🔄 ${tr('Versions signées et changements', 'Signed versions and changes')}</a>` : '');
   m.hidden = false;
   $('#menu-btn').setAttribute('aria-expanded', 'true');
   $('#menu-close').focus();
@@ -2726,6 +2755,7 @@ app.addEventListener('submit', async (e) => {
       locked = false;
       applyVersion();
       media.prune(usedMediaIds()).catch(() => {});
+      ensureVersionHistory();
       route();
     } catch {
       err.textContent = tr('Code incorrect.', 'Incorrect code.');
@@ -3055,12 +3085,8 @@ document.addEventListener('click', async (e) => {
       if (q && step) speak(`${step.title}. ${easyOn() && step.easy ? step.easy.q : step.question}`, btn);
       break;
     }
-    case 'text-big': {
-      const v = textSize() === 'm' ? 'l' : 'm';
-      try { localStorage.setItem(TEXT_KEY, v); } catch { /* ignoré */ }
-      applyTextSize(v); rerender(renderTalk);
-      break;
-    }
+    case 'talk-toggle': setTalkMode(!talkMode); break;
+    case 'talk-end': setTalkMode(false); toast(tr('Mode entretien terminé.', 'Appointment mode ended.')); break;
     case 'summary-save': pdfSave(true); break;
     case 'mes-summary':
       try { const file = await makePlanPdf('', true); download(file, file.name); toast(tr('Synthèse téléchargée.', 'Summary downloaded.')); } catch { pdfFail(); }
@@ -3154,6 +3180,7 @@ document.addEventListener('click', async (e) => {
       renderSettings();
       break;
     case 'lock-now':
+      talkMode = false; applyTextSize();
       store.lock();
       forgetMediaURLs();
       plan = null;
@@ -3301,6 +3328,16 @@ document.addEventListener('visibilitychange', () => {
   }
 });
 
+/* Bandeau du mode entretien (visible sur toutes les pages tant qu'il est actif) */
+const talkBar = document.createElement('div');
+talkBar.className = 'talk-bar no-print';
+talkBar.hidden = true;
+talkBar.setAttribute('role', 'status');
+document.body.appendChild(talkBar);
+function renderTalkBar() {
+  talkBar.innerHTML = `<span>🗣 ${tr('Mode entretien', 'Appointment mode')}</span><button type="button" class="btn btn-sm" data-act="talk-end">✕ ${tr('Terminer', 'End')}</button>`;
+}
+
 /* Bouton flottant « Terminé » : visible tant qu'une liste de la page est en modification */
 const editFloat = document.createElement('button');
 editFloat.type = 'button';
@@ -3335,6 +3372,7 @@ function start() {
   saveState.textContent = st === 'none' ? '' : savedLabel();
   store.requestPersistence();
   if (plan) media.prune(usedMediaIds()).catch(() => {});
+  if (plan) ensureVersionHistory();
   route();
   refreshInstallUI();
   if (env.isMobile && !isStandalone() && bannerAllowed()) setTimeout(() => { if (!isStandalone()) showInstallBanner(); }, 2500);

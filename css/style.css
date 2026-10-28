@@ -545,3 +545,7 @@ html[data-text="xl"] .save-state { display: none; }
 #voix { margin-top: 1rem; padding-top: .8rem; border-top: 1px solid var(--line); }
 #accessibilite .check input[type="checkbox"] { width: 22px; height: 22px; flex: none; }
 #dict-local .link { text-align: left; display: inline; padding: 0; }
+.talk-bar { position: fixed; top: 0; left: 0; right: 0; height: 48px; box-sizing: border-box; z-index: 35; white-space: nowrap; display: flex; align-items: center; justify-content: space-between; gap: .6rem; padding: .5rem 1rem; background: var(--brand); color: #fff; font-weight: 600; font-size: 15px; }
+.talk-bar .btn { background: #fff; color: var(--brand-ink); border-color: #fff; font-size: 14px; min-height: 34px; padding: 4px 12px; }
+body.has-talk-bar { padding-top: 48px; }
+body.has-talk-bar .topbar { top: 48px; }

@@ -190,6 +190,46 @@ def signed_versions(ctx, page, errors):
     assert 'Insomnie' in page.inner_text('.diff-steps')
 
 
+@test
+def changes_between_two_signatures(ctx, page, errors):
+    seed(page, {'version': 'adulte', 'difficultes': ['Angoisse'],
+                'signature': {'signataires': [{'nom': 'Léa', 'sig': 'data:image/png;base64,iVBORw0KGgo=',
+                                               'signedAt': '2026-10-21T10:00:00.000Z'}]}})
+    page.wait_for_timeout(500)
+    assert page.evaluate('JSON.parse(localStorage.getItem("monpcc.v1")).plan.data.versions.length') == 1, \
+        'un plan déjà signé doit avoir sa version dans l’historique'
+    page.goto(BASE + '#/etape/2')
+    page.fill('#free-_', 'Insomnie')
+    page.click('form.free button')
+    page.goto(BASE + '#/etape/13')
+    page.click('[data-act=sign]')
+    box = page.locator('#sigpad canvas').bounding_box()
+    page.mouse.move(box['x'] + 20, box['y'] + 40)
+    page.mouse.down()
+    page.mouse.move(box['x'] + 150, box['y'] + 80, steps=8)
+    page.mouse.up()
+    page.click('[data-sig=ok]')
+    page.goto(BASE + '#/versions/1')
+    assert 'Insomnie' in page.inner_text('.diff-steps')
+
+
+@test
+def appointment_mode_is_temporary(ctx, page, errors):
+    page.goto(BASE)
+    page.click('[data-act=start][data-v=adulte]')
+    page.goto(BASE + '#/entretien')
+    page.click('[data-act=talk-toggle]')
+    assert page.evaluate('document.documentElement.dataset.text') == 'l'
+    page.goto(BASE + '#/plan')
+    assert page.is_visible('.talk-bar')
+    page.click('.talk-bar [data-act=talk-end]')
+    assert page.evaluate('document.documentElement.dataset.text') == 'm'
+    page.goto(BASE + '#/entretien')
+    page.click('[data-act=talk-toggle]')
+    page.reload()
+    assert page.evaluate('document.documentElement.dataset.text') == 'm', 'le mode entretien ne doit pas rester'
+
+
 def main():
     failed = 0
     with sync_playwright() as pw:

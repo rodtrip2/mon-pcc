@@ -75,11 +75,13 @@ Mon PCC est une application web installable (PWA), gratuite et sans serveur, qui
 - **Écran « Ça ne va pas » sans code** : uniquement si la personne l'active, plan protégé ; la copie lisible sans code (`monpcc.crisisSnap`) ne contient que stratégies, personnes à appeler, citations, liens et exercices. Ne jamais y ajouter d'autres données sans le dire dans l'avertissement.
 - **Notes « à aborder avec mon soignant »** : privées, jamais dans le plan imprimé ou envoyé, sans effet sur les signatures (`scheduleSave(false)`).
 - **Voix** : lecture à voix haute seulement avec une voix locale (`localService`). Dictée désactivée par défaut ; mode « sur ce téléphone » refusé si le navigateur ne peut pas garantir le traitement local ; mode en ligne seulement après l'avertissement. Ne pas appeler `SpeechRecognition.available()` automatiquement (plantage de certains navigateurs) : seulement à la demande.
+- **Mode entretien** : texte agrandi seulement pendant l'entretien (jamais enregistré), bandeau en haut avec « Terminer », arrêté au verrouillage ou à la fermeture.
 - **FALC** : la question officielle reste visible et c'est elle qui figure dans les documents.
 - **Options d'accessibilité** (FALC, taille du texte, lecture à voix haute, dictée) : **désactivées par défaut**, regroupées dans Réglages › Accessibilité. Rien ne s'affiche tant que la personne ne les active pas.
 
 ## 7. Méthode de travail
 
+- Vérifier la syntaxe des modules avec `node --input-type=module --check < js/fichier.js` (un simple `node --check` ne détecte pas toutes les erreurs).
 - Tester chaque changement dans un navigateur à la taille d'un téléphone (Playwright, 390 × 844), en version adulte **et** ado, sans erreur dans la console. Lancer `tests/run_tests.py` (aussi exécuté par GitHub à chaque envoi) et y ajouter un test pour chaque nouvelle fonctionnalité.
 - Messages de commit en français. Pousser sur `main` : GitHub Pages publie depuis la racine de `main`.
 - Mettre à jour le README quand une fonctionnalité change, et **ce fichier quand une décision est prise**.

@@ -283,18 +283,26 @@ export function renderPoster(url, qr) {
   fitText(ctx, tr('Mon plan de crise conjoint', 'My joint crisis plan'), 292, 245, W - 380, 44, 500);
 
   const L = 100; const maxW = W - 2 * L;
-  ctx.fillStyle = '#1d2a2c';
-  ctx.font = `700 64px ${FONT}`;
-  let y = wrapText(ctx, tr('Et si on préparait ensemble ce qui m’aide en cas de crise ?', 'What if we prepared together what helps me in a crisis?'), L, 430, maxW, 78);
-  ctx.fillStyle = '#4b5a5c'; ctx.font = `400 38px ${FONT}`;
-  y = wrapText(ctx, tr('Le plan de crise conjoint décrit ce qui peut me mettre en crise, comment le repérer, ce qui m’aide, qui prévenir et les soins que je souhaite. Je le prépare avec mes mots, puis je le construis avec les professionnel·les qui m’accompagnent.', 'A joint crisis plan describes what can trigger a crisis, how to spot it, what helps me, who to contact and the care I want. I prepare it in my own words, then build it with the professionals who support me.'), L, y + 30, maxW, 52);
-  ctx.fillStyle = BRAND_DARK; ctx.font = `600 38px ${FONT}`;
-  for (const b of [tr('Gratuit, sans compte, sans publicité', 'Free, no account, no ads'), tr('Mes réponses restent sur mon téléphone', 'My answers stay on my phone'), tr('Version adulte et version ado', 'Adult and teen versions')]) {
-    y += 22; ctx.fillText('✓  ' + b, L, y + 40); y += 52;
-  }
-  // QR code
-  // QR code ancré en bas, au-dessus des mentions ; réduit si le texte est long
-  const box = Math.max(360, Math.min(560, H - 340 - (y + 60))); const bx = (W - box) / 2; const by = H - 330 - box;
+  // Texte : on réduit la taille si besoin pour laisser au QR code au moins 420 px, sans chevauchement
+  const drawText = (c, k) => {
+    c.fillStyle = '#1d2a2c';
+    c.font = `700 ${Math.round(64 * k)}px ${FONT}`;
+    let yy = wrapText(c, tr('Et si on préparait ensemble ce qui m’aide en cas de crise ?', 'What if we prepared together what helps me in a crisis?'), L, 430, maxW, Math.round(78 * k));
+    c.fillStyle = '#4b5a5c'; c.font = `400 ${Math.round(38 * k)}px ${FONT}`;
+    yy = wrapText(c, tr('Le plan de crise conjoint décrit ce qui peut me mettre en crise, comment le repérer, ce qui m’aide, qui prévenir et les soins que je souhaite. Je le prépare avec mes mots, puis je le construis avec les professionnel·les qui m’accompagnent.', 'A joint crisis plan describes what can trigger a crisis, how to spot it, what helps me, who to contact and the care I want. I prepare it in my own words, then build it with the professionals who support me.'), L, yy + 30 * k, maxW, Math.round(52 * k));
+    c.fillStyle = BRAND_DARK; c.font = `600 ${Math.round(38 * k)}px ${FONT}`;
+    for (const b of [tr('Gratuit, sans compte, sans publicité', 'Free, no account, no ads'), tr('Mes réponses restent sur mon téléphone', 'My answers stay on my phone'), tr('Version adulte et version ado', 'Adult and teen versions')]) {
+      yy += 22 * k; c.fillText('✓  ' + b, L, yy + 40 * k); yy += 52 * k;
+    }
+    return yy;
+  };
+  const QR_BOTTOM = H - 330; // bas du cadre du QR code (mentions en dessous)
+  const probe = document.createElement('canvas').getContext('2d');
+  let k = 1;
+  for (const kk of [1, 0.92, 0.85, 0.78, 0.72]) { k = kk; if (QR_BOTTOM - (drawText(probe, kk) + 50) >= 420) break; }
+  const y = drawText(ctx, k);
+  // QR code ancré en bas, entre le texte et les mentions
+  const box = Math.min(560, QR_BOTTOM - (y + 50)); const bx = (W - box) / 2; const by = QR_BOTTOM - box;
   ctx.save(); ctx.shadowColor = 'rgba(36, 82, 78, 0.18)'; ctx.shadowBlur = 30; ctx.shadowOffsetY = 8;
   ctx.fillStyle = '#fff'; roundRect(ctx, bx, by, box, box, 36); ctx.fill(); ctx.restore();
   ctx.strokeStyle = '#d9e6e3'; ctx.lineWidth = 3; roundRect(ctx, bx, by, box, box, 36); ctx.stroke();
