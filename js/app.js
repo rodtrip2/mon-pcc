@@ -253,7 +253,8 @@ function renderHome() {
   if (sigDate) {
     const due = addMonths(sigDate, 6);
     const late = due <= new Date().toISOString().slice(0, 10);
-    review = `<p class="review ${late ? 'late' : ''}">${late ? tr('Il est temps de relire mon plan', 'It’s time to review my plan') : tr('Prochaine relecture conseillée', 'Next suggested review')}${tr(' :', ':')} <strong>${fmtDate(due)}</strong></p>`;
+    review = `<p class="review ${late ? 'late' : ''}">${late ? tr('Il est temps de relire mon plan', 'It’s time to review my plan') : tr('Prochaine relecture conseillée', 'Next suggested review')}${tr(' :', ':')} <strong>${fmtDate(due)}</strong>
+      ${late ? '' : `<button type="button" class="link small" data-act="review-ics">📅 ${tr('Ajouter à mon agenda', 'Add to my calendar')}</button>`}</p>`;
   }
   const vl = versionLabel();
   app.innerHTML = `
@@ -452,6 +453,7 @@ function finalHTML(step) {
       <label class="field"><span>${tr('Lieu', 'Place')}</span><input data-k="lieu" data-fk="fin:lieu" value="${esc(v.lieu || '')}" placeholder="${tr('Ex. : CMP, à domicile…', 'E.g. clinic, at home…')}"></label>
       <label class="field"><span>${tr('Date', 'Date')}</span><input type="date" data-k="date" data-fk="fin:date" value="${esc(v.date || '')}"></label>
       <button type="button" class="btn btn-ghost btn-sm" data-act="today">${tr('Mettre la date du jour', 'Use today’s date')}</button>
+      ${v.date ? `<p class="small field-wide">${tr('Relecture conseillée le', 'Suggested review on')} <strong>${fmtDate(addMonths(v.date, 6))}</strong> · <button type="button" class="link small" data-act="review-ics">📅 ${tr('Ajouter un rappel à mon agenda', 'Add a reminder to my calendar')}</button></p>` : ''}
     </section>
     ${modifiedAfterSigning() ? `<div class="warn" role="status"><strong>${tr(`Le plan a été modifié le ${esc(fmtDateTime(lastUpdate(plan)))}, après certaines signatures.`, `The plan was changed on ${esc(fmtDateTime(lastUpdate(plan)))}, after some signatures.`)}</strong> ${tr('Ces signatures ne figurent plus sur l’impression ni sur le PDF : relisez le plan ensemble puis signez à nouveau.', 'These signatures no longer appear on the printout or the PDF: read the plan through together, then sign again.')}</div>` : ''}
     <section class="group card">
@@ -1795,6 +1797,33 @@ async function confirmShare() {
   return ok;
 }
 
+/* ---------- rappel de relecture (fichier d'agenda .ics, rien n'est envoyé) ---------- */
+
+async function reviewIcs() {
+  const sig = plan.data.signature?.date;
+  if (!sig) return;
+  const due = addMonths(sig, 6);
+  const d = due.replace(/-/g, '');
+  const next = new Date(due + 'T12:00:00'); next.setDate(next.getDate() + 1);
+  const d2 = next.toISOString().slice(0, 10).replace(/-/g, '');
+  const stamp = new Date().toISOString().replace(/[-:]/g, '').replace(/\.\d+/, '');
+  const icsEsc = (t) => t.replace(/[\\;,]/g, (c) => '\\' + c).replace(/\n/g, '\\n');
+  const title = tr('Relire mon plan de crise conjoint', 'Review my joint crisis plan');
+  const desc = tr('Relire mon plan avec les personnes qui m’accompagnent (Mon PCC). À faire aussi après une crise ou un changement important.', 'Review my plan with the people who support me (Mon PCC). Also do this after a crisis or an important change.');
+  const ics = ['BEGIN:VCALENDAR', 'VERSION:2.0', 'PRODID:-//Mon PCC//FR', 'CALSCALE:GREGORIAN', 'BEGIN:VEVENT',
+    `UID:monpcc-relecture-${d}@mon-pcc`, `DTSTAMP:${stamp}`, `DTSTART;VALUE=DATE:${d}`, `DTEND;VALUE=DATE:${d2}`,
+    `SUMMARY:${icsEsc(title)}`, `DESCRIPTION:${icsEsc(desc)}`,
+    'BEGIN:VALARM', 'ACTION:DISPLAY', `DESCRIPTION:${icsEsc(title)}`, 'TRIGGER:-P7D', 'END:VALARM',
+    'BEGIN:VALARM', 'ACTION:DISPLAY', `DESCRIPTION:${icsEsc(title)}`, 'TRIGGER:PT9H', 'END:VALARM',
+    'END:VEVENT', 'END:VCALENDAR'].join('\r\n') + '\r\n';
+  const file = new File([ics], tr('relecture-plan-de-crise.ics', 'crisis-plan-review.ics'), { type: 'text/calendar' });
+  if (navigator.canShare && navigator.canShare({ files: [file] })) {
+    try { await navigator.share({ files: [file], title }); return; } catch (e) { if (e.name === 'AbortError') return; }
+  }
+  download(file, file.name);
+  toast(tr('Fichier d’agenda téléchargé : je l’ouvre pour ajouter le rappel.', 'Calendar file downloaded: I open it to add the reminder.'));
+}
+
 /* ---------- PDF du plan (enregistrer / envoyer), protégé par code ---------- */
 
 function randomCode() {
@@ -2738,6 +2767,7 @@ document.addEventListener('click', async (e) => {
     }
     case 'print': window.print(); break;
     case 'pdf-save': pdfSave(); break;
+    case 'review-ics': reviewIcs(); break;
     case 'summary-save': pdfSave(true); break;
     case 'mes-summary':
       try { const file = await makePlanPdf('', true); download(file, file.name); toast(tr('Synthèse téléchargée.', 'Summary downloaded.')); } catch { pdfFail(); }
