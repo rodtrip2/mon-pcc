@@ -1855,9 +1855,8 @@ function reminderDialog() {
     <label class="field"><span>${tr('Titre dans mon agenda', 'Title in my calendar')}</span><input id="rem-title" value="${esc(defTitle)}" maxlength="80"></label>
     <p class="muted small">${tr('Je peux choisir un titre discret (par exemple «&nbsp;Relecture&nbsp;») si d’autres personnes voient mon agenda.', 'I can choose a discreet title (for example “Review”) if other people can see my calendar.')}</p>
     <div class="stack">
-      ${env.isAndroid ? `<button type="button" class="btn btn-primary" data-rem="google">📅 ${tr('Google Agenda', 'Google Calendar')} ↗</button>` : ''}
-      <button type="button" class="btn ${env.isAndroid ? 'btn-secondary' : 'btn-primary'}" data-rem="ics">📅 ${env.isIos ? tr('Ajouter à mon agenda (Calendrier)', 'Add to my calendar (Calendar)') : tr('Fichier agenda (.ics)', 'Calendar file (.ics)')}</button>
-      ${env.isAndroid ? '' : `<button type="button" class="btn btn-secondary" data-rem="google">${tr('Google Agenda', 'Google Calendar')} ↗</button>`}
+      <button type="button" class="btn btn-primary" data-rem="ics">📅 ${env.isIos ? tr('Ajouter à mon agenda (Calendrier)', 'Add to my calendar (Calendar)') : tr('Fichier agenda (.ics)', 'Calendar file (.ics)')}</button>
+      <button type="button" class="btn btn-secondary" data-rem="google">${tr('Google Agenda', 'Google Calendar')} ↗</button>
       <button type="button" class="btn btn-secondary" data-rem="outlook">Outlook ↗</button>
     </div>
     <p class="muted small">${tr('Avec Google Agenda ou Outlook, le titre et la date du rappel sont envoyés à ce service, comme pour tout évènement de mon agenda. Rien d’autre de mon plan.', 'With Google Calendar or Outlook, the reminder’s title and date are sent to that service, like any event in my calendar. Nothing else from my plan.')}</p>
