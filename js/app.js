@@ -183,6 +183,7 @@ function route() {
     case 'boite-outils': renderToolbox(arg === 'etape'); break;
     case 'crise': renderCrisis(); break;
     case 'versions': renderVersions(arg); break;
+    case 'entretien': renderTalk(); break;
     case 'apropos': renderAbout(); break;
     case 'confidentialite': renderPrivacy(); break;
     default: renderHome();
@@ -339,6 +340,7 @@ function renderStep(i) {
     <h1>${esc(step.title)}</h1>
     <blockquote class="question"><span class="q-label">${qLabel}</span>${esc(step.question)}</blockquote>
     <details class="tip"><summary>${tr('Conseil', 'Tip')}</summary><p>${esc(step.tip)}</p></details>
+    ${talkNoteHTML(step)}
     ${warn}
     <div class="step-body" data-step="${i}">${body}</div>
     <div class="nav-bottom">
@@ -1826,6 +1828,45 @@ async function reviewIcs() {
   toast(tr('Fichier d’agenda téléchargé : je l’ouvre pour ajouter le rappel.', 'Calendar file downloaded: I open it to add the reminder.'));
 }
 
+/* ---------- préparer l'entretien avec le soignant ---------- */
+
+/** Notes « à aborder avec mon soignant » d'une étape (jamais dans le plan imprimé ou envoyé) */
+function talkNoteHTML(step) {
+  const v = plan.data.notes?.[step.id] || '';
+  return `<details class="talk" ${v ? 'open' : ''}><summary>💬 ${tr('À aborder avec mon soignant', 'To discuss with my professional')}</summary>
+    <textarea rows="2" data-note="${esc(step.id)}" data-fk="note:${esc(step.id)}" placeholder="${tr('Une question, un doute, un point à préciser ensemble…', 'A question, a doubt, something to clarify together…')}">${esc(v)}</textarea>
+    <p class="muted small">${tr('Ces notes restent sur ce téléphone : elles ne figurent pas dans le plan imprimé ou envoyé.', 'These notes stay on this phone: they are not included in the printed or sent plan.')} <a href="#/entretien">${tr('Toutes mes notes', 'All my notes')}</a></p></details>`;
+}
+
+const TEXT_KEY = 'monpcc.text';
+const textSize = () => { try { return localStorage.getItem(TEXT_KEY) || 'm'; } catch { return 'm'; } };
+function applyTextSize(v = textSize()) {
+  document.documentElement.dataset.text = v;
+}
+
+function renderTalk() {
+  const notes = plan.data.notes || {};
+  const withNotes = STEPS.map((st, i) => [st, i]).filter(([st]) => (notes[st.id] || '').trim());
+  const big = textSize() !== 'm';
+  app.innerHTML = `
+    <h1>🗣 ${tr('Préparer mon entretien', 'Prepare my appointment')}</h1>
+    <p class="lead">${tr('Le plan de crise conjoint se construit avec un·e professionnel·le. Je note ici ce que je veux aborder ; pendant l’entretien, je peux afficher mon plan en grand pour le relire ensemble.', 'A joint crisis plan is built with a professional. I note here what I want to talk about; during the appointment, I can show my plan in large text to read it through together.')}</p>
+    <section class="card">
+      <h2>💬 ${tr('Mes points à aborder', 'What I want to discuss')}</h2>
+      ${withNotes.length ? `<ul class="talk-list">${withNotes.map(([st, i]) => `<li><a href="#/etape/${i}"><strong>${esc(st.title)}</strong></a><p>${esc(notes[st.id]).replace(/\n/g, '<br>')}</p></li>`).join('')}</ul>`
+        : `<p class="muted">${tr('Aucun point noté pour l’instant. Dans chaque étape, la rubrique « À aborder avec mon soignant » permet d’en ajouter.', 'Nothing noted yet. In each step, the “To discuss with my professional” section lets me add points.')}</p>`}
+    </section>
+    <section class="card">
+      <h2>🔎 ${tr('Pendant l’entretien', 'During the appointment')}</h2>
+      <div class="stack">
+        <button type="button" class="btn ${big ? 'btn-secondary' : 'btn-primary'}" data-act="text-big">${big ? tr('Revenir au texte normal', 'Back to normal text') : tr('Afficher en grand', 'Show in large text')}</button>
+        <a class="btn btn-secondary" href="#/plan">📄 ${tr('Relire mon plan', 'Read my plan')}</a>
+        ${(plan.data.versions || []).length ? `<a class="btn btn-secondary" href="#/versions">🔄 ${tr('Ce qui a changé depuis la dernière signature', 'What has changed since the last signature')}</a>` : ''}
+      </div>
+      <p class="muted small">${tr('La taille du texte se règle aussi dans les Réglages.', 'Text size can also be set in Settings.')}</p>
+    </section>`;
+}
+
 /* ---------- versions signées et changements ---------- */
 
 /** Contenu du plan sans les signatures dessinées ni les fichiers (pour l'archive) */
@@ -2088,6 +2129,10 @@ function renderSettings() {
   app.innerHTML = `
     <h1>${tr('Réglages', 'Settings')}</h1>
     ${localeSectionHTML()}
+    <section class="card" id="affichage">
+      <h2>🔠 ${tr('Taille du texte', 'Text size')}</h2>
+      <div class="choice">${[['m', tr('Normale', 'Normal')], ['l', tr('Grande', 'Large')], ['xl', tr('Très grande', 'Extra large')]].map(([v, l]) => `<label class="radio"><input type="radio" name="text" value="${v}" data-act="text-size" ${textSize() === v ? 'checked' : ''}> <span>${l}</span></label>`).join('')}</div>
+    </section>
     <section class="card" id="version">
       <h2>${tr('Version du plan', 'Plan version')}</h2>
       <p class="muted small">${tr('Je peux changer de version à tout moment. Les réponses communes sont gardées ; les rubriques propres à l’autre version sont conservées mais masquées.', 'I can switch versions at any time. Shared answers are kept; sections specific to the other version are kept but hidden.')}</p>
@@ -2433,6 +2478,7 @@ function renderChrome() {
       <a class="menu-link" href="#/">${tr('Accueil', 'Home')}</a>
       <a class="menu-link" href="#/demarche">${tr('La démarche', 'How it works')}</a>
       <div id="menu-steps"></div>
+      <a class="menu-link" href="#/entretien">🗣 ${tr('Préparer mon entretien', 'Prepare my appointment')}</a>
       <a class="menu-link" href="#/plan">📄 ${tr('Mon plan : imprimer, enregistrer, envoyer', 'My plan: print, save, send')}</a>
       <a class="menu-link tb-link-menu" href="#/boite-outils">🧰 ${tr('Ma boîte à outils', 'My toolbox')}</a>
       <a class="menu-link" href="#/ressources">📞 ${tr('Ressources d’aide', 'Help resources')}</a>
@@ -2489,6 +2535,12 @@ app.addEventListener('input', (e) => {
   if (el.dataset.tb !== undefined) {
     toolbox()[+el.dataset.tb].title = el.value;
     scheduleSave();
+    return;
+  }
+  if (el.dataset.note) {
+    (plan.data.notes ??= {})[el.dataset.note] = el.value;
+    if (!el.value.trim()) delete plan.data.notes[el.dataset.note];
+    scheduleSave(false); // notes personnelles : hors du plan signé
     return;
   }
   const stepEl = el.closest('[data-step]');
@@ -2850,6 +2902,12 @@ document.addEventListener('click', async (e) => {
     case 'print': window.print(); break;
     case 'pdf-save': pdfSave(); break;
     case 'review-ics': reviewIcs(); break;
+    case 'text-big': {
+      const v = textSize() === 'm' ? 'l' : 'm';
+      try { localStorage.setItem(TEXT_KEY, v); } catch { /* ignoré */ }
+      applyTextSize(v); rerender(renderTalk);
+      break;
+    }
     case 'summary-save': pdfSave(true); break;
     case 'mes-summary':
       try { const file = await makePlanPdf('', true); download(file, file.name); toast(tr('Synthèse téléchargée.', 'Summary downloaded.')); } catch { pdfFail(); }
@@ -3021,6 +3079,11 @@ document.addEventListener('change', async (e) => {
     toast(`${country().flag} ${L(country().name)}`);
     return;
   }
+  if (act === 'text-size') {
+    try { localStorage.setItem(TEXT_KEY, e.target.value); } catch { /* ignoré */ }
+    applyTextSize(e.target.value);
+    return;
+  }
   if (act === 'crisis-open') {
     try { if (e.target.checked) localStorage.setItem(CRISIS_OPEN, '1'); else localStorage.removeItem(CRISIS_OPEN); } catch { /* ignoré */ }
     syncCrisisSnapshot();
@@ -3080,6 +3143,7 @@ new MutationObserver(() => app.querySelectorAll('textarea.item-input, textarea.t
 /* ---------- démarrage ---------- */
 
 function start() {
+  applyTextSize();
   renderChrome();
   if (!store.storageAvailable()) {
     app.innerHTML = `<h1>${tr('Enregistrement impossible', 'Saving is not possible')}</h1><p class="warn">${tr('Ce navigateur bloque l’enregistrement local (navigation privée ?). Ouvrez Mon PCC dans une fenêtre normale pour pouvoir enregistrer votre plan.', 'This browser blocks local storage (private browsing?). Open Mon PCC in a normal window to be able to save your plan.')}</p>`;

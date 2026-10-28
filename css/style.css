@@ -43,7 +43,7 @@
 html { -webkit-text-size-adjust: 100%; }
 body {
   margin: 0;
-  font: 17px/1.55 var(--font);
+  font: 1.0625rem/1.55 var(--font);
   color: var(--ink);
   background: var(--bg);
   min-height: 100vh;
@@ -519,3 +519,15 @@ body.no-scroll { overflow: hidden; }
 .diff-del { background: #fbe7e4; color: #7a2a1f; text-decoration: line-through; }
 @media (prefers-color-scheme: dark) { .diff-add { background: #1f3a27; color: #cfe9d6; } .diff-del { background: #3e2420; color: #f2cdc6; } }
 .versions li { margin: .3rem 0; }
+html[data-text="l"] { font-size: 115%; }
+html[data-text="xl"] { font-size: 132%; }
+.talk { margin: .6rem 0 1rem; background: var(--card); border: 1px solid var(--line); border-radius: 12px; padding: .5rem .8rem; }
+.talk summary { cursor: pointer; font-weight: 600; color: var(--brand-ink); }
+.talk textarea { width: 100%; margin-top: .5rem; }
+.talk-list { list-style: none; margin: 0; padding: 0; }
+.talk-list li { padding: .5rem 0; border-bottom: 1px solid var(--line); }
+.talk-list li:last-child { border-bottom: 0; }
+.talk-list p { margin: .2rem 0 0; }
+.brand { white-space: nowrap; }
+html[data-text="l"] .save-state { font-size: .65rem; }
+html[data-text="xl"] .save-state { display: none; }
