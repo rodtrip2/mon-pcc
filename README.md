@@ -17,7 +17,7 @@ un·e professionnel·le qui l’accompagne et, si elle le souhaite, ses proches.
 - **Synthèse d’une page** (PDF) pour les urgences : personnes à prévenir, soins à éviter et alternatives, soins souhaités, ce qui aide, signes de crise.
 - **Versions signées** : copie du contenu à chaque signature (10 au plus), et page des changements depuis la dernière version signée.
 - **Préparer mon entretien** : notes privées « à aborder avec mon soignant » dans chaque étape (hors du plan), récapitulatif, affichage en grand.
-- **Rappel de relecture** : date au choix (6 mois après la signature par défaut), titre modifiable (possiblement discret), ajout direct à l’agenda du téléphone sur Android, Google Agenda ou Outlook, ou fichier .ics (ouvert directement par le Calendrier sur iPhone). La date choisie est gardée et affichée à l’accueil.
+- **Rappel de relecture** : date au choix (6 mois après la signature par défaut), titre modifiable (possiblement discret), ajout direct dans Google Agenda ou Outlook, ou fichier .ics (ouvert directement par le Calendrier sur iPhone). La date choisie est gardée et affichée à l’accueil.
 - **Pour les professionnel·les** : le PCC en bref, ce que disent les études, accompagner la démarche, affiche A4 avec QR code (PDF).
 - **Lecture et voix** : questions en « facile à lire et à comprendre » (FALC / easy read), taille du texte, lecture à voix haute avec une voix installée sur l’appareil, dictée désactivée par défaut (« sur ce téléphone uniquement », ou en ligne après avertissement).
 - **Rédaction guidée sans induire les réponses** : pour chaque question, un conseil de rédaction et une saisie libre « avec mes mots » en premier. Des **exemples à cocher** n’apparaissent qu’en touchant le bouton « Exemples ».

@@ -1833,11 +1833,8 @@ function reminderLinks(date, title, desc) {
   const d = date.replace(/-/g, '');
   const next = new Date(date + 'T12:00:00'); next.setDate(next.getDate() + 1);
   const d2 = next.toISOString().slice(0, 10).replace(/-/g, '');
-  const start = new Date(date + 'T09:00:00').getTime();
   const enc = encodeURIComponent;
   return {
-    // Android : ouvre l'écran « nouvel évènement » de l'application d'agenda du téléphone
-    android: `intent:#Intent;action=android.intent.action.INSERT;type=vnd.android.cursor.item/event;S.title=${enc(title)};S.description=${enc(desc)};l.beginTime=${start};l.endTime=${start + 3600000};B.allDay=true;end`,
     google: `https://calendar.google.com/calendar/render?action=TEMPLATE&text=${enc(title)}&dates=${d}/${d2}&details=${enc(desc)}`,
     outlook: `https://outlook.live.com/calendar/0/deeplink/compose?subject=${enc(title)}&startdt=${date}&enddt=${next.toISOString().slice(0, 10)}&allday=true&body=${enc(desc)}`,
   };
@@ -1858,9 +1855,9 @@ function reminderDialog() {
     <label class="field"><span>${tr('Titre dans mon agenda', 'Title in my calendar')}</span><input id="rem-title" value="${esc(defTitle)}" maxlength="80"></label>
     <p class="muted small">${tr('Je peux choisir un titre discret (par exemple «&nbsp;Relecture&nbsp;») si d’autres personnes voient mon agenda.', 'I can choose a discreet title (for example “Review”) if other people can see my calendar.')}</p>
     <div class="stack">
-      ${env.isAndroid ? `<button type="button" class="btn btn-primary" data-rem="android">📅 ${tr('Ouvrir l’agenda de mon téléphone', 'Open my phone’s calendar')}</button>` : ''}
+      ${env.isAndroid ? `<button type="button" class="btn btn-primary" data-rem="google">📅 ${tr('Google Agenda', 'Google Calendar')} ↗</button>` : ''}
       <button type="button" class="btn ${env.isAndroid ? 'btn-secondary' : 'btn-primary'}" data-rem="ics">📅 ${env.isIos ? tr('Ajouter à mon agenda (Calendrier)', 'Add to my calendar (Calendar)') : tr('Fichier agenda (.ics)', 'Calendar file (.ics)')}</button>
-      <button type="button" class="btn btn-secondary" data-rem="google">${tr('Google Agenda', 'Google Calendar')} ↗</button>
+      ${env.isAndroid ? '' : `<button type="button" class="btn btn-secondary" data-rem="google">${tr('Google Agenda', 'Google Calendar')} ↗</button>`}
       <button type="button" class="btn btn-secondary" data-rem="outlook">Outlook ↗</button>
     </div>
     <p class="muted small">${tr('Avec Google Agenda ou Outlook, le titre et la date du rappel sont envoyés à ce service, comme pour tout évènement de mon agenda. Rien d’autre de mon plan.', 'With Google Calendar or Outlook, the reminder’s title and date are sent to that service, like any event in my calendar. Nothing else from my plan.')}</p>
@@ -1882,8 +1879,7 @@ function reminderDialog() {
     remember();
     const title = plan.data.rappel.title;
     const links = reminderLinks(dateEl.value, title, desc);
-    if (a === 'android') location.href = links.android;
-    else if (a === 'google' || a === 'outlook') window.open(links[a], '_blank', 'noopener');
+    if (a === 'google' || a === 'outlook') window.open(links[a], '_blank', 'noopener');
     else {
       const file = new File([reminderIcs(dateEl.value, title, desc)], tr('rappel-relecture.ics', 'review-reminder.ics'), { type: 'text/calendar' });
       if (env.isIos) {
