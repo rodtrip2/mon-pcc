@@ -14,6 +14,7 @@ import { COUNTRIES, countryData } from './resources.js';
 import { parseEmbed, fetchTitle } from './embed.js';
 import { exercises, exerciseById, exerciseUrl, offlineStatus, prepareOffline } from './exercises.js';
 import { renderCrisisCard, toJpeg, crisisCardPdf } from './crisiscard.js';
+import { ttsReady, ttsAvailable, speak, stopSpeaking, dictationPref, setDictationPref, dictationSupported, localCheckSupported, localStatus, dictationOn, dictateInto } from './voice.js';
 
 initLocale();
 
@@ -168,6 +169,7 @@ function route() {
   document.body.dataset.page = page || 'accueil';
   closeMenu();
   if (!$('#exercise').hidden) closeExercise();
+  stopSpeaking();
   switch (page) {
     case '': case 'accueil': renderHome(); break;
     case 'demarche': renderProcess(); break;
@@ -339,7 +341,7 @@ function renderStep(i) {
       <div class="bar" aria-hidden="true"><span style="width:${pct}%"></span></div>
     </div>
     <h1>${esc(step.title)}</h1>
-    <blockquote class="question"><span class="q-label">${qLabel}</span>${esc(step.question)}</blockquote>
+    <blockquote class="question"><span class="q-label">${qLabel}</span>${esc(step.question)}${speakBtnHTML()}</blockquote>
     <details class="tip"><summary>${tr('Conseil', 'Tip')}</summary><p>${esc(step.tip)}</p></details>
     ${talkNoteHTML(step)}
     ${warn}
@@ -348,6 +350,7 @@ function renderStep(i) {
       ${i > 0 ? `<a class="btn btn-ghost" href="#/etape/${i - 1}">${tr('← Précédent', '← Previous')}</a>` : `<a class="btn btn-ghost" href="#/demarche">${tr('← Démarche', '← How it works')}</a>`}
       ${i < STEPS.length - 1 ? `<a class="btn btn-primary" href="#/etape/${i + 1}">${tr('Suivant →', 'Next →')}</a>` : `<a class="btn btn-primary" href="#/plan">${tr('Voir mon plan →', 'See my plan →')}</a>`}
     </div>`;
+  revealSpeak();
 }
 
 function identityHTML() {
@@ -404,6 +407,7 @@ function listGroupHTML(step, g) {
     <form class="free" data-act="free" data-g="${g.id}">
       <label class="sr-only" for="free-${g.id}">${tr('Écrire avec mes mots', 'Write in my own words')}</label>
       <input id="free-${g.id}" data-fk="free:${g.id}" placeholder="${tr('Écrire avec mes mots…', 'Write in my own words…')}" autocomplete="off">
+      ${micBtnHTML(`free-${g.id}`)}
       <button class="btn btn-secondary btn-sm">${tr('Ajouter', 'Add')}</button>
     </form>
     ${suggestionsHTML(step, g, (s) => arr.includes(s))}
@@ -1127,6 +1131,7 @@ async function quoteDialog() {
     title: tr('❝ Ajouter une citation', '❝ Add a quote'),
     body: `<label class="field"><span>${tr('Une citation, une phrase qui m’aide', 'A quote, a phrase that helps me')}</span>
         <textarea id="tb-qtext" rows="3" placeholder="${tr('Avec mes mots, ou une phrase que j’aime…', 'In my own words, or a phrase I like…')}"></textarea></label>
+      ${micBtnHTML('tb-qtext', 'mic-corner')}
       <label class="field"><span>${tr('Auteur (facultatif)', 'Author (optional)')}</span><input id="tb-qauthor" autocomplete="off" placeholder="${tr('Ex. : ma grand-mère, un livre, une chanson…', 'E.g. my grandmother, a book, a song…')}"></label>
       <p class="error small" id="tb-q-err" hidden>${tr('J’écris d’abord la citation, ou j’en choisis une dans les exemples.', 'First write the quote, or choose one from the examples.')}</p>
       <div class="sugg">
@@ -1870,13 +1875,81 @@ function renderPros() {
     </section>`;
 }
 
+/* ---------- voix : lecture à voix haute et dictée ---------- */
+
+function speakBtnHTML() {
+  return `<button type="button" class="icon tts-btn" data-act="speak" aria-pressed="false" aria-label="${tr('Lire à voix haute', 'Read aloud')}" title="${tr('Lire à voix haute', 'Read aloud')}" hidden>🔊</button>`;
+}
+function micBtnHTML(target, cls = '') {
+  if (!dictationOn()) return '';
+  return `<button type="button" class="icon mic-btn ${cls}" data-act="dictate" data-target="${esc(target)}" aria-pressed="false" aria-label="${tr('Dicter', 'Dictate')}" title="${tr('Dicter', 'Dictate')}">🎙</button>`;
+}
+/** Affiche les boutons 🔊 seulement si une voix est installée sur l'appareil */
+function revealSpeak() {
+  ttsReady().then((ok) => { if (ok) document.querySelectorAll('.tts-btn').forEach((b) => { b.hidden = false; }); });
+}
+
+async function voiceSectionHTML() {
+  const mode = dictationPref();
+  const st = localCheckSupported() ? await localStatus() : 'unknown';
+  const localTxt = {
+    available: tr('✓ Disponible sur ce téléphone.', '✓ Available on this phone.'),
+    downloadable: tr('Disponible après un téléchargement unique de la langue (fait au premier usage).', 'Available after a one-time language download (done on first use).'),
+    downloading: tr('Téléchargement de la langue en cours…', 'Language download in progress…'),
+    unavailable: tr('Non disponible dans ce navigateur pour cette langue.', 'Not available in this browser for this language.'),
+    unknown: tr('Ce navigateur ne permet pas la dictée sur l’appareil (essayer une version récente de Chrome).', 'This browser does not support on-device dictation (try a recent version of Chrome).'),
+  }[st] || '';
+  return `<section class="card" id="voix">
+      <h2>🔊 ${tr('Voix', 'Voice')}</h2>
+      <p class="small"><strong>${tr('Lecture à voix haute', 'Read aloud')}</strong> — ${ttsAvailable() ? tr('le bouton 🔊 lit chaque question avec une voix installée sur ce téléphone : aucun texte n’est envoyé.', 'the 🔊 button reads each question with a voice installed on this phone: no text is sent.') : tr('aucune voix n’est installée sur ce téléphone pour cette langue : le bouton 🔊 n’apparaît pas (Mon PCC n’utilise jamais de voix en ligne).', 'no voice is installed on this phone for this language: the 🔊 button does not appear (Mon PCC never uses online voices).')}</p>
+      <fieldset class="choice"><legend class="small"><strong>${tr('Dictée vocale', 'Voice dictation')}</strong> ${tr('(désactivée par défaut)', '(off by default)')}</legend>
+        ${!dictationSupported() ? `<p class="muted small">${tr('Ce navigateur ne propose pas la dictée.', 'This browser does not offer dictation.')}</p>` : `
+        <label class="radio"><input type="radio" name="dict" value="off" data-act="dictation" ${mode === 'off' ? 'checked' : ''}> <span>${tr('Désactivée', 'Off')}</span></label>
+        <label class="radio"><input type="radio" name="dict" value="local" data-act="dictation" ${mode === 'local' ? 'checked' : ''}> <span><strong>${tr('Sur ce téléphone uniquement', 'On this phone only')}</strong> ${tr('(recommandé)', '(recommended)')}<br><span class="muted small">${tr('Ma voix est transformée en texte sur le téléphone, sans être envoyée.', 'My voice is turned into text on the phone, without being sent.')} ${localTxt}</span></span></label>
+        <label class="radio"><input type="radio" name="dict" value="online" data-act="dictation" ${mode === 'online' ? 'checked' : ''}> <span><strong>${tr('Autoriser la dictée en ligne', 'Allow online dictation')}</strong><br><span class="muted small">${tr('⚠ Ma voix est envoyée aux serveurs de l’éditeur du navigateur.', '⚠ My voice is sent to the browser maker’s servers.')}</span></span></label>`}
+      </fieldset>
+    </section>`;
+}
+
+async function confirmOnlineDictation() {
+  return modal({
+    title: tr('Autoriser la dictée en ligne ?', 'Allow online dictation?'),
+    body: `<div class="warn small"><p><strong>${tr('Cette option va à l’encontre du principe de Mon PCC : rien ne quitte mon téléphone.', 'This option goes against Mon PCC’s principle that nothing leaves my phone.')}</strong></p>
+      <ul><li>${tr('Quand je dicte, <strong>ma voix est envoyée aux serveurs de l’éditeur de mon navigateur</strong> (Google pour Chrome, Apple pour Safari…) pour être transformée en texte.', 'When I dictate, <strong>my voice is sent to my browser maker’s servers</strong> (Google for Chrome, Apple for Safari…) to be turned into text.')}</li>
+      <li>${tr('Ce que je dis peut contenir des <strong>informations de santé</strong>. Mon PCC ne contrôle pas ce traitement ni sa conservation.', 'What I say may contain <strong>health information</strong>. Mon PCC does not control how it is processed or kept.')}</li>
+      <li>${tr('Je peux revenir à « Sur ce téléphone uniquement » ou « Désactivée » à tout moment.', 'I can switch back to “On this phone only” or “Off” at any time.')}</li></ul></div>`,
+    ok: tr('J’ai compris, autoriser', 'I understand, allow'),
+    danger: true,
+  });
+}
+
+async function runDictation(btn) {
+  if (btn.getAttribute('aria-pressed') === 'true') return; // l'appui arrête l'écoute
+  const input = document.getElementById(btn.dataset.target);
+  if (!input) return;
+  stopSpeaking();
+  const r = await dictateInto(input, btn, (st) => {
+    if (st === 'installing') toast(tr('Téléchargement de la langue pour la dictée sur le téléphone…', 'Downloading the language for on-device dictation…'));
+    if (st === 'listening') toast(tr('Je parle… (toucher 🎙 pour arrêter)', 'Speak now… (tap 🎙 to stop)'));
+  });
+  const msg = {
+    'no-local': tr('La dictée sur le téléphone n’est pas disponible ici. Aucune voix n’a été envoyée.', 'On-device dictation is not available here. No voice was sent.'),
+    'need-install': tr('La langue de dictée n’est pas encore prête sur ce téléphone. Réessayer dans un moment.', 'The dictation language is not ready on this phone yet. Try again shortly.'),
+    denied: tr('Le micro n’est pas autorisé pour Mon PCC.', 'The microphone is not allowed for Mon PCC.'),
+    error: tr('La dictée n’a pas fonctionné.', 'Dictation did not work.'),
+  }[r];
+  if (msg) toast(msg);
+  input.focus();
+}
+
 /* ---------- préparer l'entretien avec le soignant ---------- */
 
 /** Notes « à aborder avec mon soignant » d'une étape (jamais dans le plan imprimé ou envoyé) */
 function talkNoteHTML(step) {
   const v = plan.data.notes?.[step.id] || '';
   return `<details class="talk" ${v ? 'open' : ''}><summary>💬 ${tr('À aborder avec mon soignant', 'To discuss with my professional')}</summary>
-    <textarea rows="2" data-note="${esc(step.id)}" data-fk="note:${esc(step.id)}" placeholder="${tr('Une question, un doute, un point à préciser ensemble…', 'A question, a doubt, something to clarify together…')}">${esc(v)}</textarea>
+    ${micBtnHTML(`note-${step.id}`, 'mic-corner')}
+    <textarea rows="2" id="note-${esc(step.id)}" data-note="${esc(step.id)}" data-fk="note:${esc(step.id)}" placeholder="${tr('Une question, un doute, un point à préciser ensemble…', 'A question, a doubt, something to clarify together…')}">${esc(v)}</textarea>
     <p class="muted small">${tr('Ces notes restent sur ce téléphone : elles ne figurent pas dans le plan imprimé ou envoyé.', 'These notes stay on this phone: they are not included in the printed or sent plan.')} <a href="#/entretien">${tr('Toutes mes notes', 'All my notes')}</a></p></details>`;
 }
 
@@ -2171,6 +2244,7 @@ function renderSettings() {
   app.innerHTML = `
     <h1>${tr('Réglages', 'Settings')}</h1>
     ${localeSectionHTML()}
+    <div id="voice-slot"></div>
     <section class="card" id="affichage">
       <h2>🔠 ${tr('Taille du texte', 'Text size')}</h2>
       <div class="choice">${[['m', tr('Normale', 'Normal')], ['l', tr('Grande', 'Large')], ['xl', tr('Très grande', 'Extra large')]].map(([v, l]) => `<label class="radio"><input type="radio" name="text" value="${v}" data-act="text-size" ${textSize() === v ? 'checked' : ''}> <span>${l}</span></label>`).join('')}</div>
@@ -2241,6 +2315,7 @@ function renderSettings() {
       <button class="btn btn-danger" data-act="wipe">${tr('Tout effacer', 'Delete everything')}</button>
     </section>`;
   renderOfflineStatus();
+  voiceSectionHTML().then((h) => { const slot = $('#voice-slot'); if (slot) slot.outerHTML = h; });
 }
 
 /* ---------- pages d'information ---------- */
@@ -2945,6 +3020,13 @@ document.addEventListener('click', async (e) => {
     case 'print': window.print(); break;
     case 'pdf-save': pdfSave(); break;
     case 'review-ics': reviewIcs(); break;
+    case 'dictate': await runDictation(btn); break;
+    case 'speak': {
+      const q = btn.closest('.question');
+      const step = STEPS[parseInt(location.hash.split('/')[2], 10) || 0];
+      if (q && step) speak(`${step.title}. ${step.question}`, btn);
+      break;
+    }
     case 'text-big': {
       const v = textSize() === 'm' ? 'l' : 'm';
       try { localStorage.setItem(TEXT_KEY, v); } catch { /* ignoré */ }
@@ -3127,6 +3209,13 @@ document.addEventListener('change', async (e) => {
     setCountryPref(e.target.value || null);
     applyLocale();
     toast(`${country().flag} ${L(country().name)}`);
+    return;
+  }
+  if (act === 'dictation') {
+    const v = e.target.value;
+    if (v === 'online' && !(await confirmOnlineDictation())) { rerender(renderSettings); return; }
+    setDictationPref(v);
+    toast(v === 'off' ? tr('Dictée désactivée.', 'Dictation off.') : v === 'local' ? tr('Dictée sur le téléphone activée : un bouton 🎙 apparaît dans les champs de texte.', 'On-device dictation on: a 🎙 button appears in text fields.') : tr('Dictée en ligne autorisée.', 'Online dictation allowed.'));
     return;
   }
   if (act === 'text-size') {

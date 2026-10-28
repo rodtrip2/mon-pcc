@@ -532,3 +532,9 @@ html[data-text="xl"] { font-size: 132%; }
 html[data-text="l"] .save-state { font-size: .65rem; }
 html[data-text="xl"] .save-state { display: none; }
 .pro-steps li { margin: .5rem 0; line-height: 1.5; }
+.question { position: relative; }
+.tts-btn { float: right; width: 40px; height: 40px; margin: -.2rem -.2rem .2rem .5rem; }
+.tts-btn[aria-pressed="true"], .mic-btn[aria-pressed="true"] { background: var(--brand); color: #fff; border-color: var(--brand); }
+.free { align-items: center; }
+.mic-btn { width: 44px; height: 44px; flex: none; }
+.mic-corner { float: right; margin: .3rem 0 .3rem .5rem; }
